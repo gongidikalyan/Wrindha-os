@@ -77,8 +77,8 @@ export default function App() {
         supabase.from('profiles').upsert({ 
           id: session.user.id, 
           email: session.user.email,
-          full_name: session.user.user_metadata?.full_name || userName,
-          last_active: new Date().toISOString()
+          fullName: session.user.user_metadata?.full_name || userName,
+          lastActive: new Date().toISOString()
         }).then();
       }
     });
@@ -92,8 +92,8 @@ export default function App() {
         supabase.from('profiles').upsert({ 
           id: session.user.id, 
           email: session.user.email,
-          full_name: session.user.user_metadata?.full_name || userName,
-          last_active: new Date().toISOString()
+          fullName: session.user.user_metadata?.full_name || userName,
+          lastActive: new Date().toISOString()
         }).then();
       }
     });
