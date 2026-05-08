@@ -16,6 +16,8 @@ async function startServer() {
   app.use(express.json());
 
   // API Routes
+  console.log(`[Server] Running in ${process.env.NODE_ENV === 'production' ? 'PRODUCTION' : 'DEVELOPMENT'} mode`);
+  
   app.get("/api/health", (req, res) => {
     res.json({ 
       status: "ok", 
