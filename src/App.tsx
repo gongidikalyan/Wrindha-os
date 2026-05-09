@@ -538,9 +538,6 @@ function Footer({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
         </div>
       </div>
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-8 border-t border-gray-50 dark:border-gray-900">
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-          © 2024 Wrindha OS. All rights reserved.
-        </span>
         <div className="flex items-center gap-6">
            <button onClick={() => { setActiveTab('contact'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-black dark:hover:text-white transition-colors">Support</button>
            <button onClick={() => { setActiveTab('privacy'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-black dark:hover:text-white transition-colors">Privacy</button>
