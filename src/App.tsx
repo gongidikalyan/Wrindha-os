@@ -36,7 +36,12 @@ import {
   Trash2,
   Mail,
   RefreshCcw,
-  Clock
+  Clock,
+  Info,
+  Heart,
+  MessageCircle,
+  Scale,
+  Handshake
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn, formatCurrency, getStorage, setStorage } from "@/src/lib/utils";
@@ -53,6 +58,14 @@ const modules = [
   { id: 'study', name: 'Study Planner', icon: GraduationCap, color: 'text-indigo-500' },
   { id: 'finance', name: 'Expenses', icon: Wallet, color: 'text-emerald-500' },
   { id: 'timetable', name: 'Timetable', icon: Calendar, color: 'text-cyan-500' },
+];
+
+const infoModules = [
+  { id: 'about', name: 'About Us', icon: Info },
+  { id: 'contact', name: 'Contact Us', icon: MessageCircle },
+  { id: 'privacy', name: 'Privacy Policy', icon: ShieldCheck },
+  { id: 'disclaimer', name: 'Disclaimer', icon: AlertCircle },
+  { id: 'terms', name: 'Terms of Use', icon: Scale },
 ];
 
 export default function App() {
@@ -466,11 +479,79 @@ export default function App() {
                {activeTab === 'goals' && <GoalsView goals={goals} setGoals={setGoals} />}
                {activeTab === 'timetable' && <TimetableView entries={timetable} setEntries={setTimetable} theme={theme} />}
                {activeTab === 'admin' && isAdmin && <AdminView />}
+               {activeTab === 'about' && <AboutView />}
+               {activeTab === 'contact' && <ContactView />}
+               {activeTab === 'privacy' && <PrivacyView />}
+               {activeTab === 'disclaimer' && <DisclaimerView />}
+               {activeTab === 'terms' && <TermsView />}
              </motion.div>
            </AnimatePresence>
+
+           <Footer setActiveTab={setActiveTab} />
         </div>
       </main>
     </div>
+  );
+}
+
+function Footer({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
+  return (
+    <footer className="mt-20 py-12 border-t border-gray-100 dark:border-gray-800">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+        <div className="col-span-1 md:col-span-2">
+          <button 
+            onClick={() => { setActiveTab('dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className="flex items-center gap-3 mb-4 hover:opacity-80 transition-opacity"
+          >
+            <div className="w-8 h-8 bg-black dark:bg-indigo-600 rounded-lg flex items-center justify-center">
+              <BarChart3 className="text-white w-5 h-5" />
+            </div>
+            <span className="font-bold text-xl tracking-tight dark:text-white">Wrindha OS</span>
+          </button>
+          <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm leading-relaxed">
+            Empowering students to become more organized, productive, and focused in their daily lives through practical tech solutions.
+          </p>
+        </div>
+        <div>
+          <h4 className="font-bold text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-6">Product</h4>
+          <ul className="space-y-4">
+            {modules.slice(0, 4).map(m => (
+              <li key={m.id}>
+                <button onClick={() => { setActiveTab(m.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                  {m.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h4 className="font-bold text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-6">Legal & Info</h4>
+          <ul className="space-y-4">
+            {infoModules.map(m => (
+              <li key={m.id}>
+                <button onClick={() => { setActiveTab(m.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                  {m.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-8 border-t border-gray-50 dark:border-gray-900">
+        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+          © 2024 Wrindha OS. All rights reserved.
+        </span>
+        <div className="flex items-center gap-6">
+           <button onClick={() => { setActiveTab('contact'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-black dark:hover:text-white transition-colors">Support</button>
+           <button onClick={() => { setActiveTab('privacy'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-black dark:hover:text-white transition-colors">Privacy</button>
+           <div className="flex items-center gap-1">
+             <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">Made with</span>
+             <Heart className="w-2.5 h-2.5 text-rose-500 fill-rose-500" />
+             <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">by Kalyan</span>
+           </div>
+        </div>
+      </div>
+    </footer>
   );
 }
 
@@ -2098,6 +2179,271 @@ function PlaceholderView({ name }: { name: string }) {
         <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
         <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
       </div>
+    </div>
+  );
+}
+
+function AboutView() {
+  return (
+    <div className="max-w-4xl mx-auto py-12">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-12"
+      >
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <Info className="w-8 h-8 text-indigo-600" />
+          </div>
+          <h1 className="text-5xl font-black dark:text-white tracking-tight">About Us</h1>
+          <p className="text-xl text-gray-500 dark:text-gray-400 font-medium">Empowering the next generation of focused learners.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+            <div className="space-y-6">
+              <h2 className="text-3xl font-bold dark:text-white">The Mission</h2>
+              <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-lg">
+                Welcome to <span className="font-bold text-indigo-600">Wrindha OS</span>. My name is <span className="font-bold dark:text-white">Kalyan</span>, and I'm a B.Tech student passionate about bridging the gap between raw potential and structured execution.
+              </p>
+              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                As a student myself, I realized that the hurdles to academic success aren't just about intelligence, but about organization and consistency. This platform was born from that necessity.
+              </p>
+            </div>
+            <div className="bg-white dark:bg-gray-900 p-8 rounded-[3rem] border border-gray-100 dark:border-gray-800 shadow-xl">
+               <h3 className="font-bold text-indigo-600 uppercase tracking-widest text-xs mb-6">Built-in Modules</h3>
+               <div className="grid grid-cols-2 gap-4">
+                 {[
+                   { name: 'Study Planner', icon: GraduationCap },
+                   { name: 'Habit Tracker', icon: Flame },
+                   { name: 'Expense Tracker', icon: Wallet },
+                   { name: 'Goal Setting', icon: Target },
+                   { name: 'Matrix Mode', icon: Brain },
+                   { name: 'Timetable', icon: Calendar }
+                 ].map(item => (
+                   <div key={item.name} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl">
+                     <item.icon className="w-4 h-4 text-gray-400" />
+                     <span className="text-xs font-bold dark:text-gray-300">{item.name}</span>
+                   </div>
+                 ))}
+               </div>
+            </div>
+        </div>
+
+        <div className="bg-black dark:bg-indigo-600 rounded-[3rem] p-12 text-white relative overflow-hidden">
+          <div className="relative z-10">
+            <h2 className="text-3xl font-bold mb-6">Our Vision</h2>
+            <p className="text-lg opacity-80 leading-relaxed max-w-2xl">
+              "Our mission is to help students become more organized, productive, and focused in their daily lives. We believe that by providing practical tools, we can help reduce the friction of planning and allow the focus to remain on learning."
+            </p>
+          </div>
+          <div className="absolute right-0 top-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function ContactView() {
+  return (
+    <div className="max-w-4xl mx-auto py-12">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-12"
+      >
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <MessageCircle className="w-8 h-8 text-emerald-600" />
+          </div>
+          <h1 className="text-5xl font-black dark:text-white tracking-tight">Contact Us</h1>
+          <p className="text-xl text-gray-500 dark:text-gray-400 font-medium">We're here to help if you have any questions.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="md:col-span-2 bg-white dark:bg-gray-900 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-800 shadow-sm space-y-8">
+            <h2 className="text-2xl font-bold dark:text-white">Send a Message</h2>
+            <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Full Name</label>
+                  <input type="text" className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white px-5 py-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all" placeholder="Enter your name" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Email Address</label>
+                  <input type="email" className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white px-5 py-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all" placeholder="your@email.com" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                   <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Message</label>
+                   <textarea rows={4} className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white px-5 py-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all resize-none" placeholder="How can we help?"></textarea>
+              </div>
+              <button type="submit" className="w-full bg-black dark:bg-indigo-600 text-white py-4 rounded-2xl font-bold uppercase tracking-widest text-xs hover:scale-[1.02] active:scale-[0.98] transition-all">Send Message</button>
+            </form>
+          </div>
+
+          <div className="space-y-6">
+            <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col items-center text-center">
+               <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl mb-4">
+                 <Mail className="w-6 h-6 text-gray-400" />
+               </div>
+               <h3 className="font-bold text-sm mb-1 dark:text-white">Email Us</h3>
+               <p className="text-xs text-gray-400 mb-4">For all inquiries</p>
+               <a href="mailto:wrindhaos@gmail.com" className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline">wrindhaos@gmail.com</a>
+            </div>
+            <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col items-center text-center">
+               <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl mb-4">
+                 <Clock className="w-6 h-6 text-gray-400" />
+               </div>
+               <h3 className="font-bold text-sm mb-1 dark:text-white">Response Time</h3>
+               <p className="text-xs text-gray-400 leading-relaxed px-4">
+                 We usually respond within <span className="text-indigo-600 font-bold">24–48 hours</span>.
+               </p>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function PrivacyView() {
+  return (
+    <div className="max-w-3xl mx-auto py-12">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="bg-white dark:bg-gray-900 p-12 rounded-[3.5rem] border border-gray-100 dark:border-gray-800 shadow-xl space-y-10"
+      >
+        <div className="flex items-center gap-6 pb-8 border-b border-gray-50 dark:border-gray-800">
+          <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/20 rounded-[1.5rem] flex items-center justify-center">
+            <ShieldCheck className="w-8 h-8 text-indigo-600" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-black dark:text-white">Privacy Policy</h1>
+            <p className="text-gray-400 font-medium">Effective Date: May 9, 2026</p>
+          </div>
+        </div>
+
+        <section className="space-y-4">
+          <h2 className="text-xl font-bold dark:text-white flex items-center gap-2">
+            <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+            Data Collection
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+            At Wrindha OS, we value your privacy. We strictly limit the data we collect to what is necessary for providing a high-quality experience. This may include:
+          </p>
+          <ul className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-4">
+            {['Browser type', 'Device information', 'Cookies', 'Usage analytics'].map(item => (
+              <li key={item} className="flex items-center gap-2 text-sm text-gray-500">
+                <CheckCircle2 className="w-3 h-3 text-emerald-500" /> {item}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-xl font-bold dark:text-white flex items-center gap-2">
+            <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+            Third-Party Services
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-sm">
+            Third-party services such as <span className="font-bold">Google Analytics</span> and <span className="font-bold">Google AdSense</span> may use cookies to serve personalized content and advertisements. We do not sell personal information to third parties.
+          </p>
+        </section>
+
+        <div className="p-8 bg-gray-50 dark:bg-gray-800/50 rounded-3xl border border-gray-100 dark:border-gray-700">
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-300 italic text-center">
+            "By using our website, you agree to this privacy policy."
+          </p>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function DisclaimerView() {
+  return (
+    <div className="max-w-3xl mx-auto py-12">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="bg-[#FFFBEB] dark:bg-amber-900/10 p-12 rounded-[3.5rem] border-2 border-amber-200 dark:border-amber-900/30 space-y-8"
+      >
+        <div className="flex items-center gap-6">
+          <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/40 rounded-[2rem] flex items-center justify-center">
+            <AlertCircle className="w-8 h-8 text-amber-600" />
+          </div>
+          <h1 className="text-4xl font-black text-amber-900 dark:text-amber-100">Disclaimer</h1>
+        </div>
+
+        <div className="space-y-6 text-amber-900/80 dark:text-amber-100/60 leading-relaxed text-lg">
+          <p>
+            The tools, calculators, planners, trackers, and educational content available on this website are provided for <span className="font-bold text-amber-700 dark:text-amber-400 underline decoration-amber-300">informational and productivity purposes only</span>.
+          </p>
+          <p>
+            While we strive for accuracy, we do not guarantee completeness or suitability for every individual situation. Users are responsible for how they use the information and tools provided on this website.
+          </p>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function TermsView() {
+  return (
+    <div className="max-w-3xl mx-auto py-12">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="bg-white dark:bg-gray-900 p-12 rounded-[3.5rem] border border-gray-100 dark:border-gray-800 shadow-xl space-y-12"
+      >
+        <div className="text-center">
+          <Scale className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h1 className="text-4xl font-black dark:text-white">Terms & Conditions</h1>
+          <p className="text-gray-400 mt-2 font-medium uppercase tracking-widest text-[10px]">Your agreement with Wrindha OS</p>
+        </div>
+
+        <div className="space-y-8">
+          {[
+            { 
+              title: "Lawful Usage", 
+              desc: "Use this website only for lawful purposes in accordance with local and international regulations.",
+              icon: Handshake
+            },
+            { 
+              title: "Acceptable Use", 
+              desc: "Do not attempt to misuse, copy, or disrupt our services or infrastructure.",
+              icon: X
+            },
+            { 
+              title: "Intellectual Property", 
+              desc: "All content, tools, and designs belong to Wrindha OS and its creators.",
+              icon: Lock
+            },
+            { 
+              title: "Modifications", 
+              desc: "We reserve the right to update or modify services and these terms without prior notice.",
+              icon: RefreshCcw
+            }
+          ].map((term, i) => (
+            <div key={i} className="flex gap-6 p-6 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-[2rem] transition-all group">
+              <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-800 border-2 border-transparent group-hover:border-indigo-600/30 flex items-center justify-center shrink-0 transition-all">
+                <term.icon className="w-5 h-5 text-gray-400 group-hover:text-indigo-600" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-bold text-lg dark:text-gray-200">{term.title}</h3>
+                <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">{term.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="pt-8 border-t border-gray-50 dark:border-gray-800 text-center">
+          <p className="text-xs text-gray-400">
+            "Continued use of this website means acceptance of these terms."
+          </p>
+        </div>
+      </motion.div>
     </div>
   );
 }
