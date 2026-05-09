@@ -77,6 +77,11 @@ export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('wrindha_theme') as 'light' | 'dark') || 'light');
   const [showSettings, setShowSettings] = useState(false);
   const [session, setSession] = useState<any>(null);
+  const [bypassConfig, setBypassConfig] = useState(() => localStorage.getItem('wrindha_bypass_config') === 'true');
+
+  useEffect(() => {
+    localStorage.setItem('wrindha_bypass_config', bypassConfig.toString());
+  }, [bypassConfig]);
 
   const isAdmin = session?.user?.email === 'gongidikalyan08@gmail.com';
 
@@ -86,13 +91,13 @@ export default function App() {
       if (session?.user?.user_metadata?.full_name) {
         setUserName(session.user.user_metadata.full_name);
       }
-      if (session?.user) {
+      if (session?.user && !bypassConfig) {
         // Track profile for admin stats
         supabase.from('profiles').upsert({ 
           id: session.user.id, 
           email: session.user.email,
-          fullName: session.user.user_metadata?.full_name || userName,
-          lastActive: new Date().toISOString()
+          full_name: session.user.user_metadata?.full_name || userName,
+          last_active: new Date().toISOString()
         }).then();
       }
     });
@@ -102,18 +107,18 @@ export default function App() {
       if (session?.user?.user_metadata?.full_name) {
         setUserName(session.user.user_metadata.full_name);
       }
-      if (session?.user) {
+      if (session?.user && !bypassConfig) {
         supabase.from('profiles').upsert({ 
           id: session.user.id, 
           email: session.user.email,
-          fullName: session.user.user_metadata?.full_name || userName,
-          lastActive: new Date().toISOString()
+          full_name: session.user.user_metadata?.full_name || userName,
+          last_active: new Date().toISOString()
         }).then();
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [userName]);
+  }, [userName, bypassConfig]);
 
   useEffect(() => {
     localStorage.setItem('wrindha_user_name', userName);
@@ -174,11 +179,6 @@ export default function App() {
   });
 
   const [isInitializing, setIsInitializing] = useState(true);
-  const [bypassConfig, setBypassConfig] = useState(() => localStorage.getItem('wrindha_bypass_config') === 'true');
-
-  useEffect(() => {
-    localStorage.setItem('wrindha_bypass_config', bypassConfig.toString());
-  }, [bypassConfig]);
 
   // Initial Fetch from Supabase
   useEffect(() => {
@@ -191,22 +191,37 @@ export default function App() {
       const userId = session.user.id;
 
       try {
-        const { data: habitsData } = await supabase.from('habits').select('*').eq('userId', userId);
-        if (habitsData && habitsData.length > 0) setHabits(habitsData);
+        const { data: habitsData } = await supabase.from('habits').select('*').eq('user_id', userId);
+        if (habitsData && habitsData.length > 0) {
+          setHabits(habitsData.map(h => ({
+            ...h,
+            completedAt: h.completed_at || h.completedAt || []
+          })));
+        }
 
-        const { data: tasksData } = await supabase.from('tasks').select('*').eq('userId', userId);
-        if (tasksData && tasksData.length > 0) setTasks(tasksData);
+        const { data: tasksData } = await supabase.from('tasks').select('*').eq('user_id', userId);
+        if (tasksData && tasksData.length > 0) {
+          setTasks(tasksData.map(t => ({
+            ...t,
+            dueDate: t.due_date || t.dueDate
+          })));
+        }
 
-        const { data: expensesData } = await supabase.from('expenses').select('*').eq('userId', userId);
+        const { data: expensesData } = await supabase.from('expenses').select('*').eq('user_id', userId);
         if (expensesData && expensesData.length > 0) setExpenses(expensesData);
 
-        const { data: goalsData } = await supabase.from('goals').select('*').eq('userId', userId);
-        if (goalsData && goalsData.length > 0) setGoals(goalsData);
+        const { data: goalsData } = await supabase.from('goals').select('*').eq('user_id', userId);
+        if (goalsData && goalsData.length > 0) {
+          setGoals(goalsData.map(g => ({
+            ...g,
+            targetDate: g.target_date || g.targetDate
+          })));
+        }
 
-        const { data: timetableData } = await supabase.from('timetable').select('*').eq('userId', userId);
+        const { data: timetableData } = await supabase.from('timetable').select('*').eq('user_id', userId);
         if (timetableData && timetableData.length > 0) setTimetable(timetableData);
 
-        const { data: studyData } = await supabase.from('study_courses').select('*').eq('userId', userId);
+        const { data: studyData } = await supabase.from('study_courses').select('*').eq('user_id', userId);
         if (studyData && studyData.length > 0) setStudyCourses(studyData);
       } catch (error) {
         console.error('Error fetching from Supabase:', error);
@@ -220,12 +235,21 @@ export default function App() {
 
   // Sync to Supabase helper
   const syncToSupabase = async (table: string, data: any) => {
-    if (!isSupabaseConfigured() || !session?.user?.id) return;
+    if (!isSupabaseConfigured() || !session?.user?.id || bypassConfig) return;
     try {
-      // Add userId to each item before upserting
+      // Add user_id to each item before upserting and map camelCase to snake_case if needed
+      const mapItem = (item: any) => {
+        const mapped = { ...item, user_id: session.user.id };
+        // Handle common camelCase to snake_case mapping
+        if (mapped.completedAt) { mapped.completed_at = mapped.completedAt; delete mapped.completedAt; }
+        if (mapped.dueDate) { mapped.due_date = mapped.dueDate; delete mapped.dueDate; }
+        if (mapped.targetDate) { mapped.target_date = mapped.targetDate; delete mapped.targetDate; }
+        return mapped;
+      };
+
       const dataWithUser = Array.isArray(data) 
-        ? data.map(item => ({ ...item, userId: session.user.id }))
-        : { ...data, userId: session.user.id };
+        ? data.map(mapItem)
+        : mapItem(data);
         
       await supabase.from(table).upsert(dataWithUser);
     } catch (error) {
@@ -578,7 +602,7 @@ function AuthView() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -586,10 +610,20 @@ function AuthView() {
           }
         });
         if (error) throw error;
-        alert("Check your email for confirmation!");
+        
+        if (data.session) {
+           // User signed in immediately (email confirmation might be off)
+        } else {
+           alert("Space created! Please check your email inbox to confirm your account and enable data syncing.");
+        }
       }
     } catch (err: any) {
-      setError(err.message);
+      console.error("Auth error details:", err);
+      if (err.message === "Database error saving new user") {
+        setError("System configuration issue. Please copy the SQL from `supabase_schema.sql` into your Supabase SQL Editor and run it.");
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -772,7 +806,7 @@ function AdminView() {
       const { data: profileData, count, error } = await supabase
         .from('profiles')
         .select('*', { count: 'exact' })
-        .order('lastActive', { ascending: false });
+        .order('last_active', { ascending: false });
       
       if (error) throw error;
       setUsers(profileData || []);

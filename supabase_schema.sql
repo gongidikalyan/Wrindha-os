@@ -2,79 +2,79 @@
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
-    "fullName" TEXT,
-    "lastActive" TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
-    "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+    full_name TEXT,
+    last_active TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
 -- 2. Habits Table
 CREATE TABLE IF NOT EXISTS public.habits (
     id TEXT PRIMARY KEY,
-    "userId" UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
     name TEXT NOT NULL,
     frequency TEXT CHECK (frequency IN ('daily', 'weekly')),
     streak INTEGER DEFAULT 0,
-    "completedAt" TEXT[] DEFAULT '{}',
+    completed_at TEXT[] DEFAULT '{}',
     color TEXT,
-    "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
 -- 3. Tasks Table
 CREATE TABLE IF NOT EXISTS public.tasks (
     id TEXT PRIMARY KEY,
-    "userId" UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
     title TEXT NOT NULL,
     description TEXT,
     completed BOOLEAN DEFAULT false,
     quadrant TEXT CHECK (quadrant IN ('UI', 'NUI', 'UNI', 'NUNI')),
-    "dueDate" TEXT,
+    due_date TEXT,
     tags TEXT[] DEFAULT '{}',
-    "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
 -- 4. Expenses Table
 CREATE TABLE IF NOT EXISTS public.expenses (
     id TEXT PRIMARY KEY,
-    "userId" UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
     amount DECIMAL NOT NULL,
     category TEXT NOT NULL,
     date TEXT NOT NULL,
     note TEXT,
-    "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
 -- 5. Goals Table
 CREATE TABLE IF NOT EXISTS public.goals (
     id TEXT PRIMARY KEY,
-    "userId" UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
     title TEXT NOT NULL,
     type TEXT,
     progress INTEGER DEFAULT 0,
-    "targetDate" TEXT,
-    "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+    target_date TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
 -- 6. Timetable Table
 CREATE TABLE IF NOT EXISTS public.timetable (
     id TEXT PRIMARY KEY,
-    "userId" UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
     type TEXT,
     title TEXT NOT NULL,
     date TEXT NOT NULL,
     color TEXT,
-    "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
 -- 7. Study Courses Table
 CREATE TABLE IF NOT EXISTS public.study_courses (
     id TEXT PRIMARY KEY,
-    "userId" UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
     name TEXT NOT NULL,
     progress INTEGER DEFAULT 0,
     color TEXT,
     exams JSONB DEFAULT '[]',
     materials JSONB DEFAULT '[]',
-    "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
 -- --- SECURITY SETUP (RLS) ---
@@ -91,38 +91,42 @@ ALTER TABLE public.study_courses ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view their own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Users can update their own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
 CREATE POLICY "Public profile count" ON public.profiles FOR SELECT USING (true); 
+-- Allow system to insert via trigger, but we also allow user to upsert if needed (though trigger is better)
+CREATE POLICY "Users can insert their own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- Policies for Habits
 CREATE POLICY "Users can manage their own habits" ON public.habits
-    FOR ALL USING (auth.uid() = "userId");
+    FOR ALL USING (auth.uid() = user_id);
 
 -- Policies for Tasks
 CREATE POLICY "Users can manage their own tasks" ON public.tasks
-    FOR ALL USING (auth.uid() = "userId");
+    FOR ALL USING (auth.uid() = user_id);
 
 -- Policies for Expenses
 CREATE POLICY "Users can manage their own expenses" ON public.expenses
-    FOR ALL USING (auth.uid() = "userId");
+    FOR ALL USING (auth.uid() = user_id);
 
 -- Policies for Goals
 CREATE POLICY "Users can manage their own goals" ON public.goals
-    FOR ALL USING (auth.uid() = "userId");
+    FOR ALL USING (auth.uid() = user_id);
 
 -- Policies for Timetable
 CREATE POLICY "Users can manage their own timetable" ON public.timetable
-    FOR ALL USING (auth.uid() = "userId");
+    FOR ALL USING (auth.uid() = user_id);
 
 -- Policies for Study Courses
 CREATE POLICY "Users can manage their own study courses" ON public.study_courses
-    FOR ALL USING (auth.uid() = "userId");
+    FOR ALL USING (auth.uid() = user_id);
 
 -- --- AUTOMATIC PROFILE CREATION ---
 CREATE OR REPLACE FUNCTION public.handle_new_user() 
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, "fullName")
-  VALUES (new.id, new.email, new.raw_user_meta_data->>'full_name');
+  INSERT INTO public.profiles (id, email, full_name)
+  VALUES (new.id, new.email, COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'fullName'));
   RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  RETURN NEW; -- Ensure auth creation doesn't fail if profile creation fails
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
