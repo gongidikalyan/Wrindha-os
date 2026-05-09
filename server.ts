@@ -16,8 +16,16 @@ async function startServer() {
   app.use(express.json());
 
   // API Routes
-  console.log(`[Server] Running in ${process.env.NODE_ENV === 'production' ? 'PRODUCTION' : 'DEVELOPMENT'} mode`);
+  console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`[Server] Supabase Configured: ${!!process.env.VITE_SUPABASE_URL}`);
   
+  app.use((req, res, next) => {
+    if (req.url.startsWith('/api') || req.url.includes('main.tsx')) {
+      console.log(`[Request] ${req.method} ${req.url}`);
+    }
+    next();
+  });
+
   app.get("/api/health", (req, res) => {
     res.json({ 
       status: "ok", 
