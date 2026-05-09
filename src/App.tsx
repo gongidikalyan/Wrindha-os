@@ -47,7 +47,8 @@ import { motion, AnimatePresence } from "motion/react";
 import { cn, formatCurrency, getStorage, setStorage } from "@/src/lib/utils";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { Task, EisenhowerQuadrant, Habit, Expense, Goal, GoalType, TimetableEntry, TimetableType, StudyCourse } from "./types";
-import { supabase, isSupabaseConfigured, getSupabaseError } from "./lib/supabase";
+import { supabase, isSupabaseConfigured, getSupabaseError, supabaseUrl } from "./lib/supabase";
+import { gemini } from "./services/geminiService";
 
 // Modules
 const modules = [
@@ -173,6 +174,11 @@ export default function App() {
   });
 
   const [isInitializing, setIsInitializing] = useState(true);
+  const [bypassConfig, setBypassConfig] = useState(() => localStorage.getItem('wrindha_bypass_config') === 'true');
+
+  useEffect(() => {
+    localStorage.setItem('wrindha_bypass_config', bypassConfig.toString());
+  }, [bypassConfig]);
 
   // Initial Fetch from Supabase
   useEffect(() => {
@@ -263,8 +269,8 @@ export default function App() {
     return <AuthView />;
   }
 
-  if (!session && configError) {
-    return <AuthConfigErrorView error={configError} />;
+  if (!session && configError && !bypassConfig) {
+    return <AuthConfigErrorView error={configError} onBypass={() => setBypassConfig(true)} />;
   }
 
   return (
@@ -471,7 +477,7 @@ export default function App() {
                exit={{ opacity: 0, y: -10 }}
                transition={{ duration: 0.2 }}
              >
-               {activeTab === 'dashboard' && <DashboardView habits={habits} tasks={tasks} expenses={expenses} currency={currency} userName={userName} setUserName={setUserName} theme={theme} />}
+               {activeTab === 'dashboard' && <DashboardView habits={habits} tasks={tasks} expenses={expenses} currency={currency} userName={userName} setUserName={setUserName} theme={theme} setActiveTab={setActiveTab} />}
                {activeTab === 'habits' && <HabitsView habits={habits} setHabits={setHabits} theme={theme} />}
                {activeTab === 'tasks' && <TasksView tasks={tasks} setTasks={setTasks} />}
                {activeTab === 'finance' && <FinanceView expenses={expenses} setExpenses={setExpenses} currency={currency} setCurrency={setCurrency} theme={theme} />}
@@ -677,7 +683,7 @@ function AuthView() {
   );
 }
 
-function AuthConfigErrorView({ error }: { error: string }) {
+function AuthConfigErrorView({ error, onBypass }: { error: string; onBypass?: () => void }) {
   return (
     <div className="min-h-screen bg-[#F8F9FA] dark:bg-gray-950 flex items-center justify-center p-6">
       <motion.div 
@@ -718,20 +724,25 @@ function AuthConfigErrorView({ error }: { error: string }) {
                 <span className="flex-shrink-0 w-5 h-5 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center text-[10px] font-bold">4</span>
                 <span>Open <strong>Settings</strong> in AI Studio and paste them into the environment variables.</span>
               </li>
-              <li className="flex gap-3 pt-2 text-xs opacity-70 italic">
-                Note: sb_publishable_... is a Stripe key and will not work for Supabase.
-              </li>
             </ol>
           </div>
 
           <div className="pt-6 border-t border-gray-100 dark:border-gray-800 flex flex-col gap-3">
             <p className="text-xs text-gray-400 text-center mb-2">Or continue without cloud sync:</p>
-            <button 
-              onClick={() => window.location.reload()} // Just reload to try local mode if they clear keys
-              className="w-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 py-4 rounded-2xl font-bold text-sm uppercase tracking-widest hover:bg-gray-200 transition-all"
-            >
-              Refresh App
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button 
+                onClick={onBypass}
+                className="flex-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 py-4 rounded-2xl font-bold text-sm uppercase tracking-widest hover:bg-gray-200 transition-all border-2 border-transparent transition-all"
+              >
+                Local Only
+              </button>
+              <button 
+                onClick={() => window.location.reload()}
+                className="flex-1 bg-black dark:bg-indigo-600 text-white py-4 rounded-2xl font-bold text-sm uppercase tracking-widest hover:opacity-90 transition-all"
+              >
+                Refresh App
+              </button>
+            </div>
           </div>
         </div>
       </motion.div>
@@ -1056,7 +1067,7 @@ function AdminView() {
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Endpoint URL</label>
                     <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl flex items-center justify-between border border-gray-100 dark:border-gray-700">
                        <span className="text-sm font-mono text-gray-600 dark:text-gray-400 truncate max-w-[200px]">
-                         {import.meta.env.VITE_SUPABASE_URL}
+                         {supabaseUrl}
                        </span>
                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                     </div>
@@ -1112,14 +1123,15 @@ function AdminView() {
 
 // --- Views ---
 
-function DashboardView({ habits, tasks, expenses, currency, userName, setUserName, theme }: { 
+function DashboardView({ habits, tasks, expenses, currency, userName, setUserName, theme, setActiveTab }: { 
   habits: Habit[], 
   tasks: Task[], 
   expenses: Expense[], 
   currency: 'USD' | 'INR', 
   userName: string,
   setUserName: (name: string) => void,
-  theme: 'light' | 'dark'
+  theme: 'light' | 'dark',
+  setActiveTab: (tab: string) => void
 }) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState(userName);
@@ -1149,6 +1161,28 @@ function DashboardView({ habits, tasks, expenses, currency, userName, setUserNam
       currency: currency === 'USD' ? 'USD' : 'INR',
     }).format(val);
   };
+
+  const [aiTips, setAiTips] = useState<string[]>([]);
+  const [loadingTips, setLoadingTips] = useState(false);
+
+  useEffect(() => {
+    async function fetchTips() {
+      setLoadingTips(true);
+      try {
+        const tips = await gemini.getAiSuggestions('Dashboard', { 
+          habits: habits.length, 
+          tasks: tasks.filter(t => !t.completed).length,
+          userName 
+        });
+        setAiTips(tips);
+      } catch (error) {
+        console.error("Dashboard tips error:", error);
+      } finally {
+        setLoadingTips(false);
+      }
+    }
+    fetchTips();
+  }, []);
 
   const priorityTasks = tasks.filter(t => t.quadrant === EisenhowerQuadrant.URGENT_IMPORTANT && !t.completed);
 
@@ -1219,7 +1253,36 @@ function DashboardView({ habits, tasks, expenses, currency, userName, setUserNam
                {priorityTasks.length === 0 && <p className="text-gray-400 dark:text-gray-600 text-sm">No critical tasks!</p>}
             </div>
           </div>
-          <button className="text-xs font-bold text-[#6B7280] dark:text-gray-500 uppercase tracking-widest mt-6 hover:text-black dark:hover:text-white transition-colors w-full text-left">View Matrix →</button>
+          <button onClick={() => setActiveTab('tasks')} className="text-xs font-bold text-[#6B7280] dark:text-gray-500 uppercase tracking-widest mt-6 hover:text-black dark:hover:text-white transition-colors w-full text-left">View Matrix →</button>
+        </div>
+
+        {/* AI Suggestions Card */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-indigo-100 dark:border-indigo-900 shadow-sm flex flex-col group overflow-hidden relative">
+          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+            <Sparkles className="w-20 h-20 text-indigo-600" />
+          </div>
+          <div className="p-2 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl w-fit mb-4">
+            <Brain className="w-6 h-6 text-indigo-600" />
+          </div>
+          <h3 className="text-lg font-bold dark:text-white">AI Strategy</h3>
+          <div className="mt-4 space-y-3 flex-1">
+            {loadingTips ? (
+              <div className="space-y-2">
+                <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded animate-pulse w-3/4"></div>
+                <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded animate-pulse w-1/2"></div>
+                <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded animate-pulse w-2/3"></div>
+              </div>
+            ) : aiTips.length > 0 ? (
+              aiTips.map((tip, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <ChevronRight className="w-3 h-3 mt-1 text-indigo-400 shrink-0" />
+                  <p className="text-xs text-gray-600 dark:text-gray-400 leading-snug">{tip}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-xs text-gray-400">Configure Gemini API key in settings for smart tips.</p>
+            )}
+          </div>
         </div>
 
         {/* Expenses Card */}

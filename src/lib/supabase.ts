@@ -1,10 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://lbthopvezqjcynkfpcnn.supabase.co';
+export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidGhvcHZlenFqY3lua2ZwY25uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyMTg4NDgsImV4cCI6MjA5Mzc5NDg0OH0.-fCSsMSyk1Ay_dDb0juQWhCObfKtzo6L01NhqueY7J8';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase credentials missing. Persistence will fall back to local storage.');
+if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+  console.log('Using fallback Supabase credentials.');
 }
 
 export const supabase = createClient(
