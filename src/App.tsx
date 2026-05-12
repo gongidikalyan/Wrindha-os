@@ -314,22 +314,39 @@ export default function App() {
         animate={{ width: isSidebarOpen ? 260 : 80 }}
         className="bg-white dark:bg-gray-900 border-r border-[#E5E7EB] dark:border-gray-800 flex flex-col z-50 shrink-0"
       >
-        <div className="p-6 flex items-center justify-between">
-          <div className={cn("flex items-center gap-3 transition-opacity duration-300", !isSidebarOpen && "opacity-0")}>
-            <div className="w-8 h-8 bg-black dark:bg-indigo-600 rounded-lg flex items-center justify-center">
+        <div className="h-20 flex items-center px-6">
+          <div className="flex items-center gap-3 w-full overflow-hidden">
+            <div 
+              onClick={() => !isSidebarOpen && setIsSidebarOpen(true)}
+              className={cn(
+                "w-9 h-9 bg-black dark:bg-indigo-600 rounded-xl flex items-center justify-center shrink-0 cursor-pointer shadow-lg shadow-black/5 transition-all active:scale-95",
+                !isSidebarOpen && "mx-auto hover:bg-indigo-600 dark:hover:bg-indigo-500"
+              )}
+            >
               <BarChart3 className="text-white w-5 h-5" />
             </div>
-            <div className="flex flex-col">
-              <span className="font-medium text-xl tracking-tight dark:text-white leading-none">Wrindha OS</span>
-              <span className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1">Beyond Limits. Built for Future.</span>
-            </div>
+            <AnimatePresence>
+              {isSidebarOpen && (
+                <motion.div 
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  className="flex flex-col min-w-0"
+                >
+                  <span className="font-medium text-lg tracking-tight dark:text-white leading-none whitespace-nowrap">Wrindha OS</span>
+                  <span className="text-[7px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1 whitespace-nowrap">Beyond Limits. Built for Future.</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-          <button 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className={cn("p-1 hover:bg-[#F3F4F6] dark:hover:bg-gray-800 rounded-md transition-colors", !isSidebarOpen && "hidden")}
-          >
-            <Menu className="w-5 h-5 dark:text-gray-400" />
-          </button>
+          {isSidebarOpen && (
+            <button 
+              onClick={() => setIsSidebarOpen(false)}
+              className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors ml-auto text-gray-400 hover:text-black dark:hover:text-white shrink-0"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
         <nav className="flex-1 px-4 space-y-1 mt-4">
@@ -543,7 +560,7 @@ function Footer({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
             </div>
             <div className="flex flex-col text-left">
               <span className="font-medium text-xl tracking-tight dark:text-white leading-none">Wrindha OS</span>
-              <span className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1">Beyond Limits. Built for Future.</span>
+              <span className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1.5 opacity-80">Beyond Limits. Built for Future.</span>
             </div>
           </button>
           <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm leading-relaxed">
@@ -656,7 +673,7 @@ function AuthView() {
               </div>
               <span className="font-medium text-3xl tracking-tight dark:text-white leading-none">Wrindha OS</span>
             </div>
-            <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Beyond Limits. Built for Future.</span>
+            <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1 opacity-80">Beyond Limits. Built for Future.</span>
           </div>
 
           <h2 className="text-3xl font-black mb-2 dark:text-white">
