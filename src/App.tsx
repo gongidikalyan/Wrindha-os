@@ -11,7 +11,6 @@ import {
   GraduationCap,
   Settings,
   Bell,
-  Search,
   Menu,
   X,
   Plus,
@@ -178,7 +177,17 @@ export default function App() {
     ];
   });
 
+  const [userBudget, setUserBudget] = useState<number>(() => {
+    const saved = localStorage.getItem('wrindha_budget');
+    return saved ? parseFloat(saved) : (currency === 'USD' ? 5000 : 400000);
+  });
+
   const [isInitializing, setIsInitializing] = useState(true);
+
+  // Persistence
+  useEffect(() => {
+    localStorage.setItem('wrindha_budget', userBudget.toString());
+  }, [userBudget]);
 
   // Initial Fetch from Supabase
   useEffect(() => {
@@ -314,9 +323,9 @@ export default function App() {
           </div>
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-1 hover:bg-[#F3F4F6] dark:hover:bg-gray-800 rounded-md transition-colors"
+            className={cn("p-1 hover:bg-[#F3F4F6] dark:hover:bg-gray-800 rounded-md transition-colors", !isSidebarOpen && "hidden")}
           >
-            {isSidebarOpen ? <Menu className="w-5 h-5 dark:text-gray-400" /> : <Menu className="mx-auto w-5 h-5 flex justify-center dark:text-gray-400" />}
+            <Menu className="w-5 h-5 dark:text-gray-400" />
           </button>
         </div>
 
@@ -465,14 +474,7 @@ export default function App() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 bg-[#F8F9FA] dark:bg-gray-950 overflow-y-auto transition-colors duration-300">
         <header className="h-16 border-b border-[#E5E7EB] dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md sticky top-0 z-40 px-8 flex items-center justify-between">
-          <div className="flex items-center gap-4 bg-[#F3F4F6] dark:bg-gray-800 px-3 py-1.5 rounded-full w-full max-w-md border border-transparent focus-within:border-black/10 dark:focus-within:border-white/10 transition-all">
-            <Search className="w-4 h-4 text-[#9CA3AF] dark:text-gray-500" />
-            <input 
-              type="text" 
-              placeholder="Search across modules..." 
-              className="bg-transparent border-none outline-none text-sm w-full dark:text-white dark:placeholder-gray-500"
-            />
-          </div>
+          <div className="flex-1"></div>
           <div className="flex items-center gap-4">
             {!session && (
               <button 
@@ -501,10 +503,10 @@ export default function App() {
                exit={{ opacity: 0, y: -10 }}
                transition={{ duration: 0.2 }}
              >
-               {activeTab === 'dashboard' && <DashboardView habits={habits} tasks={tasks} expenses={expenses} currency={currency} userName={userName} setUserName={setUserName} theme={theme} setActiveTab={setActiveTab} />}
+               {activeTab === 'dashboard' && <DashboardView habits={habits} tasks={tasks} expenses={expenses} currency={currency} userName={userName} setUserName={setUserName} theme={theme} setActiveTab={setActiveTab} budget={userBudget} />}
                {activeTab === 'habits' && <HabitsView habits={habits} setHabits={setHabits} theme={theme} />}
                {activeTab === 'tasks' && <TasksView tasks={tasks} setTasks={setTasks} />}
-               {activeTab === 'finance' && <FinanceView expenses={expenses} setExpenses={setExpenses} currency={currency} setCurrency={setCurrency} theme={theme} />}
+               {activeTab === 'finance' && <FinanceView expenses={expenses} setExpenses={setExpenses} currency={currency} setCurrency={setCurrency} theme={theme} budget={userBudget} setBudget={setUserBudget} />}
                {activeTab === 'study' && <StudyView courses={studyCourses} setCourses={setStudyCourses} />}
                {activeTab === 'goals' && <GoalsView goals={goals} setGoals={setGoals} />}
                {activeTab === 'timetable' && <TimetableView entries={timetable} setEntries={setTimetable} theme={theme} />}
@@ -717,6 +719,8 @@ function AuthView() {
   );
 }
 
+// --- Auth View ---
+
 function AuthConfigErrorView({ error, onBypass }: { error: string; onBypass?: () => void }) {
   return (
     <div className="min-h-screen bg-[#F8F9FA] dark:bg-gray-950 flex items-center justify-center p-6">
@@ -797,7 +801,7 @@ function AdminView() {
     setLoading(true);
     if (!isSupabaseConfigured()) {
       setUserCount(1);
-      setUsers([{ id: '1', email: 'local@instance.com', fullName: 'Local Admin', lastActive: new Date().toISOString() }]);
+      setUsers([{ id: '1', email: 'local@instance.com', full_name: 'Local Admin', last_active: new Date().toISOString() }]);
       setLoading(false);
       return;
     }
@@ -1007,16 +1011,7 @@ function AdminView() {
                   <h3 className="text-xl font-bold dark:text-white">User Management</h3>
                   <p className="text-sm text-gray-400">Monitoring {users.length} registered accounts.</p>
                </div>
-               <div className="flex gap-2">
-                  <div className="relative">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input 
-                      type="text" 
-                      placeholder="Search users..." 
-                      className="pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-800 rounded-xl text-sm border-none focus:ring-2 focus:ring-indigo-600 w-64"
-                    />
-                  </div>
-               </div>
+               <div className="flex gap-2"></div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -1043,10 +1038,10 @@ function AdminView() {
                         <td className="px-8 py-6">
                            <div className="flex items-center gap-4">
                               <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold">
-                                {user.fullName?.[0] || user.email[0].toUpperCase()}
+                                {user.full_name || user.fullName ? (user.full_name || user.fullName)[0] : user.email[0].toUpperCase()}
                               </div>
                               <div className="flex flex-col">
-                                 <span className="font-bold dark:text-gray-100">{user.fullName || 'Anonymous'}</span>
+                                 <span className="font-bold dark:text-gray-100">{user.full_name || user.fullName || 'Anonymous'}</span>
                                  <span className="text-xs text-gray-400">{user.email}</span>
                               </div>
                            </div>
@@ -1054,17 +1049,17 @@ function AdminView() {
                         <td className="px-8 py-6">
                            <span className={cn(
                              "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                             new Date(user.lastActive).getTime() > Date.now() - 300000 
+                             new Date(user.last_active || user.lastActive).getTime() > Date.now() - 300000 
                                ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10" 
                                : "bg-gray-100 text-gray-500 dark:bg-gray-800"
                            )}>
-                             {new Date(user.lastActive).getTime() > Date.now() - 300000 ? 'Online' : 'Offline'}
+                             {new Date(user.last_active || user.lastActive).getTime() > Date.now() - 300000 ? 'Online' : 'Offline'}
                            </span>
                         </td>
                         <td className="px-8 py-6">
                            <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
                               <Clock className="w-3 h-3" />
-                              {new Date(user.lastActive).toLocaleString()}
+                              {new Date(user.last_active || user.lastActive).toLocaleString()}
                            </div>
                         </td>
                         <td className="px-8 py-6">
@@ -1157,7 +1152,7 @@ function AdminView() {
 
 // --- Views ---
 
-function DashboardView({ habits, tasks, expenses, currency, userName, setUserName, theme, setActiveTab }: { 
+function DashboardView({ habits, tasks, expenses, currency, userName, setUserName, theme, setActiveTab, budget }: { 
   habits: Habit[], 
   tasks: Task[], 
   expenses: Expense[], 
@@ -1165,13 +1160,13 @@ function DashboardView({ habits, tasks, expenses, currency, userName, setUserNam
   userName: string,
   setUserName: (name: string) => void,
   theme: 'light' | 'dark',
-  setActiveTab: (tab: string) => void
+  setActiveTab: (tab: string) => void,
+  budget: number
 }) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState(userName);
   
   const totalSpent = expenses.reduce((acc, curr) => acc + curr.amount, 0);
-  const budget = currency === 'USD' ? 4000 : 300000;
   const remaining = budget - totalSpent;
   const progressPercent = Math.max(0, Math.min(100, (remaining / budget) * 100));
 
@@ -1250,7 +1245,7 @@ function DashboardView({ habits, tasks, expenses, currency, userName, setUserNam
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Habit Card */}
         <div className="md:col-span-2 lg:col-span-2 bg-white dark:bg-gray-900 p-6 rounded-3xl border border-[#E5E7EB] dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow group">
           <div className="flex justify-between items-start mb-4">
@@ -1279,44 +1274,15 @@ function DashboardView({ habits, tasks, expenses, currency, userName, setUserNam
             <h3 className="text-lg font-bold leading-tight dark:text-white">Priority Matrix</h3>
              <div className="mt-4 space-y-3">
                {priorityTasks.slice(0, 3).map(task => (
-                 <div key={task.id} className="flex items-center gap-3">
-                   <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                   <span className="text-sm font-medium truncate dark:text-gray-300">{task.title}</span>
+                 <div key={task.id} className="flex items-center gap-3 min-w-0">
+                   <div className="w-2 h-2 rounded-full bg-red-500 shrink-0"></div>
+                   <span className="text-sm font-medium truncate dark:text-gray-300 flex-1">{task.title}</span>
                  </div>
                ))}
                {priorityTasks.length === 0 && <p className="text-gray-400 dark:text-gray-600 text-sm">No critical tasks!</p>}
             </div>
           </div>
           <button onClick={() => setActiveTab('tasks')} className="text-xs font-bold text-[#6B7280] dark:text-gray-500 uppercase tracking-widest mt-6 hover:text-black dark:hover:text-white transition-colors w-full text-left">View Matrix →</button>
-        </div>
-
-        {/* AI Suggestions Card */}
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-indigo-100 dark:border-indigo-900 shadow-sm flex flex-col group overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-            <Sparkles className="w-20 h-20 text-indigo-600" />
-          </div>
-          <div className="p-2 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl w-fit mb-4">
-            <Brain className="w-6 h-6 text-indigo-600" />
-          </div>
-          <h3 className="text-lg font-bold dark:text-white">AI Strategy</h3>
-          <div className="mt-4 space-y-3 flex-1">
-            {loadingTips ? (
-              <div className="space-y-2">
-                <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded animate-pulse w-3/4"></div>
-                <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded animate-pulse w-1/2"></div>
-                <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded animate-pulse w-2/3"></div>
-              </div>
-            ) : aiTips.length > 0 ? (
-              aiTips.map((tip, i) => (
-                <div key={i} className="flex items-start gap-2">
-                  <ChevronRight className="w-3 h-3 mt-1 text-indigo-400 shrink-0" />
-                  <p className="text-xs text-gray-600 dark:text-gray-400 leading-snug">{tip}</p>
-                </div>
-              ))
-            ) : (
-              <p className="text-xs text-gray-400">Configure Gemini API key in settings for smart tips.</p>
-            )}
-          </div>
         </div>
 
         {/* Expenses Card */}
@@ -1493,10 +1459,10 @@ function TasksView({ tasks, setTasks }: { tasks: Task[], setTasks: (t: Task[]) =
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[600px]">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 md:h-[calc(100vh-250px)] md:min-h-[600px]">
         {quadrants.map(q => (
-          <div key={q.id} className="bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-100 dark:border-gray-800 p-6 flex flex-col">
-            <div className="flex items-center justify-between mb-6">
+          <div key={q.id} className="bg-white dark:bg-gray-900 rounded-3xl md:rounded-[2rem] border border-gray-100 dark:border-gray-800 p-4 md:p-6 flex flex-col min-h-[250px]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 md:mb-6">
               <div className="flex items-center gap-3">
                 <div className={cn("w-3 h-3 rounded-full", q.color)}></div>
                 <h3 className="font-bold text-lg dark:text-white">{q.label}</h3>
@@ -1504,43 +1470,48 @@ function TasksView({ tasks, setTasks }: { tasks: Task[], setTasks: (t: Task[]) =
               <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{q.desc}</span>
             </div>
             
-            <div className="flex-1 space-y-3 overflow-y-auto pr-2">
+            <div className="flex-1 space-y-3 overflow-y-auto pr-2 custom-scrollbar">
               {tasks.filter(t => t.quadrant === q.id).map(task => (
-                <div key={task.id} className="group p-4 bg-[#F9FAFB] dark:bg-gray-800/40 rounded-2xl flex items-center justify-between border border-transparent hover:border-black/5 dark:hover:border-white/5 transition-all">
-                  <div className="flex items-center gap-4">
+                <div key={task.id} className="group p-3 md:p-4 bg-[#F9FAFB] dark:bg-gray-800/40 rounded-2xl flex items-start justify-between gap-3 border border-transparent hover:border-black/5 dark:hover:border-white/5 transition-all">
+                  <div className="flex items-start gap-3 md:gap-4 flex-1 min-w-0">
                     <button 
                       onClick={() => toggleTask(task.id)}
-                      className={cn("w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all", task.completed ? "bg-black dark:bg-indigo-600 border-black dark:border-indigo-600 text-white" : "border-gray-200 dark:border-gray-700 group-hover:border-black/30 dark:group-hover:border-white/30")}
+                      className={cn("mt-0.5 w-5 h-5 md:w-6 md:h-6 shrink-0 rounded-lg border-2 flex items-center justify-center transition-all", task.completed ? "bg-black dark:bg-indigo-600 border-black dark:border-indigo-600 text-white" : "border-gray-200 dark:border-gray-700 group-hover:border-black/30 dark:group-hover:border-white/30")}
                     >
-                      {task.completed && <CheckCircle2 className="w-4 h-4" />}
+                      {task.completed && <CheckCircle2 className="w-3.5 h-3.5 md:w-4 md:h-4" />}
                     </button>
-                    <span className={cn("text-sm font-medium dark:text-gray-300", task.completed && "text-gray-400 dark:text-gray-600 line-through")}>{task.title}</span>
+                    <span className={cn(
+                      "text-sm font-medium dark:text-gray-300 break-words overflow-hidden leading-relaxed", 
+                      task.completed && "text-gray-400 dark:text-gray-600 line-through font-normal"
+                    )}>
+                      {task.title}
+                    </span>
                   </div>
                   <X 
-                    className="w-4 h-4 text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 cursor-pointer hover:text-red-500" 
+                    className="w-4 h-4 text-gray-300 dark:text-gray-600 md:opacity-0 group-hover:opacity-100 cursor-pointer hover:text-red-500 shrink-0 transition-opacity" 
                     onClick={() => setTasks(tasks.filter(t => t.id !== task.id))}
                   />
                 </div>
               ))}
               {showAdd === q.id ? (
-                 <div className="bg-white dark:bg-gray-800 p-3 rounded-2xl border border-black dark:border-indigo-600 shadow-lg">
+                 <div className="bg-white dark:bg-gray-800 p-3 rounded-2xl border border-black dark:border-indigo-600 shadow-lg z-10 sticky bottom-0">
                     <input 
                       autoFocus
-                      className="w-full text-sm font-medium mb-3 outline-none px-2 bg-transparent dark:text-white" 
+                      className="w-full text-sm font-medium mb-3 outline-none px-2 py-1 bg-transparent dark:text-white" 
                       placeholder="Task name..." 
                       value={newTaskTitle}
                       onChange={e => setNewTaskTitle(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && addTask(q.id)}
                     />
                     <div className="flex gap-2">
-                       <button onClick={() => addTask(q.id)} className="flex-1 bg-black dark:bg-indigo-600 text-white py-2 rounded-xl text-xs font-bold">Add</button>
-                       <button onClick={() => setShowAdd(null)} className="flex-1 bg-gray-100 dark:bg-gray-700 text-black dark:text-white py-2 rounded-xl text-xs font-bold">Cancel</button>
+                       <button onClick={() => addTask(q.id)} className="flex-1 bg-black dark:bg-indigo-600 text-white py-2.5 rounded-xl text-xs font-bold hover:opacity-90 transition-opacity">Add</button>
+                       <button onClick={() => setShowAdd(null)} className="flex-1 bg-gray-100 dark:bg-gray-700 text-black dark:text-white py-2.5 rounded-xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Cancel</button>
                     </div>
                  </div>
               ) : (
                 <button 
                   onClick={() => setShowAdd(q.id)}
-                  className="w-full py-3 border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-2xl text-gray-400 dark:text-gray-600 text-sm hover:border-gray-200 dark:hover:border-gray-700 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-4 border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-2xl text-gray-400 dark:text-gray-600 text-xs font-bold uppercase tracking-widest hover:border-gray-200 dark:hover:border-gray-700 transition-all flex items-center justify-center gap-2"
                 >
                    <Plus className="w-4 h-4" /> Add Task
                 </button>
@@ -1553,15 +1524,19 @@ function TasksView({ tasks, setTasks }: { tasks: Task[], setTasks: (t: Task[]) =
   );
 }
 
-function FinanceView({ expenses, setExpenses, currency, setCurrency, theme }: { 
+function FinanceView({ expenses, setExpenses, currency, setCurrency, theme, budget, setBudget }: { 
   expenses: Expense[], 
   setExpenses: (e: Expense[]) => void, 
   currency: 'USD' | 'INR', 
   setCurrency: (c: 'USD' | 'INR') => void,
-  theme: 'light' | 'dark'
+  theme: 'light' | 'dark',
+  budget: number,
+  setBudget: (b: number) => void
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [newExp, setNewExp] = useState({ amount: "", note: "" });
+  const [isEditingBudget, setIsEditingBudget] = useState(false);
+  const [tempBudget, setTempBudget] = useState(budget.toString());
 
   const formatVal = (val: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -1679,32 +1654,68 @@ function FinanceView({ expenses, setExpenses, currency, setCurrency, theme }: {
           <div className="space-y-6">
              <div className="bg-black dark:bg-[#0F172A] text-white p-8 rounded-[2.5rem] border border-transparent dark:border-gray-800 flex flex-col justify-between h-fit min-h-[300px]">
                 <div>
-                   <h3 className="text-lg font-bold">Goal: New Studio</h3>
-                   <p className="text-white/50 dark:text-gray-500 text-xs mt-1">Saved $8,400 / $12,000</p>
+                   <h3 className="text-lg font-bold">Available Capital</h3>
+                   <p className="text-white/50 dark:text-gray-500 text-xs mt-1">Total budget for current period</p>
                 </div>
-                <div className="mt-8 flex justify-center">
-                   <div className="relative w-40 h-40">
-                     <ResponsiveContainer width="100%" height="100%">
-                       <PieChart>
-                         <Pie
-                           data={[{ value: 70 }, { value: 30 }]}
-                           innerRadius={60}
-                           outerRadius={80}
-                           paddingAngle={0}
-                           dataKey="value"
+                
+                <div className="mt-8 flex flex-col items-center">
+                   {isEditingBudget ? (
+                     <div className="w-full space-y-4">
+                       <input 
+                         type="number"
+                         value={tempBudget}
+                         onChange={e => setTempBudget(e.target.value)}
+                         className="w-full bg-white/10 dark:bg-gray-800 border-none rounded-xl px-4 py-3 text-white text-center text-2xl font-bold font-mono outline-none"
+                         autoFocus
+                       />
+                       <div className="flex gap-2">
+                         <button 
+                           onClick={() => {
+                             setBudget(parseFloat(tempBudget) || 0);
+                             setIsEditingBudget(false);
+                           }}
+                           className="flex-1 py-2 bg-emerald-500 rounded-xl text-xs font-bold"
                          >
-                           <Cell fill="#10B981" />
-                           <Cell fill={theme === 'dark' ? '#1E293B' : 'rgba(255,255,255,0.1)'} />
-                         </Pie>
-                       </PieChart>
-                     </ResponsiveContainer>
-                     <div className="absolute inset-0 flex flex-col items-center justify-center group pointer-events-none">
-                        <span className="text-2xl font-bold font-mono">70%</span>
-                        <span className="text-[10px] uppercase font-bold text-white/40 dark:text-gray-600">Progress</span>
+                           Save
+                         </button>
+                         <button 
+                           onClick={() => setIsEditingBudget(false)}
+                           className="flex-1 py-2 bg-white/10 rounded-xl text-xs font-bold"
+                         >
+                           Cancel
+                         </button>
+                       </div>
                      </div>
-                   </div>
+                   ) : (
+                     <>
+                       <span className="text-4xl font-bold font-mono tracking-tighter">{formatVal(budget)}</span>
+                       <button 
+                         onClick={() => {
+                           setTempBudget(budget.toString());
+                           setIsEditingBudget(true);
+                         }}
+                         className="mt-4 text-[10px] uppercase font-bold text-white/40 hover:text-white transition-colors"
+                       >
+                         Edit Budget
+                       </button>
+                     </>
+                   )}
                 </div>
-                <button className="mt-8 w-full py-4 bg-white/10 dark:bg-gray-800 hover:bg-white/20 dark:hover:bg-gray-700 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all">Contribute</button>
+
+                {!isEditingBudget && (
+                  <div className="mt-8 flex flex-col gap-2">
+                    <div className="flex justify-between text-xs font-medium">
+                      <span className="text-white/50">Spent</span>
+                      <span>{formatVal(expenses.reduce((a, b) => a + b.amount, 0))}</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-emerald-500 transition-all duration-500" 
+                        style={{ width: `${Math.min(100, (expenses.reduce((a, b) => a + b.amount, 0) / budget) * 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
              </div>
 
              <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 flex-1">

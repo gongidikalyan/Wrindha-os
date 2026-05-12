@@ -1,3 +1,16 @@
+-- === DATABASE SCHEMA FOR WRINDHA OS ===
+-- Description: Standardizes camelCase to snake_case for Supabase compatibility.
+
+-- [OPTIONAL] CLEAN START: Uncomment these lines if you want to wipe existing tables and start fresh.
+-- DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+-- DROP TABLE IF EXISTS public.profiles CASCADE;
+-- DROP TABLE IF EXISTS public.habits CASCADE;
+-- DROP TABLE IF EXISTS public.tasks CASCADE;
+-- DROP TABLE IF EXISTS public.expenses CASCADE;
+-- DROP TABLE IF EXISTS public.goals CASCADE;
+-- DROP TABLE IF EXISTS public.timetable CASCADE;
+-- DROP TABLE IF EXISTS public.study_courses CASCADE;
+
 -- 1. Profiles Table (User Metadata)
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
