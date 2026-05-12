@@ -76,7 +76,11 @@ export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('wrindha_theme') as 'light' | 'dark') || 'light');
   const [showSettings, setShowSettings] = useState(false);
   const [session, setSession] = useState<any>(null);
-  const [bypassConfig, setBypassConfig] = useState(() => localStorage.getItem('wrindha_bypass_config') === 'true');
+  const [bypassConfig, setBypassConfig] = useState(() => {
+    const saved = localStorage.getItem('wrindha_bypass_config');
+    if (saved !== null) return saved === 'true';
+    return !isSupabaseConfigured();
+  });
 
   useEffect(() => {
     localStorage.setItem('wrindha_bypass_config', bypassConfig.toString());
@@ -298,7 +302,7 @@ export default function App() {
 
   const configError = getSupabaseError();
 
-  if (!session && isSupabaseConfigured()) {
+  if (!session && isSupabaseConfigured() && !bypassConfig) {
     return <AuthView />;
   }
 
@@ -791,22 +795,24 @@ function AuthConfigErrorView({ error, onBypass }: { error: string; onBypass?: ()
             </ol>
           </div>
 
-          <div className="pt-6 border-t border-gray-100 dark:border-gray-800 flex flex-col gap-3">
-            <p className="text-xs text-gray-400 text-center mb-2">Or continue without cloud sync:</p>
-            <div className="flex flex-col sm:flex-row gap-3">
+          <div className="pt-6 border-t border-gray-100 dark:border-gray-800 flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
               <button 
                 onClick={onBypass}
-                className="flex-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 py-4 rounded-2xl font-bold text-sm uppercase tracking-widest hover:bg-gray-200 transition-all border-2 border-transparent transition-all"
+                className="w-full bg-black dark:bg-indigo-600 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-black/10 dark:shadow-indigo-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
-                Local Only
+                Continue to App (Offline Mode)
               </button>
               <button 
                 onClick={() => window.location.reload()}
-                className="flex-1 bg-black dark:bg-indigo-600 text-white py-4 rounded-2xl font-bold text-sm uppercase tracking-widest hover:opacity-90 transition-all"
+                className="w-full bg-gray-100 dark:bg-gray-800 text-gray-500 py-4 rounded-2xl font-bold text-sm uppercase tracking-widest hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
               >
                 Refresh App
               </button>
             </div>
+            <p className="text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              Cloud sync will be disabled until valid keys are provided.
+            </p>
           </div>
         </div>
       </motion.div>
