@@ -319,7 +319,10 @@ export default function App() {
             <div className="w-8 h-8 bg-black dark:bg-indigo-600 rounded-lg flex items-center justify-center">
               <BarChart3 className="text-white w-5 h-5" />
             </div>
-            <span className="font-bold text-xl tracking-tight dark:text-white">Wrindha OS</span>
+            <div className="flex flex-col">
+              <span className="font-medium text-xl tracking-tight dark:text-white leading-none">Wrindha OS</span>
+              <span className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1">Beyond Limits. Built for Future.</span>
+            </div>
           </div>
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -538,7 +541,10 @@ function Footer({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
             <div className="w-8 h-8 bg-black dark:bg-indigo-600 rounded-lg flex items-center justify-center">
               <BarChart3 className="text-white w-5 h-5" />
             </div>
-            <span className="font-bold text-xl tracking-tight dark:text-white">Wrindha OS</span>
+            <div className="flex flex-col text-left">
+              <span className="font-medium text-xl tracking-tight dark:text-white leading-none">Wrindha OS</span>
+              <span className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1">Beyond Limits. Built for Future.</span>
+            </div>
           </button>
           <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm leading-relaxed">
             Empowering students to become more organized, productive, and focused in their daily lives through practical tech solutions.
@@ -643,11 +649,14 @@ function AuthView() {
         </div>
 
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-600/20">
-              <Sparkles className="w-6 h-6 text-white" />
+          <div className="flex flex-col mb-8">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-600/20">
+                <Sparkles className="w-6 h-6 text-white" />
+              </div>
+              <span className="font-medium text-3xl tracking-tight dark:text-white leading-none">Wrindha OS</span>
             </div>
-            <h1 className="text-2xl font-bold dark:text-white">Wrindha OS</h1>
+            <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Beyond Limits. Built for Future.</span>
           </div>
 
           <h2 className="text-3xl font-black mb-2 dark:text-white">
