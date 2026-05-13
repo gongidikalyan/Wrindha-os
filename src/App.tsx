@@ -71,7 +71,7 @@ const infoModules = [
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [currency, setCurrency] = useState<'USD' | 'INR'>('USD');
+  const [currency, setCurrency] = useState<'USD' | 'INR'>(() => (localStorage.getItem('wrindha_currency') as 'USD' | 'INR') || 'INR');
   const [userName, setUserName] = useState(() => localStorage.getItem('wrindha_user_name') || "Felix");
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('wrindha_theme') as 'light' | 'dark') || 'light');
   const [showSettings, setShowSettings] = useState(false);
@@ -81,6 +81,10 @@ export default function App() {
     if (saved !== null) return saved === 'true';
     return !isSupabaseConfigured();
   });
+
+  useEffect(() => {
+    localStorage.setItem('wrindha_currency', currency);
+  }, [currency]);
 
   useEffect(() => {
     localStorage.setItem('wrindha_bypass_config', bypassConfig.toString());
@@ -139,32 +143,22 @@ export default function App() {
   // States with Persistence
   const [habits, setHabits] = useState<Habit[]>(() => {
     const saved = localStorage.getItem('wrindha_habits');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', name: 'Morning Coding', frequency: 'daily', streak: 12, completedAt: [], color: 'bg-indigo-500' },
-      { id: '2', name: '3L Hydration', frequency: 'daily', streak: 45, completedAt: [], color: 'bg-blue-500' },
-    ];
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [tasks, setTasks] = useState<Task[]>(() => {
     const saved = localStorage.getItem('wrindha_tasks');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', title: 'Finish Pitch Deck', quadrant: EisenhowerQuadrant.URGENT_IMPORTANT, completed: false, tags: ['Work'] },
-      { id: '2', title: 'Buy Groceries', quadrant: EisenhowerQuadrant.URGENT_NOT_IMPORTANT, completed: false, tags: ['Personal'] },
-    ];
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [expenses, setExpenses] = useState<Expense[]>(() => {
     const saved = localStorage.getItem('wrindha_expenses');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', amount: 45.5, note: 'Grocery Run', category: 'Food', date: new Date().toISOString() },
-    ];
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [goals, setGoals] = useState<Goal[]>(() => {
     const saved = localStorage.getItem('wrindha_goals');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', title: 'Learn Modern React', type: GoalType.SHORT, progress: 65, targetDate: '2024-06-30' },
-    ];
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [timetable, setTimetable] = useState<TimetableEntry[]>(() => {
@@ -174,11 +168,7 @@ export default function App() {
 
   const [studyCourses, setStudyCourses] = useState<StudyCourse[]>(() => {
     const saved = localStorage.getItem('wrindha_study');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', name: 'Distributed Systems', progress: 85, color: 'bg-indigo-500', exams: [], materials: [] },
-      { id: '2', name: 'UX Psychology', progress: 40, color: 'bg-rose-500', exams: [], materials: [] },
-      { id: '3', name: 'Microeconomics', progress: 62, color: 'bg-emerald-500', exams: [], materials: [] },
-    ];
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [userBudget, setUserBudget] = useState<number>(() => {
@@ -1627,7 +1617,7 @@ function FinanceView({ expenses, setExpenses, currency, setCurrency, theme, budg
                   <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-gray-50 dark:bg-gray-800 p-6 rounded-3xl mb-8 border border-emerald-100 dark:border-emerald-900/30 grid grid-cols-1 md:grid-cols-3 gap-4">
                     <input 
                       type="number" 
-                      placeholder="Amount ($)" 
+                      placeholder={`Amount (${currency === 'USD' ? '$' : '₹'})`} 
                       className="bg-white dark:bg-gray-900 dark:text-white rounded-xl px-4 py-2 border-none text-sm outline-none w-full"
                       value={newExp.amount}
                       onChange={e => setNewExp({...newExp, amount: e.target.value})}
