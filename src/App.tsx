@@ -281,6 +281,15 @@ export default function App() {
     }
   };
 
+  const deleteFromSupabase = async (table: string, id: string) => {
+    if (!isSupabaseConfigured() || !session?.user?.id || bypassConfig) return;
+    try {
+      await supabase.from(table).delete().eq('id', id).eq('user_id', session.user.id);
+    } catch (error) {
+      console.error(`Error deleting from ${table}:`, error);
+    }
+  };
+
   useEffect(() => {
     localStorage.setItem('wrindha_habits', JSON.stringify(habits));
     if (!isInitializing) syncToSupabase('habits', habits);
@@ -539,12 +548,12 @@ export default function App() {
                transition={{ duration: 0.2 }}
              >
                {activeTab === 'dashboard' && <DashboardView habits={habits} tasks={tasks} expenses={expenses} currency={currency} userName={userName} setUserName={setUserName} theme={theme} setActiveTab={setActiveTab} budget={userBudget} />}
-               {activeTab === 'habits' && <HabitsView habits={habits} setHabits={setHabits} theme={theme} />}
-               {activeTab === 'tasks' && <TasksView tasks={tasks} setTasks={setTasks} />}
-               {activeTab === 'finance' && <FinanceView expenses={expenses} setExpenses={setExpenses} currency={currency} setCurrency={setCurrency} theme={theme} budget={userBudget} setBudget={setUserBudget} />}
-               {activeTab === 'study' && <StudyView courses={studyCourses} setCourses={setStudyCourses} />}
-               {activeTab === 'goals' && <GoalsView goals={goals} setGoals={setGoals} />}
-               {activeTab === 'timetable' && <TimetableView entries={timetable} setEntries={setTimetable} theme={theme} />}
+               {activeTab === 'habits' && <HabitsView habits={habits} setHabits={setHabits} onDelete={(id) => deleteFromSupabase('habits', id)} theme={theme} />}
+               {activeTab === 'tasks' && <TasksView tasks={tasks} setTasks={setTasks} onDelete={(id) => deleteFromSupabase('tasks', id)} />}
+               {activeTab === 'finance' && <FinanceView expenses={expenses} setExpenses={setExpenses} onDelete={(id) => deleteFromSupabase('expenses', id)} currency={currency} setCurrency={setCurrency} theme={theme} budget={userBudget} setBudget={setUserBudget} />}
+               {activeTab === 'study' && <StudyView courses={studyCourses} setCourses={setStudyCourses} onDeleteCourse={(id) => deleteFromSupabase('study_courses', id)} />}
+               {activeTab === 'goals' && <GoalsView goals={goals} setGoals={setGoals} onDelete={(id) => deleteFromSupabase('goals', id)} />}
+               {activeTab === 'timetable' && <TimetableView entries={timetable} setEntries={setTimetable} onDelete={(id) => deleteFromSupabase('timetable', id)} theme={theme} />}
                {activeTab === 'admin' && isAdmin && <AdminView />}
                {activeTab === 'about' && <AboutView />}
                {activeTab === 'contact' && <ContactView />}
@@ -1367,7 +1376,7 @@ function DashboardView({ habits, tasks, expenses, currency, userName, setUserNam
   );
 }
 
-function HabitsView({ habits, setHabits, theme }: { habits: Habit[], setHabits: (h: Habit[]) => void, theme: 'light' | 'dark' }) {
+function HabitsView({ habits, setHabits, onDelete, theme }: { habits: Habit[], setHabits: (h: Habit[]) => void, onDelete: (id: string) => void, theme: 'light' | 'dark' }) {
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
 
@@ -1438,7 +1447,10 @@ function HabitsView({ habits, setHabits, theme }: { habits: Habit[], setHabits: 
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{habit.streak} day streak</p>
               </div>
               <button 
-                onClick={() => setHabits(habits.filter(h => h.id !== habit.id))}
+                onClick={() => {
+                  onDelete(habit.id);
+                  setHabits(habits.filter(h => h.id !== habit.id));
+                }}
                 className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-red-500 transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -1479,7 +1491,7 @@ function HabitsView({ habits, setHabits, theme }: { habits: Habit[], setHabits: 
   );
 }
 
-function TasksView({ tasks, setTasks }: { tasks: Task[], setTasks: (t: Task[]) => void }) {
+function TasksView({ tasks, setTasks, onDelete }: { tasks: Task[], setTasks: (t: Task[]) => void, onDelete: (id: string) => void }) {
   const [showAdd, setShowAdd] = useState<EisenhowerQuadrant | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
 
@@ -1547,7 +1559,10 @@ function TasksView({ tasks, setTasks }: { tasks: Task[], setTasks: (t: Task[]) =
                   </div>
                   <X 
                     className="w-4 h-4 text-gray-300 dark:text-gray-600 md:opacity-0 group-hover:opacity-100 cursor-pointer hover:text-red-500 shrink-0 transition-opacity" 
-                    onClick={() => setTasks(tasks.filter(t => t.id !== task.id))}
+                    onClick={() => {
+                      onDelete(task.id);
+                      setTasks(tasks.filter(t => t.id !== task.id));
+                    }}
                   />
                 </div>
               ))}
@@ -1582,9 +1597,10 @@ function TasksView({ tasks, setTasks }: { tasks: Task[], setTasks: (t: Task[]) =
   );
 }
 
-function FinanceView({ expenses, setExpenses, currency, setCurrency, theme, budget, setBudget }: { 
+function FinanceView({ expenses, setExpenses, onDelete, currency, setCurrency, theme, budget, setBudget }: { 
   expenses: Expense[], 
   setExpenses: (e: Expense[]) => void, 
+  onDelete: (id: string) => void,
   currency: 'USD' | 'INR', 
   setCurrency: (c: 'USD' | 'INR') => void,
   theme: 'light' | 'dark',
@@ -1700,7 +1716,10 @@ function FinanceView({ expenses, setExpenses, currency, setCurrency, theme, budg
                       <span className="font-bold font-mono text-sm dark:text-white">-{formatVal(exp.amount)}</span>
                       <X 
                         className="w-4 h-4 text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 cursor-pointer hover:text-red-500" 
-                        onClick={() => setExpenses(expenses.filter(e => e.id !== exp.id))}
+                        onClick={() => {
+                          onDelete(exp.id);
+                          setExpenses(expenses.filter(e => e.id !== exp.id));
+                        }}
                       />
                     </div>
                   </div>
@@ -1801,7 +1820,7 @@ function FinanceView({ expenses, setExpenses, currency, setCurrency, theme, budg
   );
 }
 
-function StudyView({ courses, setCourses }: { courses: StudyCourse[], setCourses: (c: StudyCourse[]) => void }) {
+function StudyView({ courses, setCourses, onDeleteCourse }: { courses: StudyCourse[], setCourses: (c: StudyCourse[]) => void, onDeleteCourse: (id: string) => void }) {
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(courses[0]?.id || null);
   const [showAddCourse, setShowAddCourse] = useState(false);
   const [newCourseName, setNewCourseName] = useState("");
@@ -1930,7 +1949,11 @@ function StudyView({ courses, setCourses }: { courses: StudyCourse[], setCourses
                     <span className="font-bold text-sm dark:text-gray-200">{course.name}</span>
                   </div>
                   <button 
-                    onClick={(e) => { e.stopPropagation(); deleteCourse(course.id); }}
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      onDeleteCourse(course.id);
+                      deleteCourse(course.id); 
+                    }}
                     className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 rounded-lg transition-all"
                   >
                     <X className="w-4 h-4" />
@@ -2089,7 +2112,7 @@ function StudyView({ courses, setCourses }: { courses: StudyCourse[], setCourses
   );
 }
 
-function GoalsView({ goals, setGoals }: { goals: Goal[], setGoals: (g: Goal[]) => void }) {
+function GoalsView({ goals, setGoals, onDelete }: { goals: Goal[], setGoals: (g: Goal[]) => void, onDelete: (id: string) => void }) {
   const [showAdd, setShowAdd] = useState(false);
   const [newGoal, setNewGoal] = useState({ title: '', type: GoalType.SHORT, date: '' });
 
@@ -2175,7 +2198,10 @@ function GoalsView({ goals, setGoals }: { goals: Goal[], setGoals: (g: Goal[]) =
                     <h4 className="font-bold text-lg leading-tight dark:text-white">{goal.title}</h4>
                     <X 
                       className="w-4 h-4 text-gray-300 dark:text-gray-600 cursor-pointer hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all" 
-                      onClick={() => setGoals(goals.filter(g => g.id !== goal.id))}
+                      onClick={() => {
+                        onDelete(goal.id);
+                        setGoals(goals.filter(g => g.id !== goal.id));
+                      }}
                     />
                   </div>
                   <div className="flex justify-between items-end mb-2">
@@ -2204,7 +2230,7 @@ function GoalsView({ goals, setGoals }: { goals: Goal[], setGoals: (g: Goal[]) =
   );
 }
 
-function TimetableView({ entries, setEntries, theme }: { entries: TimetableEntry[], setEntries: (e: TimetableEntry[]) => void, theme: 'light' | 'dark' }) {
+function TimetableView({ entries, setEntries, onDelete, theme }: { entries: TimetableEntry[], setEntries: (e: TimetableEntry[]) => void, onDelete: (id: string) => void, theme: 'light' | 'dark' }) {
   const [showAdd, setShowAdd] = useState(false);
   const [newEntry, setNewEntry] = useState({ title: '', type: TimetableType.WEEKLY, date: '' });
 
@@ -2291,7 +2317,10 @@ function TimetableView({ entries, setEntries, theme }: { entries: TimetableEntry
                         <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase">{new Date(entry.date).toLocaleDateString()}</span>
                         <X 
                           className="w-3 h-3 text-gray-300 dark:text-gray-600 cursor-pointer hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all" 
-                          onClick={() => setEntries(entries.filter(e => e.id !== entry.id))}
+                          onClick={() => {
+                            onDelete(entry.id);
+                            setEntries(entries.filter(e => e.id !== entry.id));
+                          }}
                         />
                       </div>
                       <p className="font-bold text-sm text-gray-900 dark:text-gray-200">{entry.title}</p>
