@@ -113,18 +113,37 @@ export default function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session?.user?.user_metadata?.full_name) {
-        setUserName(session.user.user_metadata.full_name);
-      }
-      if (session?.user && !bypassConfig) {
-        supabase.from('profiles').upsert({ 
-          id: session.user.id, 
-          email: session.user.email,
-          full_name: session.user.user_metadata?.full_name || userName,
-          budget: userBudget,
-          currency: currency,
-          last_active: new Date().toISOString()
-        }).then();
+      if (session) {
+        if (session.user?.user_metadata?.full_name) {
+          setUserName(session.user.user_metadata.full_name);
+        }
+        if (!bypassConfig) {
+          supabase.from('profiles').upsert({ 
+            id: session.user.id, 
+            email: session.user.email,
+            full_name: session.user.user_metadata?.full_name || userName,
+            budget: userBudget,
+            currency: currency,
+            last_active: new Date().toISOString()
+          }).then();
+        }
+      } else {
+        // Logout occurred: Clear all user-specific states
+        setHabits([]);
+        setTasks([]);
+        setExpenses([]);
+        setGoals([]);
+        setTimetable([]);
+        setStudyCourses([]);
+        setUserName("Felix");
+        setUserBudget(400000);
+        // Clear persistence
+        const keys = [
+          'wrindha_habits', 'wrindha_tasks', 'wrindha_expenses', 
+          'wrindha_goals', 'wrindha_timetable', 'wrindha_study', 
+          'wrindha_budget', 'wrindha_user_name'
+        ];
+        keys.forEach(k => localStorage.removeItem(k));
       }
     });
 
@@ -216,37 +235,31 @@ export default function App() {
         }
 
         const { data: habitsData } = await supabase.from('habits').select('*').eq('user_id', userId);
-        if (habitsData && habitsData.length > 0) {
-          setHabits(habitsData.map(h => ({
-            ...h,
-            completedAt: h.completed_at || h.completedAt || []
-          })));
-        }
+        setHabits(habitsData && habitsData.length > 0 ? habitsData.map(h => ({
+          ...h,
+          completedAt: h.completed_at || h.completedAt || []
+        })) : []);
 
         const { data: tasksData } = await supabase.from('tasks').select('*').eq('user_id', userId);
-        if (tasksData && tasksData.length > 0) {
-          setTasks(tasksData.map(t => ({
-            ...t,
-            dueDate: t.due_date || t.dueDate
-          })));
-        }
+        setTasks(tasksData && tasksData.length > 0 ? tasksData.map(t => ({
+          ...t,
+          dueDate: t.due_date || t.dueDate
+        })) : []);
 
         const { data: expensesData } = await supabase.from('expenses').select('*').eq('user_id', userId);
-        if (expensesData && expensesData.length > 0) setExpenses(expensesData);
+        setExpenses(expensesData && expensesData.length > 0 ? expensesData : []);
 
         const { data: goalsData } = await supabase.from('goals').select('*').eq('user_id', userId);
-        if (goalsData && goalsData.length > 0) {
-          setGoals(goalsData.map(g => ({
-            ...g,
-            targetDate: g.target_date || g.targetDate
-          })));
-        }
+        setGoals(goalsData && goalsData.length > 0 ? goalsData.map(g => ({
+          ...g,
+          targetDate: g.target_date || g.targetDate
+        })) : []);
 
         const { data: timetableData } = await supabase.from('timetable').select('*').eq('user_id', userId);
-        if (timetableData && timetableData.length > 0) setTimetable(timetableData);
+        setTimetable(timetableData && timetableData.length > 0 ? timetableData : []);
 
         const { data: studyData } = await supabase.from('study_courses').select('*').eq('user_id', userId);
-        if (studyData && studyData.length > 0) setStudyCourses(studyData);
+        setStudyCourses(studyData && studyData.length > 0 ? studyData : []);
       } catch (error) {
         console.error('Error fetching from Supabase:', error);
       } finally {
@@ -323,7 +336,7 @@ export default function App() {
   const configError = getSupabaseError();
 
   if (!session && isSupabaseConfigured() && !bypassConfig) {
-    return <AuthView />;
+    return <AuthView onBypass={() => setBypassConfig(true)} />;
   }
 
   if (!session && configError && !bypassConfig) {
@@ -416,14 +429,26 @@ export default function App() {
           )}
         </nav>
 
-        <div className="p-4 border-t border-[#E5E7EB] dark:border-gray-800">
+        <div className="p-4 border-t border-[#E5E7EB] dark:border-gray-800 space-y-1">
           <button 
             onClick={() => setShowSettings(!showSettings)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#6B7280] hover:bg-[#F3F4F6] dark:hover:bg-gray-800 transition-all"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#6B7280] dark:text-gray-500 hover:bg-[#F3F4F6] dark:hover:bg-gray-800 hover:text-black dark:hover:text-white transition-all"
           >
             <Settings className="w-5 h-5 shrink-0" />
             {isSidebarOpen && <span className="font-medium text-sm">Settings</span>}
           </button>
+          {session && (
+            <button 
+              onClick={async () => {
+                await supabase.auth.signOut();
+                setActiveTab('dashboard');
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all"
+            >
+              <LogOut className="w-5 h-5 shrink-0" />
+              {isSidebarOpen && <span className="font-medium text-sm">Logout</span>}
+            </button>
+          )}
         </div>
       </motion.aside>
 
@@ -494,10 +519,14 @@ export default function App() {
                       <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
                         <span className="text-sm font-medium dark:text-gray-300">Account</span>
                         <button 
-                          onClick={() => supabase.auth.signOut()}
-                          className="text-xs font-bold uppercase text-red-500 hover:text-red-600 px-3 py-1.5 bg-red-50 dark:bg-red-900/10 rounded-lg transition-colors"
+                          onClick={async () => {
+                            await supabase.auth.signOut();
+                            setShowSettings(false);
+                            setActiveTab('dashboard');
+                          }}
+                          className="text-xs font-bold uppercase text-red-500 hover:text-white px-3 py-1.5 bg-red-50 dark:bg-red-900/10 hover:bg-red-500 dark:hover:bg-red-600 rounded-lg transition-all flex items-center gap-2"
                         >
-                          Logout
+                          <LogOut className="w-3 h-3" /> Logout
                         </button>
                       </div>
                     </div>
@@ -633,7 +662,7 @@ function Footer({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
 
 // --- Auth View ---
 
-function AuthView() {
+function AuthView({ onBypass }: { onBypass: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -769,13 +798,10 @@ function AuthView() {
             </div>
 
             <button 
-              onClick={() => {
-                localStorage.setItem('wrindha_bypass_config', 'true');
-                window.location.reload();
-              }}
-              className="text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-black dark:hover:text-white transition-colors"
+              onClick={onBypass}
+              className="w-full bg-gray-100 dark:bg-gray-800 text-gray-500 py-4 rounded-2xl font-bold text-sm uppercase tracking-widest hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
             >
-              Continue Offline
+              Skip (Use Offline Mode)
             </button>
           </div>
         </div>
@@ -783,8 +809,6 @@ function AuthView() {
     </div>
   );
 }
-
-// --- Auth View ---
 
 function AuthConfigErrorView({ error, onBypass }: { error: string; onBypass?: () => void }) {
   return (
