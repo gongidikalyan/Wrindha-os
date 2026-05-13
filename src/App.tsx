@@ -73,6 +73,10 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [currency, setCurrency] = useState<'USD' | 'INR'>(() => (localStorage.getItem('wrindha_currency') as 'USD' | 'INR') || 'INR');
   const [userName, setUserName] = useState(() => localStorage.getItem('wrindha_user_name') || "Felix");
+  const [userBudget, setUserBudget] = useState<number>(() => {
+    const saved = localStorage.getItem('wrindha_budget');
+    return saved ? parseFloat(saved) : 0;
+  });
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('wrindha_theme') as 'light' | 'dark') || 'light');
   const [showSettings, setShowSettings] = useState(false);
   const [session, setSession] = useState<any>(null);
@@ -104,8 +108,6 @@ export default function App() {
           id: session.user.id, 
           email: session.user.email,
           full_name: session.user.user_metadata?.full_name || userName,
-          budget: userBudget,
-          currency: currency,
           last_active: new Date().toISOString()
         }).then();
       }
@@ -122,33 +124,30 @@ export default function App() {
             id: session.user.id, 
             email: session.user.email,
             full_name: session.user.user_metadata?.full_name || userName,
-            budget: userBudget,
-            currency: currency,
             last_active: new Date().toISOString()
           }).then();
         }
       } else {
-        // Logout occurred: Clear all user-specific states
+        // Logout occurred: Clear personal data arrays
         setHabits([]);
         setTasks([]);
         setExpenses([]);
         setGoals([]);
         setTimetable([]);
         setStudyCourses([]);
-        setUserName("Felix");
-        setUserBudget(400000);
-        // Clear persistence
+        // We keep userName and userBudget as they are considered persistent settings
+        
+        // Clear persistence for personal data only
         const keys = [
           'wrindha_habits', 'wrindha_tasks', 'wrindha_expenses', 
-          'wrindha_goals', 'wrindha_timetable', 'wrindha_study', 
-          'wrindha_budget', 'wrindha_user_name'
+          'wrindha_goals', 'wrindha_timetable', 'wrindha_study'
         ];
         keys.forEach(k => localStorage.removeItem(k));
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [userName, bypassConfig]);
+  }, [userName, userBudget, bypassConfig]);
 
   useEffect(() => {
     localStorage.setItem('wrindha_user_name', userName);
@@ -194,11 +193,6 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [userBudget, setUserBudget] = useState<number>(() => {
-    const saved = localStorage.getItem('wrindha_budget');
-    return saved ? parseFloat(saved) : 400000;
-  });
-
   const [isInitializing, setIsInitializing] = useState(true);
 
   // Persistence
@@ -229,7 +223,7 @@ export default function App() {
       try {
         const { data: profileData } = await supabase.from('profiles').select('budget, currency, full_name').eq('id', userId).single();
         if (profileData) {
-          if (profileData.budget) setUserBudget(profileData.budget);
+          if (profileData.budget !== undefined && profileData.budget !== null) setUserBudget(profileData.budget);
           if (profileData.currency) setCurrency(profileData.currency as 'USD' | 'INR');
           if (profileData.full_name) setUserName(profileData.full_name);
         }
@@ -557,10 +551,6 @@ export default function App() {
                 <LogIn className="w-4 h-4" /> Sign In / Sign Up
               </button>
             )}
-            <button className="p-2 text-[#6B7280] dark:text-gray-400 hover:bg-[#F3F4F6] dark:hover:bg-gray-800 rounded-full relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-900"></span>
-            </button>
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 border border-white dark:border-gray-800 shadow-sm overflow-hidden">
                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`} alt="Avatar" />
             </div>
