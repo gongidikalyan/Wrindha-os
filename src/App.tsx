@@ -104,6 +104,8 @@ export default function App() {
           id: session.user.id, 
           email: session.user.email,
           full_name: session.user.user_metadata?.full_name || userName,
+          budget: userBudget,
+          currency: currency,
           last_active: new Date().toISOString()
         }).then();
       }
@@ -119,6 +121,8 @@ export default function App() {
           id: session.user.id, 
           email: session.user.email,
           full_name: session.user.user_metadata?.full_name || userName,
+          budget: userBudget,
+          currency: currency,
           last_active: new Date().toISOString()
         }).then();
       }
@@ -173,7 +177,7 @@ export default function App() {
 
   const [userBudget, setUserBudget] = useState<number>(() => {
     const saved = localStorage.getItem('wrindha_budget');
-    return saved ? parseFloat(saved) : (currency === 'USD' ? 5000 : 400000);
+    return saved ? parseFloat(saved) : 400000;
   });
 
   const [isInitializing, setIsInitializing] = useState(true);
@@ -181,7 +185,17 @@ export default function App() {
   // Persistence
   useEffect(() => {
     localStorage.setItem('wrindha_budget', userBudget.toString());
-  }, [userBudget]);
+    if (!isInitializing && session?.user?.id && !bypassConfig) {
+      supabase.from('profiles').update({ budget: userBudget }).eq('id', session.user.id).then();
+    }
+  }, [userBudget, isInitializing, session, bypassConfig]);
+
+  useEffect(() => {
+    localStorage.setItem('wrindha_currency', currency);
+    if (!isInitializing && session?.user?.id && !bypassConfig) {
+      supabase.from('profiles').update({ currency: currency }).eq('id', session.user.id).then();
+    }
+  }, [currency, isInitializing, session, bypassConfig]);
 
   // Initial Fetch from Supabase
   useEffect(() => {
@@ -194,6 +208,13 @@ export default function App() {
       const userId = session.user.id;
 
       try {
+        const { data: profileData } = await supabase.from('profiles').select('budget, currency, full_name').eq('id', userId).single();
+        if (profileData) {
+          if (profileData.budget) setUserBudget(profileData.budget);
+          if (profileData.currency) setCurrency(profileData.currency as 'USD' | 'INR');
+          if (profileData.full_name) setUserName(profileData.full_name);
+        }
+
         const { data: habitsData } = await supabase.from('habits').select('*').eq('user_id', userId);
         if (habitsData && habitsData.length > 0) {
           setHabits(habitsData.map(h => ({
@@ -725,12 +746,27 @@ function AuthView() {
             </button>
           </form>
 
-          <div className="mt-8 text-center">
+          <div className="mt-8 flex flex-col gap-3 text-center">
             <button 
               onClick={() => setIsLogin(!isLogin)}
               className="text-sm font-bold text-gray-400 hover:text-indigo-600 transition-colors"
             >
               {isLogin ? "New here? Create your space →" : "Already systematic? Log in →"}
+            </button>
+            
+            <div className="relative py-4">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100 dark:border-gray-800"></div></div>
+              <div className="relative flex justify-center text-xs uppercase"><span className="bg-white dark:bg-gray-900 px-2 text-gray-300 font-bold tracking-widest">Or</span></div>
+            </div>
+
+            <button 
+              onClick={() => {
+                localStorage.setItem('wrindha_bypass_config', 'true');
+                window.location.reload();
+              }}
+              className="text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-black dark:hover:text-white transition-colors"
+            >
+              Continue Offline
             </button>
           </div>
         </div>
@@ -1752,7 +1788,7 @@ function FinanceView({ expenses, setExpenses, currency, setCurrency, theme, budg
                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: colors[i % colors.length] }}></div>
                            <span className="text-sm font-medium dark:text-gray-300">{cat}</span>
                          </div>
-                         <span className="text-sm font-mono font-bold dark:text-white">${val.toFixed(2)}</span>
+                         <span className="text-sm font-mono font-bold dark:text-white">{formatVal(val)}</span>
                        </div>
                      );
                    })}

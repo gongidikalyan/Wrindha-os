@@ -1,7 +1,8 @@
 {
   "name": "wrindha-os",
   "private": true,
-  "version": "0.0.0",
+  "description": "Wrindha OS - An advanced student productivity ecosystem built with React, Supabase, and Gemini AI.",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",

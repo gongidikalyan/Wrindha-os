@@ -1,6 +1,10 @@
 {
   "name": "Wrindha OS",
-  "description": "An all-in-one productivity ecosystem combining Habit Tracking, Study Planning, Finance Management, and Task Orchestration.",
+  "description": "An all-in-one productivity ecosystem for students combining Study Planning, Habit Tracking, Finance Management, and Task Orchestration with AI insights.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": [
+    "authentication",
+    "realtime_db",
+    "ai_integration"
+  ]
 }
