@@ -113,7 +113,7 @@ export default function App() {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       if (session) {
         if (session.user?.user_metadata?.full_name) {
@@ -127,7 +127,7 @@ export default function App() {
             last_active: new Date().toISOString()
           }).then();
         }
-      } else {
+      } else if (event === 'SIGNED_OUT') {
         // Logout occurred: Clear personal data arrays
         setHabits([]);
         setTasks([]);
@@ -229,31 +229,73 @@ export default function App() {
         }
 
         const { data: habitsData } = await supabase.from('habits').select('*').eq('user_id', userId);
-        setHabits(habitsData && habitsData.length > 0 ? habitsData.map(h => ({
+        const mappedHabits = habitsData && habitsData.length > 0 ? habitsData.map(h => ({
           ...h,
           completedAt: h.completed_at || h.completedAt || []
-        })) : []);
+        })) : [];
+        setHabits(prev => {
+          const merged = [...mappedHabits];
+          prev.forEach(local => {
+            if (!merged.find(m => m.id === local.id)) merged.push(local);
+          });
+          return merged;
+        });
 
         const { data: tasksData } = await supabase.from('tasks').select('*').eq('user_id', userId);
-        setTasks(tasksData && tasksData.length > 0 ? tasksData.map(t => ({
+        const mappedTasks = tasksData && tasksData.length > 0 ? tasksData.map(t => ({
           ...t,
           dueDate: t.due_date || t.dueDate
-        })) : []);
+        })) : [];
+        setTasks(prev => {
+          const merged = [...mappedTasks];
+          prev.forEach(local => {
+            if (!merged.find(m => m.id === local.id)) merged.push(local);
+          });
+          return merged;
+        });
 
         const { data: expensesData } = await supabase.from('expenses').select('*').eq('user_id', userId);
-        setExpenses(expensesData && expensesData.length > 0 ? expensesData : []);
+        const mappedExpenses = expensesData && expensesData.length > 0 ? expensesData : [];
+        setExpenses(prev => {
+          const merged = [...mappedExpenses];
+          prev.forEach(local => {
+            if (!merged.find(m => m.id === local.id)) merged.push(local);
+          });
+          return merged;
+        });
 
         const { data: goalsData } = await supabase.from('goals').select('*').eq('user_id', userId);
-        setGoals(goalsData && goalsData.length > 0 ? goalsData.map(g => ({
+        const mappedGoals = goalsData && goalsData.length > 0 ? goalsData.map(g => ({
           ...g,
           targetDate: g.target_date || g.targetDate
-        })) : []);
+        })) : [];
+        setGoals(prev => {
+          const merged = [...mappedGoals];
+          prev.forEach(local => {
+            if (!merged.find(m => m.id === local.id)) merged.push(local);
+          });
+          return merged;
+        });
 
         const { data: timetableData } = await supabase.from('timetable').select('*').eq('user_id', userId);
-        setTimetable(timetableData && timetableData.length > 0 ? timetableData : []);
+        const mappedTimetable = timetableData && timetableData.length > 0 ? timetableData : [];
+        setTimetable(prev => {
+          const merged = [...mappedTimetable];
+          prev.forEach(local => {
+            if (!merged.find(m => m.id === local.id)) merged.push(local);
+          });
+          return merged;
+        });
 
         const { data: studyData } = await supabase.from('study_courses').select('*').eq('user_id', userId);
-        setStudyCourses(studyData && studyData.length > 0 ? studyData : []);
+        const mappedStudy = studyData && studyData.length > 0 ? studyData : [];
+        setStudyCourses(prev => {
+          const merged = [...mappedStudy];
+          prev.forEach(local => {
+            if (!merged.find(m => m.id === local.id)) merged.push(local);
+          });
+          return merged;
+        });
       } catch (error) {
         console.error('Error fetching from Supabase:', error);
       } finally {
