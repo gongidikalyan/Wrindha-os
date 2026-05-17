@@ -70,7 +70,7 @@ const infoModules = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
   const [currency, setCurrency] = useState<'USD' | 'INR'>(() => (localStorage.getItem('wrindha_currency') as 'USD' | 'INR') || 'INR');
   const [userName, setUserName] = useState(() => localStorage.getItem('wrindha_user_name') || "Felix");
   const [userBudget, setUserBudget] = useState<number>(() => {
@@ -210,9 +210,25 @@ export default function App() {
     }
   }, [currency, isInitializing, session, bypassConfig]);
 
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth <= 768 && isSidebarOpen) {
+        setIsSidebarOpen(false);
+      } else if (window.innerWidth > 768 && !isSidebarOpen) {
+        setIsSidebarOpen(true);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isSidebarOpen]);
+
   // Initial Fetch from Supabase
   useEffect(() => {
     async function fetchData() {
+      if (session?.user?.id) {
+        setIsInitializing(true);
+      }
+      
       if (!isSupabaseConfigured() || !session?.user?.id) {
         setIsInitializing(false);
         return;
@@ -582,7 +598,7 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 bg-[#F8F9FA] dark:bg-gray-950 overflow-y-auto transition-colors duration-300">
-        <header className="h-16 border-b border-[#E5E7EB] dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md sticky top-0 z-40 px-8 flex items-center justify-between">
+        <header className="h-16 border-b border-[#E5E7EB] dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md sticky top-0 z-40 px-4 md:px-8 flex items-center justify-between">
           <div className="flex-1"></div>
           <div className="flex items-center gap-4">
             {!session && (
@@ -599,7 +615,7 @@ export default function App() {
           </div>
         </header>
 
-        <div className="p-8 max-w-7xl mx-auto w-full">
+        <div className="p-4 md:p-8 max-w-7xl mx-auto w-full">
            <AnimatePresence mode="wait">
              <motion.div
                key={activeTab}
