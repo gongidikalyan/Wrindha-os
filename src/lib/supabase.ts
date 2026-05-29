@@ -7,7 +7,22 @@ if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KE
   console.log('Supabase credentials missing. Using default demo environment.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const getStorageAlternative = () => {
+  try {
+    const sessionOnly = localStorage.getItem('wrindha_session_only') === 'true';
+    return sessionOnly ? window.sessionStorage : window.localStorage;
+  } catch (e) {
+    return window.localStorage;
+  }
+};
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: getStorageAlternative(),
+    autoRefreshToken: true,
+    persistSession: true,
+  }
+});
 
 export const isSupabaseConfigured = () => {
   const isPlaceholder = supabaseUrl.includes('your_') || supabaseUrl.includes('placeholder');

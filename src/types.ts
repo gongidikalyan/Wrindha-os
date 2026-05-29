@@ -100,3 +100,35 @@ export interface TimetableEntry {
   date: string;
   color: string;
 }
+
+// 9. Blogs & Guides
+export interface Blog {
+  id: string;
+  title: string;
+  content: string;
+  author: string;
+  imageUrl?: string;
+  category: string;
+  createdAt: string;
+}
+
+// 10. Pricing & Subscriptions
+export interface PricingPlan {
+  id: string;
+  name: string;
+  price: string;
+  period: string;
+  features: string[];
+  isActive: boolean;
+  createdAt?: string;
+}
+
+export interface UserSubscription {
+  userId: string;
+  email: string;
+  fullName: string;
+  subscriptionTier: string;
+  maxHabits: number;
+}
+
+

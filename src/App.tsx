@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   BarChart3, 
   Calendar, 
   CheckCircle2, 
+  Check,
   LayoutDashboard, 
   ListTodo, 
   Target, 
@@ -16,6 +17,7 @@ import {
   Plus,
   Flame,
   Brain,
+  BookOpen,
   ChevronRight,
   TrendingDown,
   TrendingUp,
@@ -40,24 +42,35 @@ import {
   Heart,
   MessageCircle,
   Scale,
-  Handshake
+  Handshake,
+  CreditCard,
+  Award,
+  ShieldAlert,
+  Timer,
+  Play
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn, formatCurrency, getStorage, setStorage } from "@/src/lib/utils";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
-import { Task, EisenhowerQuadrant, Habit, Expense, Goal, GoalType, TimetableEntry, TimetableType, StudyCourse } from "./types";
+import { Task, EisenhowerQuadrant, Habit, Expense, Goal, GoalType, TimetableEntry, TimetableType, StudyCourse, Blog, PricingPlan, UserSubscription } from "./types";
 import { supabase, isSupabaseConfigured, getSupabaseError, supabaseUrl } from "./lib/supabase";
 import { gemini } from "./services/geminiService";
+import AnalyticsView from "./components/AnalyticsView";
+import PomodoroTimer from "./components/PomodoroTimer";
+import TaskNotesEditor from "./components/TaskNotesEditor";
 
 // Modules
 const modules = [
   { id: 'dashboard', name: 'Overview', icon: LayoutDashboard, color: 'text-blue-500' },
+  { id: 'analytics', name: 'Analytics', icon: BarChart3, color: 'text-pink-500' },
   { id: 'habits', name: 'Habit Tracker', icon: Flame, color: 'text-orange-500' },
   { id: 'tasks', name: 'Tasks & Matrix', icon: CheckCircle2, color: 'text-green-500' },
   { id: 'goals', name: 'Goal System', icon: Target, color: 'text-purple-500' },
   { id: 'study', name: 'Study Planner', icon: GraduationCap, color: 'text-indigo-500' },
   { id: 'finance', name: 'Expenses', icon: Wallet, color: 'text-emerald-500' },
   { id: 'timetable', name: 'Timetable', icon: Calendar, color: 'text-cyan-500' },
+  { id: 'blogs', name: 'Blogs & Guides', icon: FileText, color: 'text-rose-500' },
+  { id: 'pricing', name: 'Plans & Pricing', icon: CreditCard, color: 'text-amber-500' },
 ];
 
 const infoModules = [
@@ -80,11 +93,62 @@ export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('wrindha_theme') as 'light' | 'dark') || 'light');
   const [showSettings, setShowSettings] = useState(false);
   const [session, setSession] = useState<any>(null);
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+  const [isPasswordRecoveryActive, setIsPasswordRecoveryActive] = useState(false);
   const [bypassConfig, setBypassConfig] = useState(() => {
     const saved = localStorage.getItem('wrindha_bypass_config');
     if (saved !== null) return saved === 'true';
     return !isSupabaseConfigured();
   });
+
+  const [orders, setOrders] = useState<any[]>(() => {
+    const saved = localStorage.getItem('wrindha_orders');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [sessionOnly, setSessionOnly] = useState(() => {
+    return localStorage.getItem('wrindha_session_only') === 'true';
+  });
+
+  const [subscriptionTier, setSubscriptionTier] = useState<string>(() => localStorage.getItem('wrindha_subscription_tier') || 'Free');
+  const [maxHabits, setMaxHabits] = useState<number>(() => {
+    const saved = localStorage.getItem('wrindha_max_habits');
+    return saved ? parseInt(saved) : 5;
+  });
+  const [userPlans, setUserPlans] = useState<PricingPlan[]>(() => {
+    const saved = localStorage.getItem('wrindha_user_plans');
+    return saved ? JSON.parse(saved) : [
+      {
+        id: "premium-plan-1",
+        name: "Pro Space",
+        price: "₹199",
+        period: "month",
+        features: ["Unlimited Habits & Tasks", "Full Budgeting Insights", "Smart Study courses with auto exam reminders", "Priority support"],
+        isActive: true
+      },
+      {
+        id: "premium-plan-2",
+        name: "Ultimate Matrix",
+        price: "₹399",
+        period: "month",
+        features: ["Everything in Pro Space", "Unlimited Timetable elements", "Exclusive Premium productivity badges", "Advance Analytics dashboards", "AI-powered course summarizer"],
+        isActive: true
+      }
+    ];
+  });
+  const [allUserProfiles, setAllUserProfiles] = useState<UserSubscription[]>([]);
+
+  useEffect(() => {
+    localStorage.setItem('wrindha_subscription_tier', subscriptionTier);
+  }, [subscriptionTier]);
+
+  useEffect(() => {
+    localStorage.setItem('wrindha_max_habits', maxHabits.toString());
+  }, [maxHabits]);
+
+  useEffect(() => {
+    localStorage.setItem('wrindha_user_plans', JSON.stringify(userPlans));
+  }, [userPlans]);
+
 
   useEffect(() => {
     localStorage.setItem('wrindha_currency', currency);
@@ -94,6 +158,21 @@ export default function App() {
     localStorage.setItem('wrindha_bypass_config', bypassConfig.toString());
   }, [bypassConfig]);
 
+  useEffect(() => {
+    // Detect password recovery in URL hash or search params proactively on mount or reload
+    const hash = window.location.hash || "";
+    const search = window.location.search || "";
+    const isRecovery = hash.includes("type=recovery") || 
+                       search.includes("type=recovery") || 
+                       (hash.includes("access_token") && hash.includes("recovery")) ||
+                       hash.includes("recovery") ||
+                       search.includes("recovery");
+                       
+    if (isRecovery) {
+      setIsPasswordRecoveryActive(true);
+    }
+  }, []);
+
   const isAdmin = session?.user?.email === 'gongidikalyan08@gmail.com';
 
   useEffect(() => {
@@ -102,52 +181,91 @@ export default function App() {
       if (session?.user?.user_metadata?.full_name) {
         setUserName(session.user.user_metadata.full_name);
       }
-      if (session?.user && !bypassConfig) {
-        // Track profile for admin stats
-        supabase.from('profiles').upsert({ 
-          id: session.user.id, 
-          email: session.user.email,
-          full_name: session.user.user_metadata?.full_name || userName,
-          last_active: new Date().toISOString()
-        }).then();
+      const isBypassed = () => {
+        const saved = localStorage.getItem('wrindha_bypass_config');
+        return saved === 'true';
+      };
+      if (session?.user && !isBypassed()) {
+        const uName = session.user.user_metadata?.full_name || localStorage.getItem('wrindha_user_name') || "Felix";
+        supabase.from('profiles').select('id').eq('id', session.user.id).single().then(({ data }) => {
+          if (data) {
+            supabase.from('profiles').update({ 
+              last_active: new Date().toISOString() 
+            }).eq('id', session.user.id).then();
+          } else {
+            supabase.from('profiles').insert({ 
+              id: session.user.id, 
+              email: session.user.email,
+              full_name: uName,
+              last_active: new Date().toISOString(),
+              budget: userBudget,
+              currency: currency
+            }).then();
+          }
+        });
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
+      if (event === 'PASSWORD_RECOVERY') {
+        setShowResetPasswordModal(true);
+        setIsPasswordRecoveryActive(true);
+      }
       if (session) {
         if (session.user?.user_metadata?.full_name) {
           setUserName(session.user.user_metadata.full_name);
         }
-        if (!bypassConfig) {
-          supabase.from('profiles').upsert({ 
-            id: session.user.id, 
-            email: session.user.email,
-            full_name: session.user.user_metadata?.full_name || userName,
-            last_active: new Date().toISOString()
-          }).then();
+        const isBypassed = () => {
+          const saved = localStorage.getItem('wrindha_bypass_config');
+          return saved === 'true';
+        };
+        if (!isBypassed()) {
+          const uName = session.user.user_metadata?.full_name || localStorage.getItem('wrindha_user_name') || "Felix";
+          supabase.from('profiles').select('id').eq('id', session.user.id).single().then(({ data }) => {
+            if (data) {
+              supabase.from('profiles').update({ 
+                last_active: new Date().toISOString() 
+              }).eq('id', session.user.id).then();
+            } else {
+              supabase.from('profiles').insert({ 
+                id: session.user.id, 
+                email: session.user.email,
+                full_name: uName,
+                last_active: new Date().toISOString(),
+                budget: userBudget,
+                currency: currency
+              }).then();
+            }
+          });
         }
       } else if (event === 'SIGNED_OUT') {
-        // Logout occurred: Clear personal data arrays
+        // Logout occurred: Clear personal data arrays and settings/tiers
         setHabits([]);
         setTasks([]);
         setExpenses([]);
         setGoals([]);
         setTimetable([]);
         setStudyCourses([]);
-        // We keep userName and userBudget as they are considered persistent settings
+        setUserName("Felix");
+        setUserBudget(5000);
+        setCurrency("INR");
+        setSubscriptionTier("Free");
+        setMaxHabits(5);
         
-        // Clear persistence for personal data only
+        // Clear all personal data and configuration settings from localStorage
         const keys = [
           'wrindha_habits', 'wrindha_tasks', 'wrindha_expenses', 
-          'wrindha_goals', 'wrindha_timetable', 'wrindha_study'
+          'wrindha_goals', 'wrindha_timetable', 'wrindha_study',
+          'wrindha_user_name', 'wrindha_budget', 'wrindha_currency',
+          'wrindha_subscription_tier', 'wrindha_max_habits'
         ];
         keys.forEach(k => localStorage.removeItem(k));
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [userName, userBudget, bypassConfig]);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('wrindha_user_name', userName);
@@ -193,6 +311,30 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [blogs, setBlogs] = useState<Blog[]>(() => {
+    const saved = localStorage.getItem('wrindha_blogs');
+    return saved ? JSON.parse(saved) : [
+      {
+        id: "1",
+        title: "Productivity Hacks for Students & Professionals",
+        content: "To stay ahead in your daily routines, categorize your tasks using the Eisenhower Matrix. Tackle the 'Do First' quadrant immediately to free up brain energy. Break down study loads into blocks of 25-minute Pomodoro intervals to reinforce focus and retention.",
+        author: "Admin",
+        category: "Productivity",
+        createdAt: "2026-05-13T12:00:00Z",
+        imageUrl: "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?q=80&w=600&auto=format&fit=crop"
+      },
+      {
+        id: "2",
+        title: "Building Habits That Stick for Good",
+        content: "Consistency beats intensity. Focus on establishing repetitive progress over grand, sporadic gestures. Habit-stacking is an excellent strategy: anchor a new habit to an existing automated routine (e.g., 'Right after making my morning coffee, I will write down 3 priority desk goals'). Maintain streak counters to visualize incremental progression and build positive feedback loops.",
+        author: "Admin",
+        category: "Habits",
+        createdAt: "2026-05-15T10:00:00Z",
+        imageUrl: "https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?q=80&w=600&auto=format&fit=crop"
+      }
+    ];
+  });
+
   const [isInitializing, setIsInitializing] = useState(true);
 
   // Persistence
@@ -209,6 +351,13 @@ export default function App() {
       supabase.from('profiles').update({ currency: currency }).eq('id', session.user.id).then();
     }
   }, [currency, isInitializing, session, bypassConfig]);
+
+  useEffect(() => {
+    localStorage.setItem('wrindha_user_name', userName);
+    if (!isInitializing && session?.user?.id && !bypassConfig) {
+      supabase.from('profiles').update({ full_name: userName }).eq('id', session.user.id).then();
+    }
+  }, [userName, isInitializing, session, bypassConfig]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -237,11 +386,46 @@ export default function App() {
       const userId = session.user.id;
 
       try {
-        const { data: profileData } = await supabase.from('profiles').select('budget, currency, full_name').eq('id', userId).single();
+        const { data: profileData } = await supabase.from('profiles').select('*').eq('id', userId).single();
         if (profileData) {
           if (profileData.budget !== undefined && profileData.budget !== null) setUserBudget(profileData.budget);
           if (profileData.currency) setCurrency(profileData.currency as 'USD' | 'INR');
           if (profileData.full_name) setUserName(profileData.full_name);
+          if (profileData.subscription_tier) setSubscriptionTier(profileData.subscription_tier);
+          if (profileData.max_habits) setMaxHabits(profileData.max_habits);
+        }
+
+        try {
+          const { data: plansData, error: plansError } = await supabase.from('pricing_plans').select('*');
+          if (!plansError && plansData) {
+            setUserPlans(plansData.map(p => ({
+              id: p.id,
+              name: p.name,
+              price: p.price,
+              period: p.period || 'month',
+              features: p.features || [],
+              isActive: p.is_active === undefined ? true : p.is_active
+            })));
+          }
+        } catch (planErr) {
+          console.warn("Pricing plans table or columns may not exist yet, defaulting:", planErr);
+        }
+
+        if (session?.user?.email === 'gongidikalyan08@gmail.com') {
+          try {
+            const { data: allProfiles } = await supabase.from('profiles').select('*');
+            if (allProfiles) {
+              setAllUserProfiles(allProfiles.map(p => ({
+                userId: p.id,
+                email: p.email,
+                fullName: p.full_name || 'Anonymous User',
+                subscriptionTier: p.subscription_tier || 'Free',
+                maxHabits: p.max_habits || 5
+              })));
+            }
+          } catch (profileErr) {
+            console.warn("Could not query profiles:", profileErr);
+          }
         }
 
         const { data: habitsData } = await supabase.from('habits').select('*').eq('user_id', userId);
@@ -312,6 +496,32 @@ export default function App() {
           });
           return merged;
         });
+
+        // Globally load blogs (any user can view them)
+        try {
+          const { data: blogsData } = await supabase.from('blogs').select('*').order('created_at', { ascending: false });
+          if (blogsData && blogsData.length > 0) {
+            const mappedBlogs = blogsData.map(b => ({
+              ...b,
+              imageUrl: b.image_url || b.imageUrl || undefined,
+              createdAt: b.created_at || b.createdAt || new Date().toISOString()
+            }));
+            setBlogs(mappedBlogs);
+          }
+        } catch (blogError) {
+          console.warn("Table 'blogs' might not be created in Supabase yet. Using local state fallback.", blogError);
+        }
+
+        // Load order records
+        try {
+          const { data: ordersData } = await supabase.from('orders').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+          if (ordersData && ordersData.length > 0) {
+            setOrders(ordersData);
+            localStorage.setItem('wrindha_orders', JSON.stringify(ordersData));
+          }
+        } catch (ordersError) {
+          console.warn("Table 'orders' might not exist or be accessible yet in Supabase.", ordersError);
+        }
       } catch (error) {
         console.error('Error fetching from Supabase:', error);
       } finally {
@@ -385,7 +595,193 @@ export default function App() {
     if (!isInitializing) syncToSupabase('study_courses', studyCourses);
   }, [studyCourses, isInitializing]);
 
+  const syncBlogsToSupabase = async (blogList: Blog[]) => {
+    if (!isSupabaseConfigured() || !session?.user?.id || bypassConfig) return;
+    if (session?.user?.email !== 'gongidikalyan08@gmail.com') return;
+    try {
+      const mapped = blogList.map(b => ({
+        id: b.id,
+        title: b.title,
+        content: b.content,
+        author: b.author,
+        image_url: b.imageUrl || null,
+        category: b.category,
+        created_at: b.createdAt
+      }));
+      await supabase.from('blogs').upsert(mapped);
+    } catch (error) {
+      console.warn('Error syncing blogs to Supabase (blogs table may need creation):', error);
+    }
+  };
+
+  const updateUserTier = async (userId: string, tier: string, habitsLimit: number, amountPaid?: string, planId?: string) => {
+    if (!isSupabaseConfigured() || bypassConfig) {
+      // Local Fallback if offline
+      if (session?.user?.id === userId || userId === "local-user") {
+        setSubscriptionTier(tier);
+        setMaxHabits(habitsLimit);
+        localStorage.setItem('wrindha_subscription_tier', tier);
+        localStorage.setItem('wrindha_max_habits', habitsLimit.toString());
+      }
+
+      // Record offline order
+      if (amountPaid && planId) {
+        const orderId = 'ord_' + Math.random().toString(36).substring(2, 9);
+        const orderData = {
+          id: orderId,
+          user_id: session?.user?.id || 'local-user',
+          plan_id: planId,
+          plan_name: tier,
+          amount: parseFloat(amountPaid.replace(/[^0-9.]/g, '')) || 0,
+          currency: amountPaid.includes('₹') || amountPaid.includes('INR') ? 'INR' : 'USD',
+          status: 'completed',
+          payment_method: 'stripe',
+          created_at: new Date().toISOString()
+        };
+        const updatedOrders = [orderData, ...orders];
+        setOrders(updatedOrders);
+        localStorage.setItem('wrindha_orders', JSON.stringify(updatedOrders));
+      }
+      return;
+    }
+    try {
+      await supabase.from('profiles').update({ 
+        subscription_tier: tier,
+        max_habits: habitsLimit
+      }).eq('id', userId);
+      
+      if (session?.user?.id === userId) {
+        setSubscriptionTier(tier);
+        setMaxHabits(habitsLimit);
+        localStorage.setItem('wrindha_subscription_tier', tier);
+        localStorage.setItem('wrindha_max_habits', habitsLimit.toString());
+      }
+      
+      if (session?.user?.email === 'gongidikalyan08@gmail.com') {
+        setAllUserProfiles(prev => prev.map(p => p.userId === userId ? { ...p, subscriptionTier: tier, maxHabits: habitsLimit } : p));
+      }
+
+      // Record order logging
+      if (amountPaid && planId) {
+        const orderId = 'ord_' + Math.random().toString(36).substring(2, 9);
+        const orderData = {
+          id: orderId,
+          user_id: userId,
+          plan_id: planId,
+          plan_name: tier,
+          amount: parseFloat(amountPaid.replace(/[^0-9.]/g, '')) || 0,
+          currency: amountPaid.includes('₹') || amountPaid.includes('INR') ? 'INR' : 'USD',
+          status: 'completed',
+          payment_method: 'stripe',
+          created_at: new Date().toISOString()
+        };
+        
+        try {
+          await supabase.from('orders').insert(orderData);
+        } catch (dbErr) {
+          console.error("Failed to insert order to Supabase:", dbErr);
+        }
+        
+        const updatedOrders = [orderData, ...orders];
+        setOrders(updatedOrders);
+        localStorage.setItem('wrindha_orders', JSON.stringify(updatedOrders));
+      }
+    } catch (err) {
+      console.error("Error updating user tier:", err);
+    }
+  };
+
+  const updatePricingPlan = async (plan: PricingPlan) => {
+    // If not config, update locally
+    if (!isSupabaseConfigured() || bypassConfig || session?.user?.email !== 'gongidikalyan08@gmail.com') {
+      setUserPlans(prev => {
+        const index = prev.findIndex(p => p.id === plan.id);
+        if (index >= 0) return prev.map(p => p.id === plan.id ? plan : p);
+        return [...prev, plan];
+      });
+      return;
+    }
+    try {
+      await supabase.from('pricing_plans').upsert({
+        id: plan.id,
+        name: plan.name,
+        price: plan.price,
+        period: plan.period,
+        features: plan.features,
+        is_active: plan.isActive
+      });
+      setUserPlans(prev => {
+        const index = prev.findIndex(p => p.id === plan.id);
+        if (index >= 0) return prev.map(p => p.id === plan.id ? plan : p);
+        return [...prev, plan];
+      });
+    } catch (err) {
+      console.error("Error updating plan:", err);
+    }
+  };
+
+  const deletePricingPlan = async (id: string) => {
+    if (!isSupabaseConfigured() || bypassConfig || session?.user?.email !== 'gongidikalyan08@gmail.com') {
+      setUserPlans(prev => prev.filter(p => p.id !== id));
+      return;
+    }
+    try {
+      await supabase.from('pricing_plans').delete().eq('id', id);
+      setUserPlans(prev => prev.filter(p => p.id !== id));
+    } catch (err) {
+      console.error("Error deleting plan:", err);
+    }
+  };
+
+  useEffect(() => {
+    localStorage.setItem('wrindha_blogs', JSON.stringify(blogs));
+    if (!isInitializing && session?.user?.email === 'gongidikalyan08@gmail.com') {
+      syncBlogsToSupabase(blogs);
+    }
+  }, [blogs, isInitializing]);
+
   const configError = getSupabaseError();
+
+  if (isPasswordRecoveryActive) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] dark:bg-gray-950 flex items-center justify-center p-6 transition-colors font-sans">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-md bg-white dark:bg-gray-900 rounded-[2.5rem] border-2 border-indigo-600 p-10 shadow-2xl relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 p-8 opacity-5">
+             <Brain className="w-32 h-32 text-indigo-600 animate-pulse" />
+          </div>
+
+          <div className="relative z-10 space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-600/20">
+                <Lock className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black dark:text-white">Reset Password</h3>
+                <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mt-0.5">Secure Update Required</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+              Please configure a safe, strong password to regain complete access to your Wrindha OS workspace.
+            </p>
+
+            <ResetPasswordForm onComplete={() => {
+              setIsPasswordRecoveryActive(false);
+              setShowResetPasswordModal(false);
+              // Clean up local URL and redirect/reload to enter the re-secured session
+              window.location.hash = "";
+              window.location.search = "";
+              window.location.href = window.location.origin;
+            }} />
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (!session && isSupabaseConfigured() && !bypassConfig) {
     return <AuthView onBypass={() => setBypassConfig(true)} />;
@@ -397,11 +793,22 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-[#F8F9FA] dark:bg-gray-950 text-[#1A1A1A] dark:text-gray-100 font-sans overflow-hidden transition-colors duration-300">
+      {isSidebarOpen && (
+        <div 
+          onClick={() => setIsSidebarOpen(false)} 
+          className="fixed inset-0 z-40 bg-black/45 backdrop-blur-xs transition-opacity md:hidden animate-none"
+        />
+      )}
+
       {/* Sidebar */}
       <motion.aside 
         initial={false}
-        animate={{ width: isSidebarOpen ? 260 : 80 }}
-        className="bg-white dark:bg-gray-900 border-r border-[#E5E7EB] dark:border-gray-800 flex flex-col z-50 shrink-0"
+        animate={{ 
+          width: isSidebarOpen ? 260 : (window.innerWidth < 768 ? 0 : 80),
+          x: isSidebarOpen ? 0 : (window.innerWidth < 768 ? -260 : 0)
+        }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="bg-white dark:bg-gray-900 border-r border-[#E5E7EB] dark:border-gray-800 flex flex-col z-50 shrink-0 fixed md:static inset-y-0 left-0 shadow-2xl md:shadow-none"
       >
         <div className="h-20 flex items-center px-6">
           <div className="flex items-center gap-3 w-full overflow-hidden">
@@ -560,6 +967,22 @@ export default function App() {
                          </select>
                       </div>
                       <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                         <div className="space-y-0.5">
+                            <span className="text-sm font-medium dark:text-gray-300 block">Strict Auth (No Auto-Login)</span>
+                            <span className="text-[10px] text-gray-400 dark:text-gray-500 block leading-tight">Requires signing in on each new session</span>
+                         </div>
+                         <input 
+                           type="checkbox"
+                           checked={sessionOnly}
+                           onChange={(e) => {
+                             const checked = e.target.checked;
+                             setSessionOnly(checked);
+                             localStorage.setItem('wrindha_session_only', checked ? 'true' : 'false');
+                           }}
+                           className="rounded border-gray-300 dark:border-gray-700 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                         />
+                      </div>
+                      <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
                         <span className="text-sm font-medium dark:text-gray-300">Supabase</span>
                         <div className="flex items-center gap-2">
                           <div className={cn("w-2 h-2 rounded-full", isSupabaseConfigured() ? "bg-emerald-500" : "bg-amber-500")}></div>
@@ -597,8 +1020,18 @@ export default function App() {
       </AnimatePresence>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 bg-[#F8F9FA] dark:bg-gray-950 overflow-y-auto transition-colors duration-300">
+      <main className="flex-1 flex flex-col min-w-0 bg-[#F8F9FA] dark:bg-gray-950 overflow-y-auto transition-colors duration-300 pb-20 md:pb-0">
         <header className="h-16 border-b border-[#E5E7EB] dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md sticky top-0 z-40 px-4 md:px-8 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors text-gray-500 hover:text-black dark:hover:text-white shrink-0 block md:hidden"
+              aria-label="Toggle Sidebar"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <span className="font-extrabold text-sm text-[#1A1A1A] dark:text-white tracking-tight uppercase block md:hidden">Wrindha OS</span>
+          </div>
           <div className="flex-1"></div>
           <div className="flex items-center gap-4">
             {!session && (
@@ -625,13 +1058,24 @@ export default function App() {
                transition={{ duration: 0.2 }}
              >
                {activeTab === 'dashboard' && <DashboardView habits={habits} tasks={tasks} expenses={expenses} currency={currency} userName={userName} setUserName={setUserName} theme={theme} setActiveTab={setActiveTab} budget={userBudget} />}
+                {activeTab === 'analytics' && <AnalyticsView expenses={expenses} habits={habits} tasks={tasks} goals={goals} courses={studyCourses} currency={currency} />}
                {activeTab === 'habits' && <HabitsView habits={habits} setHabits={setHabits} onDelete={(id) => deleteFromSupabase('habits', id)} theme={theme} />}
                {activeTab === 'tasks' && <TasksView tasks={tasks} setTasks={setTasks} onDelete={(id) => deleteFromSupabase('tasks', id)} />}
                {activeTab === 'finance' && <FinanceView expenses={expenses} setExpenses={setExpenses} onDelete={(id) => deleteFromSupabase('expenses', id)} currency={currency} setCurrency={setCurrency} theme={theme} budget={userBudget} setBudget={setUserBudget} />}
                {activeTab === 'study' && <StudyView courses={studyCourses} setCourses={setStudyCourses} onDeleteCourse={(id) => deleteFromSupabase('study_courses', id)} />}
                {activeTab === 'goals' && <GoalsView goals={goals} setGoals={setGoals} onDelete={(id) => deleteFromSupabase('goals', id)} />}
                {activeTab === 'timetable' && <TimetableView entries={timetable} setEntries={setTimetable} onDelete={(id) => deleteFromSupabase('timetable', id)} theme={theme} />}
-               {activeTab === 'admin' && isAdmin && <AdminView />}
+               {activeTab === 'blogs' && <BlogsView blogs={blogs} setBlogs={setBlogs} isAdmin={isAdmin} />}
+               {activeTab === 'pricing' && <PricingView plans={userPlans} subscriptionTier={subscriptionTier} onUpgrade={updateUserTier} session={session} setActiveTab={setActiveTab} orders={orders} />}
+               {activeTab === 'admin' && isAdmin && (
+                 <AdminView 
+                   plans={userPlans} 
+                   allUsers={allUserProfiles || []} 
+                   onUpdateUser={updateUserTier} 
+                   onUpdatePlan={updatePricingPlan} 
+                   onDeletePlan={deletePricingPlan} 
+                 />
+               )}
                {activeTab === 'about' && <AboutView />}
                {activeTab === 'contact' && <ContactView />}
                {activeTab === 'privacy' && <PrivacyView />}
@@ -643,6 +1087,65 @@ export default function App() {
            <Footer setActiveTab={setActiveTab} />
         </div>
       </main>
+
+      {/* Mobile Sticky Bottom Navigation Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-45 md:hidden bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 px-3 py-2 flex justify-around items-center gap-1 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
+        {[
+          { id: 'dashboard', name: 'Overview', icon: LayoutDashboard },
+          { id: 'analytics', name: 'Analytics', icon: BarChart3 },
+          { id: 'habits', name: 'Habits', icon: Flame },
+          { id: 'tasks', name: 'Tasks', icon: ListTodo },
+          { id: 'blogs', name: 'Blogs', icon: FileText },
+          { id: 'pricing', name: 'Pricing', icon: Award },
+        ].map((m) => (
+          <button
+            key={m.id}
+            onClick={() => setActiveTab(m.id)}
+            className={cn(
+              "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all",
+              activeTab === m.id 
+                ? "text-indigo-600 dark:text-indigo-400 scale-105 font-bold" 
+                : "text-gray-400 hover:text-gray-600"
+            )}
+          >
+            <m.icon className="w-5 h-5 shrink-0 mb-0.5" />
+            <span className="text-[9px] tracking-tight">{m.name}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Absolute Password Reset Modal / Overlay */}
+      {showResetPasswordModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md bg-white dark:bg-gray-900 rounded-[2.5rem] border-2 border-indigo-600 p-8 shadow-2xl relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 p-6 opacity-5">
+              <Brain className="w-24 h-24 text-indigo-600 animate-pulse" />
+            </div>
+
+            <div className="relative z-10 space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-600/20">
+                  <Lock className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black dark:text-white">Reset Password</h3>
+                  <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mt-0.5">Secure Update Required</p>
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+                Please configure a safe, strong password to regain complete access to your Wrindha OS workspace.
+              </p>
+
+              <ResetPasswordForm onComplete={() => setShowResetPasswordModal(false)} />
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
@@ -708,6 +1211,110 @@ function Footer({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
   );
 }
 
+// --- Reset Password helper ---
+
+function ResetPasswordForm({ onComplete }: { onComplete: () => void }) {
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const meetsMinLength = password.length >= 8;
+  const meetsUppercase = /[A-Z]/.test(password);
+  const meetsLowercase = /[a-z]/.test(password);
+  const meetsNumber = /[0-9]/.test(password);
+  const meetsSpecial = /[^A-Za-z0-9]/.test(password);
+
+  const isPasswordStrong = meetsMinLength && meetsUppercase && meetsLowercase && meetsNumber && meetsSpecial;
+
+  const handleUpdate = async (e: any) => {
+    e.preventDefault();
+    if (!isPasswordStrong) {
+      setError("Please satisfy all password strength requirements first.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      setSuccess(true);
+      setTimeout(() => {
+        onComplete();
+      }, 1500);
+    } catch (err: any) {
+      setError(err.message || "An update error occurred.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="text-center p-6 space-y-3">
+        <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 rounded-full flex items-center justify-center mx-auto">
+          <ShieldCheck className="w-6 h-6 animate-bounce" />
+        </div>
+        <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Password Updated Successfully!</p>
+        <p className="text-xs text-gray-400">Your workspace is now re-secured.</p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleUpdate} className="space-y-4">
+      <div className="space-y-2">
+        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 ml-2">New Password</label>
+        <input 
+          type="password" 
+          required
+          autoFocus
+          className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white px-5 py-4 rounded-2xl border-none outline-none focus:ring-2 ring-indigo-500/50 transition-all font-medium text-sm"
+          placeholder="••••••••"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+        />
+      </div>
+
+      <div className="p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800 space-y-2">
+        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Required Elements</p>
+        <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 pt-1">
+          <div className="flex items-center gap-1.5 text-xs">
+            {meetsMinLength ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <X className="w-3.5 h-3.5 text-rose-500" />}
+            <span className={meetsMinLength ? "text-emerald-600 font-bold" : "text-gray-400"}>8+ characters</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs">
+            {meetsUppercase ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <X className="w-3.5 h-3.5 text-rose-500" />}
+            <span className={meetsUppercase ? "text-emerald-600 font-bold" : "text-gray-400"}>1 uppercase</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs">
+            {meetsLowercase ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <X className="w-3.5 h-3.5 text-rose-500" />}
+            <span className={meetsLowercase ? "text-emerald-600 font-bold" : "text-gray-400"}>1 lowercase</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs">
+            {meetsNumber ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <X className="w-3.5 h-3.5 text-rose-500" />}
+            <span className={meetsNumber ? "text-emerald-600 font-bold" : "text-gray-400"}>1 number</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs col-span-2">
+            {meetsSpecial ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <X className="w-3.5 h-3.5 text-rose-500" />}
+            <span className={meetsSpecial ? "text-emerald-600 font-bold" : "text-gray-400"}>1 special symbol (e.g. !@#$)</span>
+          </div>
+        </div>
+      </div>
+
+      {error && <p className="text-red-500 text-xs font-bold px-2">{error}</p>}
+
+      <button 
+        type="submit" 
+        disabled={loading || !isPasswordStrong}
+        className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40"
+      >
+        {loading ? "Securing Account..." : "Confirm & Re-encrypt"}
+      </button>
+    </form>
+  );
+}
+
 // --- Auth View ---
 
 function AuthView({ onBypass }: { onBypass: () => void }) {
@@ -715,19 +1322,42 @@ function AuthView({ onBypass }: { onBypass: () => void }) {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [isLogin, setIsLogin] = useState(true);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const meetsMinLength = password.length >= 8;
+  const meetsUppercase = /[A-Z]/.test(password);
+  const meetsLowercase = /[a-z]/.test(password);
+  const meetsNumber = /[0-9]/.test(password);
+  const meetsSpecial = /[^A-Za-z0-9]/.test(password);
+
+  const isPasswordStrong = meetsMinLength && meetsUppercase && meetsLowercase && meetsNumber && meetsSpecial;
 
   const handleAuth = async (e: any) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccessMsg(null);
 
     try {
-      if (isLogin) {
+      if (showForgotPassword) {
+        if (!email.trim()) {
+          throw new Error("Please fill in your email address.");
+        }
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin,
+        });
+        if (error) throw error;
+        setSuccessMsg("Reset protocol initiated! Check your email inbox for the secure calibration link.");
+      } else if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
+        if (!isPasswordStrong) {
+          throw new Error("Your password does not satisfy safety restrictions. Please conform to all listed criteria (8+ chars, uppercase, lowercase, special character, number).");
+        }
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -738,9 +1368,9 @@ function AuthView({ onBypass }: { onBypass: () => void }) {
         if (error) throw error;
         
         if (data.session) {
-           // User signed in immediately (email confirmation might be off)
+           // Signed in immediately
         } else {
-           alert("Space created! Please check your email inbox to confirm your account and enable data syncing.");
+           setSuccessMsg("Space created successfully! Check your email inbox to verify your identity and authorize synchronization.");
         }
       }
     } catch (err: any) {
@@ -756,7 +1386,7 @@ function AuthView({ onBypass }: { onBypass: () => void }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] dark:bg-gray-950 flex items-center justify-center p-6 transition-colors">
+    <div className="min-h-screen bg-[#F8F9FA] dark:bg-gray-950 flex items-center justify-center p-6 transition-colors font-sans">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -778,14 +1408,22 @@ function AuthView({ onBypass }: { onBypass: () => void }) {
           </div>
 
           <h2 className="text-3xl font-black mb-2 dark:text-white">
-            {isLogin ? "Welcome back." : "Create space."}
+            {showForgotPassword 
+              ? "Reset Password" 
+              : isLogin 
+                ? "Welcome back." 
+                : "Create an account."}
           </h2>
-          <p className="text-gray-500 dark:text-gray-400 mb-8 font-medium">
-            {isLogin ? "Your optimal environment awaits." : "Start your systematic journey today."}
+          <p className="text-gray-500 dark:text-gray-400 mb-8 font-medium text-sm">
+            {showForgotPassword 
+              ? "Re-secure your synchronized credentials." 
+              : isLogin 
+                ? "Your optimal environment awaits." 
+                : "Enter a strong password to start your journey."}
           </p>
 
           <form onSubmit={handleAuth} className="space-y-4">
-            {!isLogin && (
+            {!isLogin && !showForgotPassword && (
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 ml-2">Full Name</label>
                 <input 
@@ -799,58 +1437,117 @@ function AuthView({ onBypass }: { onBypass: () => void }) {
               </div>
             )}
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 ml-2">Email Address</label>
+              <label className="text-xs font-black uppercase tracking-wider text-gray-700 dark:text-gray-300 ml-2">Email Address</label>
               <input 
                 type="email" 
                 required
-                className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white px-5 py-4 rounded-2xl border-none outline-none focus:ring-2 ring-indigo-500/50 transition-all font-medium"
+                className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white px-5 py-4 rounded-2xl border-none outline-none focus:ring-2 ring-indigo-500/50 transition-all font-semibold"
                 placeholder="felix@wrindha.com"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 ml-2">Security Key</label>
-              <input 
-                type="password" 
-                required
-                className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white px-5 py-4 rounded-2xl border-none outline-none focus:ring-2 ring-indigo-500/50 transition-all font-medium"
-                placeholder="••••••••"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-              />
-            </div>
+            {!showForgotPassword && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-2">
+                  <label className="text-xs font-black uppercase tracking-wider text-gray-700 dark:text-gray-300">Password</label>
+                  {isLogin && (
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setShowForgotPassword(true);
+                        setError(null);
+                        setSuccessMsg(null);
+                      }}
+                      className="text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700 transition-colors"
+                    >
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
+                <input 
+                  type="password" 
+                  required
+                  className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white px-5 py-4 rounded-2xl border-none outline-none focus:ring-2 ring-indigo-500/50 transition-all font-semibold"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                />
+              </div>
+            )}
+
+            {!isLogin && !showForgotPassword && (
+              <div className="p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800 space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Required Password Standards</p>
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 pt-0.5">
+                  <div className="flex items-center gap-1.5 text-[11px]">
+                    {meetsMinLength ? <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> : <X className="w-3.5 h-3.5 text-rose-500 shrink-0" />}
+                    <span className={meetsMinLength ? "text-emerald-600 font-bold" : "text-gray-400"}>8+ characters</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px]">
+                    {meetsUppercase ? <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> : <X className="w-3.5 h-3.5 text-rose-500 shrink-0" />}
+                    <span className={meetsUppercase ? "text-emerald-600 font-bold" : "text-gray-400"}>1 uppercase</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px]">
+                    {meetsLowercase ? <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> : <X className="w-3.5 h-3.5 text-rose-500 shrink-0" />}
+                    <span className={meetsLowercase ? "text-emerald-600 font-bold" : "text-gray-400"}>1 lowercase</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px]">
+                    {meetsNumber ? <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> : <X className="w-3.5 h-3.5 text-rose-500 shrink-0" />}
+                    <span className={meetsNumber ? "text-emerald-600 font-bold" : "text-gray-400"}>1 number</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] col-span-2">
+                    {meetsSpecial ? <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> : <X className="w-3.5 h-3.5 text-rose-500 shrink-0" />}
+                    <span className={meetsSpecial ? "text-emerald-600 font-bold" : "text-gray-400"}>1 special char (e.g. !@#$)</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {error && <p className="text-red-500 text-xs font-bold px-2">{error}</p>}
+            {successMsg && <p className="text-emerald-500 text-xs font-bold px-2 leading-relaxed">{successMsg}</p>}
 
             <button 
               type="submit" 
-              disabled={loading}
+              disabled={loading || (!isLogin && !showForgotPassword && !isPasswordStrong)}
               className="w-full bg-black dark:bg-indigo-600 text-white py-4 rounded-2xl font-bold text-sm uppercase tracking-widest shadow-xl shadow-black/10 dark:shadow-indigo-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 mt-4"
             >
-              {loading ? "Processing..." : (isLogin ? "Authenticate" : "Generate Account")}
+              {loading 
+                ? "Processing..." 
+                : showForgotPassword 
+                  ? "Request Reset Link" 
+                  : isLogin 
+                    ? "Authenticate" 
+                    : "Generate Account"}
             </button>
           </form>
 
           <div className="mt-8 flex flex-col gap-3 text-center">
-            <button 
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-sm font-bold text-gray-400 hover:text-indigo-600 transition-colors"
-            >
-              {isLogin ? "New here? Create your space →" : "Already systematic? Log in →"}
-            </button>
-            
-            <div className="relative py-4">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100 dark:border-gray-800"></div></div>
-              <div className="relative flex justify-center text-xs uppercase"><span className="bg-white dark:bg-gray-900 px-2 text-gray-300 font-bold tracking-widest">Or</span></div>
-            </div>
-
-            <button 
-              onClick={onBypass}
-              className="w-full bg-gray-100 dark:bg-gray-800 text-gray-500 py-4 rounded-2xl font-bold text-sm uppercase tracking-widest hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
-            >
-              Skip (Use Offline Mode)
-            </button>
+            {showForgotPassword ? (
+              <button 
+                type="button"
+                onClick={() => {
+                  setShowForgotPassword(false);
+                  setError(null);
+                  setSuccessMsg(null);
+                }}
+                className="text-sm font-black text-indigo-600 dark:text-indigo-400 hover:underline transition-all"
+              >
+                ← Back to Login
+              </button>
+            ) : (
+              <button 
+                type="button"
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  setError(null);
+                  setSuccessMsg(null);
+                }}
+                className="text-sm font-black text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
+              >
+                {isLogin ? "New here? Create an account →" : "Already systematic? Log in →"}
+              </button>
+            )}
           </div>
         </div>
       </motion.div>
@@ -927,20 +1624,43 @@ function AuthConfigErrorView({ error, onBypass }: { error: string; onBypass?: ()
   );
 }
 
-// --- Admin View ---
+interface AdminViewProps {
+  plans: PricingPlan[];
+  allUsers: UserSubscription[];
+  onUpdateUser: (userId: string, tier: string, habitsLimit: number) => Promise<void>;
+  onUpdatePlan: (plan: PricingPlan) => Promise<void>;
+  onDeletePlan: (id: string) => Promise<void>;
+}
 
-function AdminView() {
+function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan }: AdminViewProps) {
+  const SUGGESTED_FEATURES = [
+    "Unlimited Habit tracking elements",
+    "Daily streak analysis & calendar highlights",
+    "Unlimited Tasks & flexible list priorities",
+    "Full Finance visualizer & custom budgets",
+    "Smart Study courses with exam countdowns",
+    "Goals milestones & percentage tracking",
+    "Dynamic weekly & daily Timetable slots",
+    "Admin privileges to publish custom Blogs",
+    "AI-powered context insights & suggestion prompts",
+    "Exclusive premium productivity badges",
+    "Priority 24/7 dedicated chat support",
+    "Advanced offline-first local database synchronization"
+  ];
+
   const [userCount, setUserCount] = useState<number | null>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [adminTab, setAdminTab] = useState<'overview' | 'users' | 'config'>('overview');
+  const [adminTab, setAdminTab] = useState<'overview' | 'users' | 'plans' | 'config'>('overview');
   const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editingTier, setEditingTier] = useState<string>('Free');
 
   const fetchStats = async () => {
     setLoading(true);
     if (!isSupabaseConfigured()) {
       setUserCount(1);
-      setUsers([{ id: '1', email: 'local@instance.com', full_name: 'Local Admin', last_active: new Date().toISOString() }]);
+      setUsers([{ id: '1', email: 'local@instance.com', full_name: 'Local Admin', last_active: new Date().toISOString(), subscription_tier: 'Free' }]);
       setLoading(false);
       return;
     }
@@ -974,7 +1694,7 @@ function AdminView() {
             <ShieldCheck className="w-8 h-8 text-indigo-600" />
             Admin Center
           </h2>
-          <p className="text-gray-500 dark:text-gray-400">System orchestration & governance dashboard.</p>
+          <p className="text-gray-500 dark:text-gray-400">System orchestration, user memberships & plans governance.</p>
         </div>
         <div className="flex items-center gap-2">
           <button 
@@ -983,13 +1703,13 @@ function AdminView() {
           >
             <RefreshCcw className={cn("w-5 h-5 dark:text-gray-300", loading && "animate-spin")} />
           </button>
-          <div className="p-1 bg-gray-100 dark:bg-gray-800 rounded-2xl flex">
-            {(['overview', 'users', 'config'] as const).map((tab) => (
+          <div className="p-1 bg-gray-100 dark:bg-gray-800 rounded-2xl flex flex-wrap gap-1">
+            {(['overview', 'users', 'plans', 'config'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setAdminTab(tab)}
                 className={cn(
-                  "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                  "px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
                   adminTab === tab 
                     ? "bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm" 
                     : "text-gray-400 hover:text-gray-600"
@@ -1018,7 +1738,7 @@ function AdminView() {
                   <div className="p-3 bg-white/20 rounded-2xl">
                     <Users className="w-6 h-6" />
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Database Nodes</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">System Users</span>
                 </div>
                 <p className="text-5xl font-black font-mono">
                   {loading ? "..." : userCount ?? "0"}
@@ -1027,7 +1747,7 @@ function AdminView() {
                    <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
                       <div className="h-full bg-white w-3/4"></div>
                    </div>
-                   <span className="text-[10px] font-bold">75%</span>
+                   <span className="text-[10px] font-bold">75% active</span>
                 </div>
               </div>
 
@@ -1035,11 +1755,11 @@ function AdminView() {
                 <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl w-fit mb-6">
                   <Activity className="w-6 h-6 text-emerald-500" />
                 </div>
-                <h3 className="font-bold dark:text-white">API Throughput</h3>
-                <p className="text-2xl font-black mt-2 dark:text-gray-200">1.2k req/s</p>
+                <h3 className="font-bold dark:text-white">API status</h3>
+                <p className="text-2xl font-black mt-2 dark:text-gray-200">Optimal</p>
                 <div className="mt-4 flex items-center gap-1">
                   <TrendingUp className="w-3 h-3 text-emerald-500" />
-                  <span className="text-[10px] font-bold text-emerald-500">+12.4% from last hour</span>
+                  <span className="text-[10px] font-bold text-emerald-500">Supabase DB connected</span>
                 </div>
               </div>
 
@@ -1047,9 +1767,9 @@ function AdminView() {
                 <div className="p-3 bg-amber-50 dark:bg-amber-500/10 rounded-2xl w-fit mb-6">
                   <Database className="w-6 h-6 text-amber-500" />
                 </div>
-                <h3 className="font-bold dark:text-white">Storage Usage</h3>
-                <p className="text-2xl font-black mt-2 dark:text-gray-200">22.4 GB</p>
-                <p className="text-[10px] text-gray-400 mt-4 leading-relaxed">AWS S3 integration active.</p>
+                <h3 className="font-bold dark:text-white">Premium Plans</h3>
+                <p className="text-2xl font-black mt-2 dark:text-gray-200">{plans.length} Custom Plans</p>
+                <p className="text-[10px] text-gray-400 mt-4 leading-relaxed">Persisted in database.</p>
               </div>
 
               <div className="p-8 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2.5rem] shadow-sm">
@@ -1060,7 +1780,7 @@ function AdminView() {
                 <p className="text-2xl font-black mt-2 dark:text-gray-200 text-indigo-600 dark:text-indigo-400">98/100</p>
                 <div className="mt-4 flex items-center gap-2">
                    <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                   <span className="text-[10px] font-bold text-gray-400">SOC2 Type II Compliant</span>
+                   <span className="text-[10px] font-bold text-gray-400">RLS Policies Enabled</span>
                 </div>
               </div>
             </div>
@@ -1068,15 +1788,15 @@ function AdminView() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm">
                 <div className="flex items-center justify-between mb-8">
-                  <h3 className="text-xl font-bold dark:text-white">Recent Deployment Log</h3>
-                  <button className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest hover:underline">View All Logs</button>
+                  <h3 className="text-xl font-bold dark:text-white">Admin Logs</h3>
+                  <button className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest hover:underline">System logs</button>
                 </div>
                 <div className="space-y-4">
                   {[
+                    { tag: "PRICING", msg: "Feature licensing limits loaded", time: "1m ago", status: "success" },
                     { tag: "AUTH", msg: "Email provider verification enabled", time: "2m ago", status: "success" },
                     { tag: "DB", msg: "Supabase cloud sync latency stabilized", time: "15m ago", status: "success" },
                     { tag: "UI", msg: "Dark mode color palette optimized", time: "1h ago", status: "info" },
-                    { tag: "SEC", msg: "Firewall rule updated for API endpoints", time: "3h ago", status: "warning" },
                   ].map((log, i) => (
                     <div key={i} className="flex items-center justify-between p-5 bg-gray-50 dark:bg-gray-800/40 rounded-[2rem] border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all">
                       <div className="flex items-center gap-4">
@@ -1147,8 +1867,8 @@ function AdminView() {
           >
             <div className="p-8 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
                <div>
-                  <h3 className="text-xl font-bold dark:text-white">User Management</h3>
-                  <p className="text-sm text-gray-400">Monitoring {users.length} registered accounts.</p>
+                  <h3 className="text-xl font-bold dark:text-white">User Membership Control</h3>
+                  <p className="text-sm text-gray-400">Monitoring {users.length} registered accounts. Admin can assign user premium status below.</p>
                </div>
                <div className="flex gap-2"></div>
             </div>
@@ -1157,7 +1877,8 @@ function AdminView() {
                 <thead>
                   <tr className="bg-gray-50/50 dark:bg-gray-800/50">
                     <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-gray-500">Identity</th>
-                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-gray-500">Status</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-gray-500">Pricing Tier</th>
+                    <th className="px-5 py-5 text-[10px] font-black uppercase tracking-widest text-gray-500">Status</th>
                     <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-gray-500">Last Active</th>
                     <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-gray-500">Actions</th>
                   </tr>
@@ -1165,11 +1886,11 @@ function AdminView() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={4} className="px-8 py-20 text-center text-gray-400">Loading user database...</td>
+                      <td colSpan={5} className="px-8 py-20 text-center text-gray-400">Loading user database...</td>
                     </tr>
                   ) : users.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-8 py-20 text-center text-gray-400">No users found. Ensure the 'profiles' table exists.</td>
+                      <td colSpan={5} className="px-8 py-20 text-center text-gray-400">No users found. Ensure the 'profiles' table exists.</td>
                     </tr>
                   ) : (
                     users.map((user) => (
@@ -1187,6 +1908,18 @@ function AdminView() {
                         </td>
                         <td className="px-8 py-6">
                            <span className={cn(
+                             "px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                             user.subscription_tier === 'Free' || !user.subscription_tier
+                               ? "bg-gray-100 text-gray-500 dark:bg-gray-850 dark:text-gray-400" 
+                               : user.subscription_tier === 'Pro Space'
+                                 ? "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400"
+                                 : "bg-amber-105 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
+                           )}>
+                             {user.subscription_tier || 'Free'}
+                           </span>
+                        </td>
+                        <td className="px-5 py-6">
+                           <span className={cn(
                              "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
                              new Date(user.last_active || user.lastActive).getTime() > Date.now() - 300000 
                                ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10" 
@@ -1202,20 +1935,196 @@ function AdminView() {
                            </div>
                         </td>
                         <td className="px-8 py-6">
-                           <div className="flex gap-2">
-                             <button className="p-2 hover:bg-white dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-indigo-600">
-                                <Settings2 className="w-4 h-4" />
-                             </button>
-                             <button className="p-2 hover:bg-white dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-red-500">
-                                <Trash2 className="w-4 h-4" />
-                             </button>
-                           </div>
+                           {editingUserId === user.id ? (
+                             <div className="flex items-center gap-2">
+                               <select
+                                 value={editingTier}
+                                 onChange={(e) => setEditingTier(e.target.value)}
+                                 className="bg-gray-50 dark:bg-gray-800 dark:text-white rounded-xl px-2.5 py-1.5 text-xs font-bold border border-gray-200 dark:border-gray-700 outline-none"
+                               >
+                                 <option value="Free">Free</option>
+                                 {plans.map(p => (
+                                    <option key={p.id} value={p.name}>{p.name} Plan</option>
+                                  ))}
+                                 
+                               </select>
+                               <button
+                                 onClick={async () => {
+                                   const maxH = editingTier === 'Free' ? 5 : 9999;
+                                   await onUpdateUser(user.id, editingTier, maxH);
+                                   setEditingUserId(null);
+                                   fetchStats();
+                                 }}
+                                 className="px-3 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md hover:bg-indigo-700 transition-all active:scale-95"
+                               >
+                                 Save
+                               </button>
+                               <button
+                                 onClick={() => setEditingUserId(null)}
+                                 className="px-2 py-2 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 rounded-xl text-[10px] font-bold hover:bg-gray-200 dark:hover:bg-gray-700"
+                               >
+                                 Cancel
+                               </button>
+                             </div>
+                           ) : (
+                             <div className="flex gap-2">
+                               <button 
+                                 onClick={() => {
+                                   setEditingUserId(user.id);
+                                   setEditingTier(user.subscription_tier || 'Free');
+                                 }}
+                                 className="p-2.5 bg-gray-50 hover:bg-indigo-50 dark:bg-gray-800/40 dark:hover:bg-indigo-900/10 rounded-xl transition-colors text-gray-500 dark:text-gray-400 hover:text-indigo-600"
+                                 title="Grant membership pricing feature"
+                               >
+                                 <Settings2 className="w-4 h-4" />
+                               </button>
+                             </div>
+                           )}
                         </td>
                       </tr>
                     ))
                   )}
                 </tbody>
               </table>
+            </div>
+          </motion.div>
+        )}
+
+        {adminTab === 'plans' && (
+          <motion.div 
+            key="plans"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            className="space-y-8"
+          >
+            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2.5rem] p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div>
+                <h3 className="text-xl font-bold dark:text-white">Active Product Pricing & Plan Features</h3>
+                <p className="text-sm text-gray-400">Configure tiers, monthly prices, and core limitations visible to system users.</p>
+              </div>
+              <button
+                onClick={() => {
+                  const newId = `custom-plan-${Math.random().toString(36).substr(2, 9)}`;
+                  const plan: PricingPlan = {
+                    id: newId,
+                    name: "Custom Enterprise Edition",
+                    price: "₹999",
+                    period: "month",
+                    features: ["All capabilities", "100% SLA Guarantee", "Dedicated Support Advisor"],
+                    isActive: true
+                  };
+                  onUpdatePlan(plan);
+                }}
+                className="px-6 py-4 bg-indigo-600 text-white hover:bg-indigo-700 rounded-2xl text-xs font-black uppercase tracking-widest transition-all hover:shadow-lg hover:shadow-indigo-600/20 active:scale-95 flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> Create Custom Plan
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {plans.map((plan) => (
+                <div key={plan.id} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2.5rem] p-8 shadow-sm space-y-6 flex flex-col justify-between">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-gray-50 dark:border-gray-800/40 pb-4">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[#6B7280]">Plan Tier Name</span>
+                        <input
+                          type="text"
+                          value={plan.name}
+                          onChange={(e) => onUpdatePlan({ ...plan, name: e.target.value })}
+                          className="bg-transparent text-lg font-bold border-none p-0 focus:ring-0 dark:text-white w-full outline-none"
+                        />
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[#6B7280]">Price</span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={plan.price}
+                            onChange={(e) => onUpdatePlan({ ...plan, price: e.target.value })}
+                            className="bg-transparent text-lg font-bold text-right border-none p-0 focus:ring-0 dark:text-white w-24 outline-none font-mono"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Core Features Listed</label>
+                      <div className="space-y-2">
+                        {plan.features.map((feat, fIdx) => (
+                          <div key={fIdx} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/40 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+                            <input
+                              type="text"
+                              value={feat}
+                              onChange={(e) => {
+                                const newFeatures = [...plan.features];
+                                newFeatures[fIdx] = e.target.value;
+                                onUpdatePlan({ ...plan, features: newFeatures });
+                              }}
+                              className="bg-transparent text-xs text-gray-600 dark:text-gray-300 border-none p-0 focus:ring-0 w-full outline-none"
+                            />
+                            <button
+                              onClick={() => {
+                                const newFeatures = plan.features.filter((_, idx) => idx !== fIdx);
+                                onUpdatePlan({ ...plan, features: newFeatures });
+                              }}
+                              className="p-1 hover:bg-red-50 dark:hover:bg-red-950/20 text-gray-400 hover:text-red-500 rounded"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          onClick={() => {
+                            onUpdatePlan({ ...plan, features: [...plan.features, "Premium service capability"] });
+                          }}
+                          className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest hover:underline flex items-center gap-1 mt-2 outline-none"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Add feature line
+                        </button>
+                      </div>
+
+                      {/* Suggested Features Guidance for Admin */}
+                      <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800/60 space-y-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                          <Sparkles className="w-3 h-3 text-amber-500" />
+                          Suggested Website Features to Include:
+                        </span>
+                        <p className="text-[11px] text-gray-450 dark:text-gray-400 leading-snug">
+                          Align your plans with actual app modules. Click any capability below to instantly append it to this plan:
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 pt-1 max-h-[140px] overflow-y-auto pr-1">
+                          {SUGGESTED_FEATURES.filter(f => !plan.features.includes(f)).map((feat, sIdx) => (
+                            <button
+                              key={sIdx}
+                              onClick={() => {
+                                onUpdatePlan({ ...plan, features: [...plan.features, feat] });
+                              }}
+                              className="px-2.5 py-1.5 bg-indigo-50/60 dark:bg-indigo-950/15 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white rounded-lg text-[10px] font-bold transition-all border border-transparent hover:border-indigo-500 active:scale-95"
+                            >
+                              + {feat}
+                            </button>
+                          ))}
+                          {SUGGESTED_FEATURES.filter(f => !plan.features.includes(f)).length === 0 && (
+                            <span className="text-[10px] text-emerald-500 font-bold italic">All suggested elements are added!</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-gray-50 dark:border-gray-800/40 pt-4 mt-6">
+                    <button
+                      onClick={() => onDeletePlan(plan.id)}
+                      className="px-4 py-2 bg-red-50 dark:bg-red-950/15 text-red-500 hover:bg-red-500 hover:text-white rounded-xl text-xs font-bold transition-all"
+                    >
+                      Delete Plan
+                    </button>
+                    <span className="text-[10px] text-gray-400 italic">Updates database directly</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </motion.div>
         )}
@@ -1235,7 +2144,7 @@ function AdminView() {
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Endpoint URL</label>
                     <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl flex items-center justify-between border border-gray-100 dark:border-gray-700">
                        <span className="text-sm font-mono text-gray-600 dark:text-gray-400 truncate max-w-[200px]">
-                         {supabaseUrl}
+                          {supabaseUrl}
                        </span>
                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                     </div>
@@ -1270,8 +2179,8 @@ function AdminView() {
                           <span className="text-[10px] text-gray-400">{flag.desc}</span>
                        </div>
                        <div className={cn(
-                         "w-12 h-6 rounded-full relative cursor-pointer transition-all",
-                         flag.checked ? "bg-indigo-600" : "bg-gray-200 dark:bg-gray-700"
+                          "w-12 h-6 rounded-full relative cursor-pointer transition-all",
+                          flag.checked ? "bg-indigo-600" : "bg-gray-200 dark:bg-gray-700"
                        )}>
                           <div className={cn(
                             "w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm",
@@ -1395,11 +2304,39 @@ function DashboardView({ habits, tasks, expenses, currency, userName, setUserNam
           </div>
           <h3 className="text-lg font-bold mb-4 dark:text-white">{habits[0]?.name || "No active habits"}</h3>
           <div className="flex gap-2 mb-4">
-            {[...Array(7)].map((_, i) => (
-              <div key={i} className={cn("flex-1 h-12 rounded-lg flex items-center justify-center font-mono text-xs", i < (habits[0]?.streak % 7 || 0) ? "bg-orange-500 text-white" : "bg-[#F3F4F6] dark:bg-gray-800 text-[#9CA3AF] dark:text-gray-600")}>
-                {['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}
-              </div>
-            ))}
+            {(() => {
+              const current = new Date();
+              const day = current.getDay();
+              const diff = current.getDate() - day + (day === 0 ? -6 : 1);
+              const monday = new Date(current.setDate(diff));
+              const dates = [];
+              for (let i = 0; i < 7; i++) {
+                const d = new Date(monday);
+                d.setDate(monday.getDate() + i);
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                dates.push(`${yyyy}-${mm}-${dd}`);
+              }
+              
+              return dates.map((dateStr, i) => {
+                const isCompleted = habits[0]?.completedAt?.some(d => d.startsWith(dateStr));
+                return (
+                  <div 
+                    key={i} 
+                    className={cn(
+                      "flex-1 h-12 rounded-lg flex items-center justify-center font-mono text-xs font-bold transition-all", 
+                      isCompleted 
+                        ? "bg-orange-500 text-white shadow-sm shadow-orange-500/20 font-black animate-pulse" 
+                        : "bg-[#F3F4F6] dark:bg-gray-800 text-[#9CA3AF] dark:text-gray-600"
+                    )}
+                    title={`${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][i]} (${dateStr})`}
+                  >
+                    {['M', 'Y', 'W', 'T', 'F', 'S', 'S'][i] === 'Y' ? 'T' : ['M', 'Y', 'W', 'T', 'F', 'S', 'S'][i]}
+                  </div>
+                );
+              });
+            })()}
           </div>
           <p className="text-sm text-[#6B7280] dark:text-gray-400">Streak: {habits[0]?.streak || 0} days. Keep pushing!</p>
         </div>
@@ -1448,9 +2385,73 @@ function DashboardView({ habits, tasks, expenses, currency, userName, setUserNam
   );
 }
 
+export function calculateStreak(completedDates: string[]): number {
+  if (!completedDates || completedDates.length === 0) return 0;
+  
+  const dateSet = new Set(
+    completedDates.map(d => d.split('T')[0])
+  );
+  
+  let streak = 0;
+  const checkDate = new Date(); // local today
+  
+  const formatDate = (date: Date) => {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+  
+  const todayStr = formatDate(checkDate);
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = formatDate(yesterday);
+  
+  let currentDate = checkDate;
+  if (dateSet.has(todayStr)) {
+    streak = 1;
+    currentDate.setDate(currentDate.getDate() - 1);
+  } else if (dateSet.has(yesterdayStr)) {
+    streak = 1;
+    currentDate = yesterday;
+    currentDate.setDate(currentDate.getDate() - 1);
+  } else {
+    return 0;
+  }
+  
+  while (true) {
+    const checkStr = formatDate(currentDate);
+    if (dateSet.has(checkStr)) {
+      streak += 1;
+      currentDate.setDate(currentDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  
+  return streak;
+}
+
 function HabitsView({ habits, setHabits, onDelete, theme }: { habits: Habit[], setHabits: (h: Habit[]) => void, onDelete: (id: string) => void, theme: 'light' | 'dark' }) {
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
+
+  const weekDates = (() => {
+    const current = new Date();
+    const day = current.getDay();
+    const diff = current.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(current.setDate(diff));
+    const dates = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      dates.push(`${yyyy}-${mm}-${dd}`);
+    }
+    return dates;
+  })();
 
   const addHabit = () => {
     if (!newName.trim()) return;
@@ -1468,19 +2469,77 @@ function HabitsView({ habits, setHabits, onDelete, theme }: { habits: Habit[], s
   };
 
   const checkIn = (id: string) => {
-    setHabits(habits.map(h => h.id === id ? { ...h, streak: h.streak + 1 } : h));
+    const todayStr = new Date().toISOString().split('T')[0];
+    const updated = habits.map(h => {
+      if (h.id !== id) return h;
+      const comp = h.completedAt || [];
+      const index = comp.findIndex(d => d.startsWith(todayStr));
+      let newComp = [...comp];
+      if (index >= 0) {
+        // Toggle off
+        newComp.splice(index, 1);
+      } else {
+        // Completing today
+        newComp.push(todayStr);
+      }
+      const newStreak = calculateStreak(newComp);
+      return {
+        ...h,
+        completedAt: newComp,
+        streak: newStreak
+      };
+    });
+    setHabits(updated);
   };
+
+  const getLast7DaysData = () => {
+    const daysData = [];
+    const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${yyyy}-${mm}-${dd}`;
+      const dayName = daysOfWeek[d.getDay()];
+      
+      let completionsCount = 0;
+      habits.forEach(h => {
+        const hasCompleted = h.completedAt && h.completedAt.some(dateTime => dateTime.startsWith(dateStr));
+        if (hasCompleted) {
+          completionsCount++;
+        }
+      });
+      
+      const completionRate = habits.length > 0 
+        ? Math.round((completionsCount / habits.length) * 100) 
+        : 0;
+        
+      daysData.push({
+        name: `${dayName} (${dd}/${mm})`,
+        completion: completionRate,
+        count: completionsCount,
+        total: habits.length
+      });
+    }
+    
+    return daysData;
+  };
+
+  const todayStr = new Date().toISOString().split('T')[0];
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">Unstoppable Streaks</h2>
-          <p className="text-gray-500">Don't break the chain.</p>
+          <h2 className="text-2xl font-bold dark:text-white">Unstoppable Streaks</h2>
+          <p className="text-gray-500 dark:text-gray-400">Habit completions directly update your graphs and streaks dynamically.</p>
         </div>
         <button 
           onClick={() => setShowAdd(true)}
-          className="bg-black text-white p-3 rounded-2xl hover:scale-105 transition-transform"
+          className="bg-black dark:bg-indigo-600 hover:opacity-95 text-white p-3 rounded-2xl hover:scale-105 transition-transform"
         >
           <Plus className="w-5 h-5" />
         </button>
@@ -1492,7 +2551,7 @@ function HabitsView({ habits, setHabits, onDelete, theme }: { habits: Habit[], s
              <input 
               autoFocus
               className="flex-1 bg-gray-50 dark:bg-gray-800 dark:text-white rounded-xl px-4 text-sm font-medium outline-none" 
-              placeholder="Habit name..." 
+              placeholder="Habit name (e.g. Morning Meditation, Read 10 Pages)..." 
               value={newName}
               onChange={e => setNewName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addHabit()}
@@ -1504,54 +2563,91 @@ function HabitsView({ habits, setHabits, onDelete, theme }: { habits: Habit[], s
       </AnimatePresence>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {habits.map(habit => (
-          <motion.div 
-            whileHover={{ y: -4 }}
-            key={habit.id} 
-            className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col justify-between"
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center mb-4 text-white", habit.color)}>
-                  <Flame className="w-6 h-6" />
+        {habits.map(habit => {
+          const isCompletedToday = habit.completedAt && habit.completedAt.some(d => d.startsWith(todayStr));
+          return (
+            <motion.div 
+              whileHover={{ y: -4 }}
+              key={habit.id} 
+              className={cn(
+                "bg-white dark:bg-gray-900 p-6 rounded-3xl border shadow-sm flex flex-col justify-between transition-all duration-300",
+                isCompletedToday 
+                  ? "border-emerald-500/40 bg-emerald-50/10 dark:bg-emerald-950/5" 
+                  : "border-gray-100 dark:border-gray-800"
+              )}
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center mb-4 text-white relative", habit.color)}>
+                    <Flame className="w-6 h-6" />
+                    {isCompletedToday && (
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white dark:border-gray-900 flex items-center justify-center">
+                        <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="font-bold text-lg dark:text-white flex items-center gap-2">
+                    {habit.name}
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{habit.streak} day streak</p>
+                  <div className="flex gap-1 mt-4">
+                    {weekDates.map((dateStr, idx) => {
+                      const isComp = habit.completedAt && habit.completedAt.some(d => d.startsWith(dateStr));
+                      return (
+                        <div 
+                          key={idx} 
+                          title={`${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][idx]} (${dateStr})`}
+                          className={cn(
+                            "w-6 h-6 rounded-md flex items-center justify-center font-mono text-[9px] font-black transition-all",
+                            isComp 
+                              ? "bg-orange-500 text-white shadow-sm shadow-orange-500/10" 
+                              : "bg-[#F3F4F6] dark:bg-gray-800 text-[#9CA3AF] dark:text-gray-600"
+                          )}
+                        >
+                          {['M', 'Y', 'W', 'T', 'F', 'S', 'S'][idx] === 'Y' ? 'T' : ['M', 'Y', 'W', 'T', 'F', 'S', 'S'][idx]}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <h3 className="font-bold text-lg dark:text-white">{habit.name}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{habit.streak} day streak</p>
+                <button 
+                  onClick={() => {
+                    onDelete(habit.id);
+                    setHabits(habits.filter(h => h.id !== habit.id));
+                  }}
+                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
               <button 
-                onClick={() => {
-                  onDelete(habit.id);
-                  setHabits(habits.filter(h => h.id !== habit.id));
-                }}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-red-500 transition-colors"
+                onClick={() => checkIn(habit.id)}
+                className={cn(
+                  "mt-6 w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all duration-200 border-2",
+                  isCompletedToday 
+                    ? "bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/10 hover:bg-emerald-600"
+                    : "bg-gray-50 dark:bg-gray-800 text-black dark:text-white border-transparent hover:bg-black hover:text-white dark:hover:bg-indigo-600"
+                )}
               >
-                <X className="w-4 h-4" />
+                {isCompletedToday ? "✓ Completed Today" : "Mark Completed"}
               </button>
-            </div>
-            <button 
-              onClick={() => checkIn(habit.id)}
-              className="mt-6 w-full py-2 bg-gray-50 dark:bg-gray-800 rounded-xl text-black dark:text-white font-bold text-xs uppercase tracking-widest hover:bg-black dark:hover:bg-indigo-600 hover:text-white transition-all"
-            >
-              Completed
-            </button>
-          </motion.div>
-        ))}
+            </motion.div>
+          );
+        })}
+        {habits.length === 0 && (
+          <div className="col-span-full border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-3xl p-8 text-center text-gray-400 font-medium">
+            No habits registered yet. Keep yourself highly disciplined.
+          </div>
+        )}
       </div>
 
       {/* Habit Analytics */}
       <div className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] border border-gray-100 dark:border-gray-800">
-        <h3 className="text-xl font-bold mb-6 dark:text-white">Completion Rate</h3>
+        <h3 className="text-xl font-bold mb-2 dark:text-white">Active Completion Rate</h3>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mb-6">Real-time daily consistency graph calculated from your completed dates.</p>
         <div className="h-64">
            <ResponsiveContainer width="100%" height="100%">
-             <BarChart data={[
-               { name: 'Mon', completion: 80 },
-               { name: 'Tue', completion: 95 },
-               { name: 'Wed', completion: 70 },
-               { name: 'Thu', completion: 100 },
-               { name: 'Fri', completion: 85 },
-               { name: 'Sat', completion: 60 },
-               { name: 'Sun', completion: 40 },
-             ]}>
+             <BarChart data={getLast7DaysData()}>
                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9CA3AF'}} />
                <Tooltip cursor={{fill: theme === 'dark' ? '#1F2937' : '#F9FAFB'}} contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: theme === 'dark' ? '#111827' : '#FFF', color: theme === 'dark' ? '#FFF' : '#000', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
                <Bar dataKey="completion" fill={theme === 'dark' ? '#6366F1' : '#000'} radius={[4, 4, 0, 0]} />
@@ -1566,6 +2662,8 @@ function HabitsView({ habits, setHabits, onDelete, theme }: { habits: Habit[], s
 function TasksView({ tasks, setTasks, onDelete }: { tasks: Task[], setTasks: (t: Task[]) => void, onDelete: (id: string) => void }) {
   const [showAdd, setShowAdd] = useState<EisenhowerQuadrant | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
 
   const addTask = (q: EisenhowerQuadrant) => {
     if (!newTaskTitle.trim()) return;
@@ -1593,77 +2691,169 @@ function TasksView({ tasks, setTasks, onDelete }: { tasks: Task[], setTasks: (t:
   ];
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-center">
+    <div className="space-y-8 animate-fade-in">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Eisenhower Matrix</h2>
-          <p className="text-gray-500">Prioritize your focus across 4 quadrants.</p>
+          <h2 className="text-3xl font-black tracking-tight dark:text-white">Task Priority Matrix</h2>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            Prioritize your tasks across Eisenhower's 4 quadrants and focus with Pomodoro cycles.
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 md:h-[calc(100vh-250px)] md:min-h-[600px]">
-        {quadrants.map(q => (
-          <div key={q.id} className="bg-white dark:bg-gray-900 rounded-3xl md:rounded-[2rem] border border-gray-100 dark:border-gray-800 p-4 md:p-6 flex flex-col min-h-[250px]">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 md:mb-6">
-              <div className="flex items-center gap-3">
-                <div className={cn("w-3 h-3 rounded-full", q.color)}></div>
-                <h3 className="font-bold text-lg dark:text-white">{q.label}</h3>
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{q.desc}</span>
-            </div>
-            
-            <div className="flex-1 space-y-3 overflow-y-auto pr-2 custom-scrollbar">
-              {tasks.filter(t => t.quadrant === q.id).map(task => (
-                <div key={task.id} className="group p-3 md:p-4 bg-[#F9FAFB] dark:bg-gray-800/40 rounded-2xl flex items-start justify-between gap-3 border border-transparent hover:border-black/5 dark:hover:border-white/5 transition-all">
-                  <div className="flex items-start gap-3 md:gap-4 flex-1 min-w-0">
-                    <button 
-                      onClick={() => toggleTask(task.id)}
-                      className={cn("mt-0.5 w-5 h-5 md:w-6 md:h-6 shrink-0 rounded-lg border-2 flex items-center justify-center transition-all", task.completed ? "bg-black dark:bg-indigo-600 border-black dark:border-indigo-600 text-white" : "border-gray-200 dark:border-gray-700 group-hover:border-black/30 dark:group-hover:border-white/30")}
-                    >
-                      {task.completed && <CheckCircle2 className="w-3.5 h-3.5 md:w-4 md:h-4" />}
-                    </button>
-                    <span className={cn(
-                      "text-sm font-medium dark:text-gray-300 break-words overflow-hidden leading-relaxed", 
-                      task.completed && "text-gray-400 dark:text-gray-600 line-through font-normal"
-                    )}>
-                      {task.title}
-                    </span>
-                  </div>
-                  <X 
-                    className="w-4 h-4 text-gray-300 dark:text-gray-600 md:opacity-0 group-hover:opacity-100 cursor-pointer hover:text-red-500 shrink-0 transition-opacity" 
-                    onClick={() => {
-                      onDelete(task.id);
-                      setTasks(tasks.filter(t => t.id !== task.id));
-                    }}
-                  />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        {/* Left / Main Section: Quadrants Matrix (Grid) */}
+        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          {quadrants.map(q => (
+            <div key={q.id} className="bg-white dark:bg-gray-900 rounded-3xl md:rounded-[2rem] border border-gray-100 dark:border-gray-800 p-5 md:p-6 flex flex-col min-h-[300px]">
+              <div className="flex justify-between items-center mb-5">
+                <div className="flex items-center gap-3">
+                  <div className={cn("w-3 h-3 rounded-full", q.color)}></div>
+                  <h3 className="font-extrabold text-base dark:text-white">{q.label}</h3>
                 </div>
-              ))}
-              {showAdd === q.id ? (
-                 <div className="bg-white dark:bg-gray-800 p-3 rounded-2xl border border-black dark:border-indigo-600 shadow-lg z-10 sticky bottom-0">
-                    <input 
-                      autoFocus
-                      className="w-full text-sm font-medium mb-3 outline-none px-2 py-1 bg-transparent dark:text-white" 
-                      placeholder="Task name..." 
-                      value={newTaskTitle}
-                      onChange={e => setNewTaskTitle(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && addTask(q.id)}
-                    />
-                    <div className="flex gap-2">
-                       <button onClick={() => addTask(q.id)} className="flex-1 bg-black dark:bg-indigo-600 text-white py-2.5 rounded-xl text-xs font-bold hover:opacity-90 transition-opacity">Add</button>
-                       <button onClick={() => setShowAdd(null)} className="flex-1 bg-gray-100 dark:bg-gray-700 text-black dark:text-white py-2.5 rounded-xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Cancel</button>
+                <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{q.desc}</span>
+              </div>
+              
+              <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+                {tasks.filter(t => t.quadrant === q.id).map(task => (
+                  <div key={task.id} className="group p-3.5 bg-gray-50/50 dark:bg-gray-800/25 rounded-2xl flex flex-col gap-1 border border-transparent hover:border-black/5 dark:hover:border-white/5 transition-all">
+                    {/* Top row with details */}
+                    <div className="flex items-start justify-between gap-3 w-full">
+                      <div 
+                        className="flex items-start gap-3 flex-1 min-w-0 cursor-pointer"
+                        onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
+                      >
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleTask(task.id);
+                            if (activeTaskId === task.id) {
+                              setActiveTaskId(null);
+                            }
+                          }}
+                          className={cn("mt-0.5 w-5 h-5 shrink-0 rounded-lg border-2 flex items-center justify-center transition-all", task.completed ? "bg-black dark:bg-indigo-600 border-black dark:border-indigo-600 text-white" : "border-gray-200 dark:border-gray-700 group-hover:border-black/30 dark:group-hover:border-white/30")}
+                        >
+                          {task.completed && <CheckCircle2 className="w-3 h-3" />}
+                        </button>
+                        <div className="flex flex-col min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={cn(
+                              "text-xs md:text-sm font-semibold dark:text-gray-300 break-words leading-relaxed", 
+                              task.completed && "text-gray-400 dark:text-gray-600 line-through font-normal"
+                            )}>
+                              {task.title}
+                            </span>
+                            {task.description && task.description.trim().length > 0 && (
+                              <span className="inline-flex items-center text-[9px] bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold px-1.5 py-0.5 rounded-md gap-0.5" title="Has notes">
+                                <FileText className="w-2.5 h-2.5" /> Notes
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Expand/Collapse Chevron Triggers */}
+                        <button
+                          onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
+                          title={expandedTaskId === task.id ? "Collapse detailed notes" : "Expand detailed notes"}
+                          className={cn(
+                            "p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-all",
+                            expandedTaskId === task.id ? "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40" : "md:opacity-0 group-hover:opacity-100"
+                          )}
+                        >
+                          <ChevronRight className={cn("w-3.5 h-3.5 transition-transform duration-250", expandedTaskId === task.id ? "rotate-90 text-indigo-500" : "")} />
+                        </button>
+
+                        {!task.completed && (
+                          <button
+                            onClick={() => setActiveTaskId(task.id)}
+                            title="Focus on this task with Pomodoro"
+                            className={cn(
+                              "p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 md:opacity-0 group-hover:opacity-100 transition-all duration-200",
+                              activeTaskId === task.id ? "text-indigo-500 opacity-100 bg-indigo-50/85 dark:bg-indigo-950/45" : ""
+                            )}
+                          >
+                            <Timer className="w-3.5 h-3.5 animate-pulse" />
+                          </button>
+                        )}
+                        <X 
+                          className="w-4 h-4 text-gray-300 dark:text-gray-600 md:opacity-0 group-hover:opacity-100 cursor-pointer hover:text-red-500 transition-opacity" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(task.id);
+                            setTasks(tasks.filter(t => t.id !== task.id));
+                            if (activeTaskId === task.id) {
+                              setActiveTaskId(null);
+                            }
+                            if (expandedTaskId === task.id) {
+                              setExpandedTaskId(null);
+                            }
+                          }}
+                        />
+                      </div>
                     </div>
-                 </div>
-              ) : (
-                <button 
-                  onClick={() => setShowAdd(q.id)}
-                  className="w-full py-4 border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-2xl text-gray-400 dark:text-gray-600 text-xs font-bold uppercase tracking-widest hover:border-gray-200 dark:hover:border-gray-700 transition-all flex items-center justify-center gap-2"
-                >
-                   <Plus className="w-4 h-4" /> Add Task
-                </button>
-              )}
+
+                    {/* Expandable Section */}
+                    <AnimatePresence initial={false}>
+                      {expandedTaskId === task.id && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden w-full"
+                        >
+                          <TaskNotesEditor 
+                            taskId={task.id}
+                            initialValue={task.description || ""}
+                            onSave={(val) => {
+                              setTasks(tasks.map(t => t.id === task.id ? { ...t, description: val } : t));
+                            }}
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                ))}
+
+                {showAdd === q.id ? (
+                   <div className="bg-white dark:bg-gray-800 p-3 rounded-2xl border border-black dark:border-indigo-600 shadow-lg z-10 sticky bottom-0">
+                      <input 
+                        autoFocus
+                        className="w-full text-xs font-semibold mb-3 outline-none px-2 py-1 bg-transparent dark:text-white" 
+                        placeholder="Task name..." 
+                        value={newTaskTitle}
+                        onChange={e => setNewTaskTitle(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && addTask(q.id)}
+                      />
+                      <div className="flex gap-2">
+                         <button onClick={() => addTask(q.id)} className="flex-1 bg-black dark:bg-indigo-600 text-white py-2.5 rounded-xl text-xs font-bold hover:opacity-90 transition-opacity">Add</button>
+                         <button onClick={() => setShowAdd(null)} className="flex-1 bg-gray-100 dark:bg-gray-700 text-black dark:text-white py-2.5 rounded-xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Cancel</button>
+                      </div>
+                   </div>
+                ) : (
+                  <button 
+                    onClick={() => setShowAdd(q.id)}
+                    className="w-full py-4 border-2 border-dashed border-gray-100 dark:border-gray-800/80 rounded-2xl text-gray-400 dark:text-gray-500 text-[10px] font-bold uppercase tracking-widest hover:border-gray-200 dark:hover:border-gray-700 transition-all flex items-center justify-center gap-2"
+                  >
+                     <Plus className="w-3.5 h-3.5" /> Add Task
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
+
+        {/* Right Section: Focus Pomodoro Widget */}
+        <div className="lg:col-span-1 sticky top-6">
+          <PomodoroTimer 
+            tasks={tasks}
+            onToggleTask={toggleTask}
+            activeTaskId={activeTaskId}
+            onSelectTask={setActiveTaskId}
+          />
+        </div>
       </div>
     </div>
   );
@@ -2283,7 +3473,7 @@ function GoalsView({ goals, setGoals, onDelete }: { goals: Goal[], setGoals: (g:
                   <div className="h-2 bg-gray-50 dark:bg-gray-800 rounded-full overflow-hidden">
                     <div className="h-full bg-purple-500 dark:bg-purple-600 transition-all duration-500" style={{ width: `${goal.progress}%` }}></div>
                   </div>
-                  <div className="flex gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex gap-2 mt-4">
                     <button onClick={() => updateProgress(goal.id, -10)} className="flex-1 py-1 px-2 bg-gray-50 dark:bg-gray-800 dark:text-gray-300 rounded-lg text-[10px] font-bold hover:bg-gray-100 dark:hover:bg-gray-700">-10%</button>
                     <button onClick={() => updateProgress(goal.id, 10)} className="flex-1 py-1 px-2 bg-black dark:bg-indigo-600 text-white rounded-lg text-[10px] font-bold">+10%</button>
                   </div>
@@ -2711,3 +3901,601 @@ function TermsView() {
     </div>
   );
 }
+
+// --- BlogsView Component ---
+function BlogsView({ blogs, setBlogs, isAdmin }: { blogs: Blog[], setBlogs: (b: Blog[]) => void, isAdmin: boolean }) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("Productivity");
+  const [content, setContent] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [selectedBlog, setSelectedBlog] = useState<Blog | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const categories = ["All", "Productivity", "Habits", "Study", "Finance", "Goals"];
+  const [activeCategory, setActiveCategory] = useState("All");
+
+  const addBlog = () => {
+    if (!isAdmin) return;
+    if (!title.trim() || !content.trim()) return;
+    const newBlog: Blog = {
+      id: Math.random().toString(36).substr(2, 9),
+      title,
+      content,
+      author: "Admin",
+      category,
+      imageUrl: imageUrl.trim() || undefined,
+      createdAt: new Date().toISOString()
+    };
+    setBlogs([newBlog, ...blogs]);
+    setTitle("");
+    setContent("");
+    setImageUrl("");
+    setShowAdd(false);
+  };
+
+  const deleteBlog = (id: string) => {
+    if (!isAdmin) return;
+    if (confirm("Are you sure you want to delete this blog post?")) {
+      setBlogs(blogs.filter(b => b.id !== id));
+      if (selectedBlog?.id === id) {
+        setSelectedBlog(null);
+      }
+    }
+  };
+
+  const filteredBlogs = blogs.filter(b => {
+    const matchesSearch = b.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          b.content.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = activeCategory === "All" || b.category.toLowerCase() === activeCategory.toLowerCase();
+    return matchesSearch && matchesCategory;
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold dark:text-white">Blogs & Guides</h2>
+          <p className="text-gray-500 dark:text-gray-400">Expand your mind. Master your routines.</p>
+        </div>
+        {isAdmin && (
+          <button 
+            onClick={() => setShowAdd(!showAdd)}
+            className="bg-black dark:bg-indigo-600 hover:opacity-95 text-white px-5 py-3 rounded-2xl font-bold text-sm tracking-wide shadow-lg flex items-center gap-2 transition-transform active:scale-95"
+          >
+            <Plus className="w-5 h-5" />
+            {showAdd ? "Close Writer" : "Add New Blog"}
+          </button>
+        )}
+      </div>
+
+      {isAdmin && showAdd && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] border-2 border-black dark:border-indigo-600/30 shadow-xl space-y-4"
+        >
+          <h3 className="text-lg font-black dark:text-white">Publish a Blog Post</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Blog Title</label>
+              <input 
+                className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 ring-indigo-500/50" 
+                placeholder="Title..." 
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Category</label>
+              <select 
+                className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 ring-indigo-500/50 grayscale-0"
+                value={category}
+                onChange={e => setCategory(e.target.value)}
+              >
+                <option value="Productivity">Productivity</option>
+                <option value="Habits">Habits</option>
+                <option value="Study">Study</option>
+                <option value="Finance">Finance</option>
+                <option value="Goals">Goals</option>
+              </select>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Cover Image URL (Optional)</label>
+            <input 
+              className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 ring-indigo-500/50 animate-none" 
+              placeholder="https://images.unsplash.com/..." 
+              value={imageUrl}
+              onChange={e => setImageUrl(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Content</label>
+            <textarea 
+              rows={5}
+              className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 ring-indigo-500/50 resize-none" 
+              placeholder="Type your insights and knowledge here..." 
+              value={content}
+              onChange={e => setContent(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button 
+              onClick={() => setShowAdd(false)} 
+              className="bg-gray-100 dark:bg-gray-800 text-black dark:text-white px-5 py-2.5 rounded-xl font-bold text-sm"
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={addBlog} 
+              className="bg-black dark:bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm"
+            >
+              Publish
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Filter Category Row & Search */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 py-2">
+        <div className="flex flex-wrap gap-2">
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              className={cn(
+                "px-4 py-2 rounded-xl font-semibold text-xs tracking-wide transition-all uppercase",
+                activeCategory === cat 
+                  ? "bg-black dark:bg-indigo-600 text-white shadow-md shadow-indigo-600/10" 
+                  : "bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50/50"
+              )}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+        <input
+          className="w-full md:w-64 bg-white dark:bg-gray-900 text-sm font-medium rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-2.5 dark:text-white outline-none focus:ring-2 ring-indigo-500/50"
+          placeholder="Search blogs..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+        />
+      </div>
+
+      {selectedBlog ? (
+        <motion.div 
+          layoutId={`blog-card-${selectedBlog.id}`} 
+          className="bg-white dark:bg-gray-900 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 p-8 md:p-12 shadow-md space-y-6"
+        >
+          <button 
+            onClick={() => setSelectedBlog(null)}
+            className="text-gray-400 hover:text-black dark:hover:text-white font-bold text-xs uppercase tracking-widest flex items-center gap-2 mb-4 bg-gray-50 dark:bg-gray-800 px-4 py-2 rounded-xl w-fit"
+          >
+            ← Back to All Blogs
+          </button>
+          {selectedBlog.imageUrl && (
+            <div className="w-full max-h-[350px] overflow-hidden rounded-3xl border border-gray-100 dark:border-gray-800">
+              <img src={selectedBlog.imageUrl} alt={selectedBlog.title} className="w-full h-full object-cover" />
+            </div>
+          )}
+          <div className="space-y-4">
+            <span className="bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full">
+              {selectedBlog.category}
+            </span>
+            <h1 className="text-3xl md:text-4xl font-black dark:text-white leading-tight">{selectedBlog.title}</h1>
+            <div className="flex items-center gap-3 text-xs text-gray-400 font-mono">
+              <span>By {selectedBlog.author}</span>
+              <span>•</span>
+              <span>{new Date(selectedBlog.createdAt).toLocaleDateString(undefined, { dateStyle: 'long' })}</span>
+            </div>
+            <div className="text-gray-600 dark:text-gray-300 whitespace-pre-line leading-relaxed text-base pt-4 border-t border-gray-50 dark:border-gray-800">
+              {selectedBlog.content}
+            </div>
+          </div>
+        </motion.div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredBlogs.map(blog => (
+            <motion.div 
+              whileHover={{ y: -4 }}
+              key={blog.id} 
+              className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden flex flex-col justify-between"
+            >
+              <div>
+                {blog.imageUrl ? (
+                  <div className="h-48 overflow-hidden bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-800 relative">
+                    <img src={blog.imageUrl} alt={blog.title} className="w-full h-full object-cover" />
+                    <span className="absolute top-4 left-4 bg-black/75 text-white font-bold text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full backdrop-blur-sm">
+                      {blog.category}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="h-48 bg-gradient-to-br from-indigo-500/10 to-rose-500/10 dark:from-indigo-600/20 dark:to-rose-600/10 relative border-b border-gray-100 dark:border-gray-800 flex items-center justify-center p-6">
+                    <BookOpen className="w-12 h-12 text-gray-400" />
+                    <span className="absolute top-4 left-4 bg-white/90 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 text-gray-500 dark:text-gray-400 font-bold text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full">
+                      {blog.category}
+                    </span>
+                  </div>
+                )}
+                <div className="p-6 space-y-3">
+                  <h3 className="font-bold text-lg dark:text-white line-clamp-2 leading-snug">{blog.title}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-3 leading-relaxed">{blog.content}</p>
+                </div>
+              </div>
+              <div className="p-6 pt-0 flex justify-between items-center border-t border-gray-50/50 dark:border-gray-800/40">
+                <button 
+                  onClick={() => setSelectedBlog(blog)}
+                  className="font-bold text-xs uppercase tracking-widest text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
+                >
+                  Read Article →
+                </button>
+                {isAdmin && (
+                  <button 
+                    onClick={() => deleteBlog(blog.id)}
+                    className="p-1 hover:bg-red-50 dark:hover:bg-red-950/20 rounded text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          ))}
+
+          {filteredBlogs.length === 0 && (
+            <div className="col-span-full bg-white dark:bg-gray-900 rounded-3xl p-12 text-center text-gray-400 dark:text-gray-500 border border-gray-100 dark:border-gray-800 font-medium">
+              No articles found matching the filters. Check back later!
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface PricingViewProps {
+  plans: PricingPlan[];
+  subscriptionTier: string;
+  onUpgrade: (userId: string, tier: string, habitsLimit: number, amountPaid?: string, planId?: string) => Promise<void>;
+  session: any;
+  setActiveTab: (tab: string) => void;
+  orders?: any[];
+}
+
+function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab, orders = [] }: PricingViewProps) {
+  const [upgradingTo, setUpgradingTo] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
+
+  const activePlan = plans.find(p => p.name.toLowerCase() === subscriptionTier.toLowerCase());
+  const effectiveTier = (subscriptionTier === 'Free' || activePlan) ? subscriptionTier : 'Free';
+
+  const handleUpgrade = async (plan: PricingPlan) => {
+    if (!session?.user?.id) {
+       // Allow upgrade in local/bypass mode
+       setUpgradingTo(plan.id);
+       await onUpgrade("local-user", plan.name, 9999, plan.price, plan.id);
+       setUpgradingTo(null);
+       setSuccessMsg(`Congratulations! You have successfully upgraded to the ${plan.name} tier! enjoy unlimited premium features. ✨`);
+       setTimeout(() => setSuccessMsg(null), 5000);
+       return;
+    }
+    setUpgradingTo(plan.id);
+    await onUpgrade(session.user.id, plan.name, 9999, plan.price, plan.id);
+    setUpgradingTo(null);
+    setSuccessMsg(`Congratulations! You have successfully upgraded to the ${plan.name} tier! enjoy unlimited premium features. ✨`);
+    setTimeout(() => setSuccessMsg(null), 5000);
+  };
+
+  return (
+    <div className="space-y-8 pb-20">
+      <div>
+        <h2 className="text-3xl font-black dark:text-white flex items-center gap-3">
+          <Award className="w-8 h-8 text-amber-500 animate-pulse" />
+          Subscription Plans & Pricing
+        </h2>
+        <p className="text-gray-500 dark:text-gray-400">Unlock full productivity capacity, customized databases, and advanced orchestration analytics.</p>
+      </div>
+
+      {successMsg && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-6 bg-emerald-50 dark:bg-emerald-900/15 border border-emerald-100 dark:border-emerald-500/20 text-emerald-800 dark:text-emerald-400 rounded-3xl flex items-center gap-3"
+        >
+          <Sparkles className="w-5 h-5 text-emerald-500 shrink-0" />
+          <span className="font-bold text-sm">{successMsg}</span>
+        </motion.div>
+      )}
+
+      {/* Current Subscription Status Panel */}
+      <div className="p-8 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2.5rem] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden group">
+        <div className="space-y-2">
+          <span className="text-[10px] bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-black uppercase tracking-widest px-3 py-1.5 rounded-full">
+            Active Tier
+          </span>
+          <h3 className="text-2xl font-black dark:text-white mt-1">{effectiveTier} Plan</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl">
+            {effectiveTier === 'Free' 
+              ? "You are currently on the free version with a limit of 5 habits. Upgrade to gain access to comprehensive widgets, more tracking entries, and AI modules." 
+              : `You are on the ${effectiveTier} plan. You have full access to unlimited habits, and expanded data insights.`}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800 rounded-2xl flex flex-col items-center justify-center border border-gray-100 dark:border-gray-700 min-w-[120px]">
+             <span className="text-xs text-gray-400">Status</span>
+             <span className="text-lg font-black dark:text-white">Active</span>
+          </div>
+        </div>
+      </div>
+
+      {plans.length === 0 ? (
+        <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] p-12 text-center border border-gray-100 dark:border-gray-800 space-y-6 max-w-2xl mx-auto shadow-sm">
+          <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8 animate-pulse" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-xl font-bold dark:text-white">No custom plans configured yet</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+              The platform administrator has not published any custom subscription plans to the Supabase database yet. You are currently on the baseline Free Tier.
+            </p>
+          </div>
+          {session?.user?.email === 'gongidikalyan08@gmail.com' ? (
+            <div className="pt-2">
+              <button
+                onClick={() => setActiveTab('admin')}
+                className="px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-lg hover:shadow-indigo-600/20 active:scale-95"
+              >
+                Go to Admin to Create Plans
+              </button>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400">Please check back later or contact the workspace administrator.</p>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {plans.map((p) => {
+          const isCurrent = subscriptionTier.toLowerCase() === p.name.toLowerCase();
+          return (
+            <div 
+              key={p.id}
+              className={cn(
+                "p-10 rounded-[3rem] border flex flex-col justify-between space-y-8 relative overflow-hidden transition-all duration-300",
+                isCurrent 
+                  ? "bg-black text-white border-black dark:bg-gray-900 dark:border-indigo-600 shadow-xl" 
+                  : "bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800 hover:shadow-lg hover:border-gray-200 dark:hover:border-gray-700"
+              )}
+            >
+              <div className="space-y-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className={cn("text-2xl font-black", isCurrent ? "text-white animate-pulse" : "text-gray-900 dark:text-white")}>
+                      {p.name}
+                    </h3>
+                    <p className="text-xs text-indigo-500 dark:text-indigo-400 font-bold mt-1 uppercase tracking-widest">Premium Features Hub</p>
+                  </div>
+                  {isCurrent && (
+                    <span className="bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-lg shadow-indigo-600/25 animate-bounce">
+                      Your Tier
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-baseline gap-1 pt-2">
+                  <span className={cn("text-5xl font-black font-mono", isCurrent ? "text-white" : "text-gray-900 dark:text-white")}>{p.price}</span>
+                  <span className="text-gray-400 text-sm font-semibold">/ {p.period}</span>
+                </div>
+
+                <div className="h-[2px] bg-gray-100 dark:bg-gray-800/60 w-full"></div>
+
+                <div className="space-y-4">
+                  <h4 className={cn("text-xs font-black uppercase tracking-wider", isCurrent ? "text-indigo-300" : "text-gray-450 dark:text-gray-400")}>
+                    Included Capabilities
+                  </h4>
+                  <ul className="space-y-3.5">
+                    {p.features.map((feature, index) => (
+                      <li key={index} className="flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-indigo-500 shrink-0 animate-none" />
+                        <span className={cn("text-sm", isCurrent ? "text-gray-200" : "text-gray-650 dark:text-gray-300")}>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              <button
+                onClick={() => handleUpgrade(p)}
+                disabled={upgradingTo !== null || isCurrent}
+                className={cn(
+                  "w-full py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2",
+                  isCurrent 
+                    ? "bg-gray-800 text-gray-400 cursor-not-allowed dark:bg-gray-800" 
+                    : "bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-600/10"
+                )}
+              >
+                {upgradingTo === p.id ? (
+                  <span className="flex items-center gap-2">
+                    <RefreshCcw className="w-4 h-4 animate-spin" /> Upgrading...
+                  </span>
+                ) : isCurrent ? (
+                  "Active Premium Tier"
+                ) : (
+                  `Upgrade to ${p.name}`
+                )}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      )}
+
+      {/* Orders & Billing History Section */}
+      <div className="pt-8 border-t border-gray-100 dark:border-gray-800 space-y-6">
+        <div>
+          <h3 className="text-xl font-black dark:text-white flex items-center gap-2.5">
+            <CreditCard className="w-5 h-5 text-indigo-500" />
+            Billing & Transaction History
+          </h3>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            Review your historical transactions, system logs, and invoice receipts securely recorded in the platform database.
+          </p>
+        </div>
+
+        {orders.length === 0 ? (
+          <div className="p-10 text-center border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-3xl bg-gray-50/30 dark:bg-gray-950/20">
+            <p className="text-xs font-semibold text-gray-400">No transactions recorded yet in this account profile.</p>
+            <p className="text-[10px] text-gray-400 dark:text-gray-600 mt-1">Upgrade or modify your plan higher to log invoices.</p>
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2rem] overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50/50 dark:bg-gray-800/20 text-[10px] font-black uppercase tracking-wider text-gray-400 border-b border-gray-100 dark:border-gray-800">
+                    <th className="py-4 px-6">Invoice ID</th>
+                    <th className="py-4 px-6">Transaction Date</th>
+                    <th className="py-4 px-6">Space Plan</th>
+                    <th className="py-4 px-6 text-right">Amount Paid</th>
+                    <th className="py-4 px-6">Status</th>
+                    <th className="py-4 px-6 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {orders.map((order) => (
+                    <tr key={order.id} className="text-xs dark:text-gray-300 font-medium hover:bg-gray-50/50 dark:hover:bg-gray-800/10 transition-colors">
+                      <td className="py-4 px-6 font-mono font-bold text-gray-400">{order.id}</td>
+                      <td className="py-4 px-6 text-gray-500">
+                        {new Date(order.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                      </td>
+                      <td className="py-4 px-6 font-bold">{order.plan_name}</td>
+                      <td className="py-4 px-6 text-right font-bold text-gray-900 dark:text-white font-mono">
+                        {order.currency === 'INR' ? '₹' : '$'}{parseFloat(order.amount).toFixed(2)}
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-900/15 text-emerald-600 dark:text-emerald-400">
+                          <CheckCircle2 className="w-3 h-3" /> {order.status}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 text-center">
+                        <button
+                          onClick={() => setSelectedReceipt(order)}
+                          className="px-3 py-1.5 bg-gray-50 dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 font-bold uppercase text-[10px] tracking-wider rounded-lg transition-all"
+                        >
+                          Invoice Details
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Invoice Receipt Modal */}
+      <AnimatePresence>
+        {selectedReceipt && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-[2.5rem] p-8 border-2 border-indigo-600 shadow-2xl relative overflow-hidden"
+            >
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <span className="text-[9px] bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 font-black uppercase tracking-widest px-2.5 py-1 rounded-full">
+                    Official Receipt
+                  </span>
+                  <h3 className="text-xl font-black mt-2 dark:text-white">Transaction details</h3>
+                </div>
+                <button
+                  onClick={() => setSelectedReceipt(null)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                >
+                  <X className="w-4 h-4 dark:text-gray-400" />
+                </button>
+              </div>
+
+              <div className="space-y-4 pt-1 pb-6 border-b border-dashed border-gray-100 dark:border-gray-800 font-mono text-xs text-gray-500 dark:text-gray-400">
+                <div className="flex justify-between">
+                  <span>Invoice Reference:</span>
+                  <span className="font-bold text-gray-900 dark:text-white">{selectedReceipt.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Transaction Date:</span>
+                  <span className="font-bold text-gray-800 dark:text-gray-200">
+                    {new Date(selectedReceipt.created_at).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Product Purchased:</span>
+                  <span className="font-bold text-indigo-600 dark:text-indigo-400">{selectedReceipt.plan_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Payment Gateway:</span>
+                  <span className="font-bold text-gray-800 dark:text-gray-200 uppercase">{selectedReceipt.payment_method}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Verification Status:</span>
+                  <span className="font-bold text-emerald-500 uppercase">{selectedReceipt.status}</span>
+                </div>
+              </div>
+
+              {/* Invoice Value Summary */}
+              <div className="py-6 flex items-baseline justify-between">
+                <span className="text-sm font-black dark:text-white font-mono">Total Paid</span>
+                <span className="text-3xl font-black font-mono text-gray-900 dark:text-white">
+                  {selectedReceipt.currency === 'INR' ? '₹' : '$'}{parseFloat(selectedReceipt.amount).toFixed(2)}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    const printContents = document.createElement("div");
+                    printContents.innerHTML = `
+                      <div style="font-family: monospace; padding: 40px; border: 2px solid #000; max-width: 400px; margin: 0 auto; background: #fff; color: #000;">
+                        <h2 style="font-weight: 900; margin-bottom: 2px;">WRINDHA OS</h2>
+                        <h4 style="text-transform: uppercase; color: #666; margin-top: 0; font-size: 11px; letter-spacing: 2px;">Receipt & Verification Details</h4>
+                        <hr style="border: 1px dashed #ccc;" />
+                        <p><strong>Invoice Reference:</strong> ${selectedReceipt.id}</p>
+                        <p><strong>Transaction Date:</strong> ${new Date(selectedReceipt.created_at).toLocaleString()}</p>
+                        <p><strong>Product:</strong> ${selectedReceipt.plan_name}</p>
+                        <p><strong>Payment Method:</strong> ${selectedReceipt.payment_method.toUpperCase()}</p>
+                        <p><strong>Status:</strong> ${selectedReceipt.status.toUpperCase()}</p>
+                        <hr style="border: 1px dashed #ccc;" />
+                        <h3 style="display: flex; justify-content: space-between; font-weight: 900; margin-top: 20px;">
+                          <span>TOTAL PAID:</span>
+                          <span>${selectedReceipt.currency === 'INR' ? '₹' : '$'}${parseFloat(selectedReceipt.amount).toFixed(2)}</span>
+                        </h3>
+                        <p style="text-align: center; color: #888; font-size: 10px; margin-top: 40px;">Thank you for upgrading! Your system credentials has been recompiled successfully.</p>
+                      </div>
+                    `;
+                    const win = window.open("", "_blank");
+                    if (win) {
+                      win.document.body.appendChild(printContents);
+                      win.print();
+                    }
+                  }}
+                  className="w-full py-4 bg-black dark:bg-indigo-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  <FileText className="w-4 h-4" /> Print Receipt
+                </button>
+                <button
+                  onClick={() => setSelectedReceipt(null)}
+                  className="w-full py-3 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 font-bold rounded-2xl text-xs uppercase tracking-wider transition-colors"
+                >
+                  Dismiss Receipt
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
