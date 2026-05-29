@@ -84,6 +84,7 @@ const infoModules = [
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
+  const isFetchingRef = useRef(true);
   const [currency, setCurrency] = useState<'USD' | 'INR'>(() => (localStorage.getItem('wrindha_currency') as 'USD' | 'INR') || 'INR');
   const [userName, setUserName] = useState(() => localStorage.getItem('wrindha_user_name') || "Felix");
   const [userBudget, setUserBudget] = useState<number>(() => {
@@ -176,43 +177,55 @@ export default function App() {
   const isAdmin = session?.user?.email === 'gongidikalyan08@gmail.com';
 
   useEffect(() => {
+    isFetchingRef.current = true;
+    setIsInitializing(true);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session?.user?.user_metadata?.full_name) {
-        setUserName(session.user.user_metadata.full_name);
-      }
-      const isBypassed = () => {
-        const saved = localStorage.getItem('wrindha_bypass_config');
-        return saved === 'true';
-      };
-      if (session?.user && !isBypassed()) {
-        const uName = session.user.user_metadata?.full_name || localStorage.getItem('wrindha_user_name') || "Felix";
-        supabase.from('profiles').select('id').eq('id', session.user.id).single().then(({ data }) => {
-          if (data) {
-            supabase.from('profiles').update({ 
-              last_active: new Date().toISOString() 
-            }).eq('id', session.user.id).then();
-          } else {
-            supabase.from('profiles').insert({ 
-              id: session.user.id, 
-              email: session.user.email,
-              full_name: uName,
-              last_active: new Date().toISOString(),
-              budget: userBudget,
-              currency: currency
-            }).then();
-          }
-        });
+      if (session) {
+        isFetchingRef.current = true;
+        setIsInitializing(true);
+        setSession(session);
+        if (session.user?.user_metadata?.full_name) {
+          setUserName(session.user.user_metadata.full_name);
+        }
+        const isBypassed = () => {
+          const saved = localStorage.getItem('wrindha_bypass_config');
+          return saved === 'true';
+        };
+        if (!isBypassed()) {
+          const uName = session.user.user_metadata?.full_name || localStorage.getItem('wrindha_user_name') || "Felix";
+          supabase.from('profiles').select('id').eq('id', session.user.id).single().then(({ data }) => {
+            if (data) {
+              supabase.from('profiles').update({ 
+                last_active: new Date().toISOString() 
+              }).eq('id', session.user.id).then();
+            } else {
+              supabase.from('profiles').insert({ 
+                id: session.user.id, 
+                email: session.user.email,
+                full_name: uName,
+                last_active: new Date().toISOString(),
+                budget: userBudget,
+                currency: currency
+              }).then();
+            }
+          });
+        }
+      } else {
+        isFetchingRef.current = false;
+        setIsInitializing(false);
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      if (event === 'PASSWORD_RECOVERY') {
-        setShowResetPasswordModal(true);
-        setIsPasswordRecoveryActive(true);
-      }
       if (session) {
+        isFetchingRef.current = true;
+        setIsInitializing(true);
+        setSession(session);
+        if (event === 'PASSWORD_RECOVERY') {
+          setShowResetPasswordModal(true);
+          setIsPasswordRecoveryActive(true);
+        }
         if (session.user?.user_metadata?.full_name) {
           setUserName(session.user.user_metadata.full_name);
         }
@@ -240,6 +253,10 @@ export default function App() {
           });
         }
       } else if (event === 'SIGNED_OUT') {
+        isFetchingRef.current = true;
+        setIsInitializing(true);
+        setSession(null);
+        
         // Logout occurred: Clear personal data arrays and settings/tiers
         setHabits([]);
         setTasks([]);
@@ -261,6 +278,11 @@ export default function App() {
           'wrindha_subscription_tier', 'wrindha_max_habits'
         ];
         keys.forEach(k => localStorage.removeItem(k));
+
+        isFetchingRef.current = false;
+        setIsInitializing(false);
+      } else {
+        setSession(session);
       }
     });
 
@@ -340,21 +362,21 @@ export default function App() {
   // Persistence
   useEffect(() => {
     localStorage.setItem('wrindha_budget', userBudget.toString());
-    if (!isInitializing && session?.user?.id && !bypassConfig) {
+    if (!isInitializing && !isFetchingRef.current && session?.user?.id && !bypassConfig) {
       supabase.from('profiles').update({ budget: userBudget }).eq('id', session.user.id).then();
     }
   }, [userBudget, isInitializing, session, bypassConfig]);
 
   useEffect(() => {
     localStorage.setItem('wrindha_currency', currency);
-    if (!isInitializing && session?.user?.id && !bypassConfig) {
+    if (!isInitializing && !isFetchingRef.current && session?.user?.id && !bypassConfig) {
       supabase.from('profiles').update({ currency: currency }).eq('id', session.user.id).then();
     }
   }, [currency, isInitializing, session, bypassConfig]);
 
   useEffect(() => {
     localStorage.setItem('wrindha_user_name', userName);
-    if (!isInitializing && session?.user?.id && !bypassConfig) {
+    if (!isInitializing && !isFetchingRef.current && session?.user?.id && !bypassConfig) {
       supabase.from('profiles').update({ full_name: userName }).eq('id', session.user.id).then();
     }
   }, [userName, isInitializing, session, bypassConfig]);
@@ -374,12 +396,12 @@ export default function App() {
   // Initial Fetch from Supabase
   useEffect(() => {
     async function fetchData() {
-      if (session?.user?.id) {
-        setIsInitializing(true);
-      }
+      isFetchingRef.current = true;
+      setIsInitializing(true);
       
       if (!isSupabaseConfigured() || !session?.user?.id) {
         setIsInitializing(false);
+        isFetchingRef.current = false;
         return;
       }
 
@@ -526,6 +548,7 @@ export default function App() {
         console.error('Error fetching from Supabase:', error);
       } finally {
         setIsInitializing(false);
+        isFetchingRef.current = false;
       }
     }
 
@@ -535,6 +558,7 @@ export default function App() {
   // Sync to Supabase helper
   const syncToSupabase = async (table: string, data: any) => {
     if (!isSupabaseConfigured() || !session?.user?.id || bypassConfig) return;
+    if (isInitializing || isFetchingRef.current) return;
     try {
       // Add user_id to each item before upserting and map camelCase to snake_case if needed
       const mapItem = (item: any) => {
