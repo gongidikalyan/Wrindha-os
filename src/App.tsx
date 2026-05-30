@@ -47,14 +47,16 @@ import {
   Award,
   ShieldAlert,
   Timer,
-  Play
+  Play,
+  Zap,
+  QrCode,
+  Smartphone
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn, formatCurrency, getStorage, setStorage } from "@/src/lib/utils";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { Task, EisenhowerQuadrant, Habit, Expense, Goal, GoalType, TimetableEntry, TimetableType, StudyCourse, Blog, PricingPlan, UserSubscription } from "./types";
 import { supabase, isSupabaseConfigured, getSupabaseError, supabaseUrl } from "./lib/supabase";
-import { gemini } from "./services/geminiService";
 import AnalyticsView from "./components/AnalyticsView";
 import PomodoroTimer from "./components/PomodoroTimer";
 import TaskNotesEditor from "./components/TaskNotesEditor";
@@ -113,25 +115,55 @@ export default function App() {
   const [subscriptionTier, setSubscriptionTier] = useState<string>(() => localStorage.getItem('wrindha_subscription_tier') || 'Free');
   const [maxHabits, setMaxHabits] = useState<number>(() => {
     const saved = localStorage.getItem('wrindha_max_habits');
-    return saved ? parseInt(saved) : 5;
+    return saved ? parseInt(saved) : 9999;
   });
+
+  const [trialStart, setTrialStart] = useState<string>(() => {
+    const key = session?.user?.id ? `wrindha_trial_start_${session.user.id}` : 'wrindha_trial_start_local';
+    let saved = localStorage.getItem(key);
+    if (!saved) {
+      saved = new Date().toISOString();
+      localStorage.setItem(key, saved);
+    }
+    return saved;
+  });
+
+  useEffect(() => {
+    const key = session?.user?.id ? `wrindha_trial_start_${session.user.id}` : 'wrindha_trial_start_local';
+    let saved = localStorage.getItem(key);
+    if (!saved) {
+      saved = new Date().toISOString();
+      localStorage.setItem(key, saved);
+    }
+    setTrialStart(saved);
+  }, [session?.user?.id]);
+
+  const trialStartDate = new Date(trialStart || new Date());
+  const trialEndDate = new Date(trialStartDate.getTime() + 5 * 24 * 60 * 60 * 1000);
+  const msLeft = trialEndDate.getTime() - Date.now();
+  const trialDaysLeft = Math.max(0, Math.ceil(msLeft / (24 * 60 * 60 * 1000)));
+  const isTrialActive = msLeft > 0;
+
+  const isPremiumPaid = subscriptionTier.toLowerCase() === 'premium' || subscriptionTier.toLowerCase() === 'pro space' || subscriptionTier.toLowerCase() === 'ultimate matrix' || subscriptionTier.toLowerCase() === 'active';
+  const hasActiveAccess = isPremiumPaid || isTrialActive;
+
   const [userPlans, setUserPlans] = useState<PricingPlan[]>(() => {
-    const saved = localStorage.getItem('wrindha_user_plans');
-    return saved ? JSON.parse(saved) : [
+    return [
       {
-        id: "premium-plan-1",
-        name: "Pro Space",
-        price: "₹199",
+        id: "premium-plan-49",
+        name: "Premium",
+        price: "₹49",
         period: "month",
-        features: ["Unlimited Habits & Tasks", "Full Budgeting Insights", "Smart Study courses with auto exam reminders", "Priority support"],
-        isActive: true
-      },
-      {
-        id: "premium-plan-2",
-        name: "Ultimate Matrix",
-        price: "₹399",
-        period: "month",
-        features: ["Everything in Pro Space", "Unlimited Timetable elements", "Exclusive Premium productivity badges", "Advance Analytics dashboards", "AI-powered course summarizer"],
+        features: [
+          "5-day free trial (no credit card upfront)",
+          "No artificial limitations",
+          "Unlimited habit trackers & custom daily streaks",
+          "Unlimited Priority Eisenhower quadrant tasks",
+          "Full financial accounts, expense ledgers, & budgets",
+          "Smart academic planner with exam custom Reminders",
+          "Advanced interactive multi-tier daily timetables",
+          "In-depth visual analytics and performance reports"
+        ],
         isActive: true
       }
     ];
@@ -417,21 +449,26 @@ export default function App() {
           if (profileData.max_habits) setMaxHabits(profileData.max_habits);
         }
 
-        try {
-          const { data: plansData, error: plansError } = await supabase.from('pricing_plans').select('*');
-          if (!plansError && plansData) {
-            setUserPlans(plansData.map(p => ({
-              id: p.id,
-              name: p.name,
-              price: p.price,
-              period: p.period || 'month',
-              features: p.features || [],
-              isActive: p.is_active === undefined ? true : p.is_active
-            })));
+        // Bypassed database pricing plan query to keep standard premium OS ₹49 rate custom-configured
+        setUserPlans([
+          {
+            id: "premium-plan-49",
+            name: "Premium",
+            price: "₹49",
+            period: "month",
+            features: [
+              "5-day free trial (no credit card upfront)",
+              "No artificial limitations",
+              "Unlimited habit trackers & custom daily streaks",
+              "Unlimited Priority Eisenhower quadrant tasks",
+              "Full financial accounts, expense ledgers, & budgets",
+              "Smart academic planner with exam custom Reminders",
+              "Advanced interactive multi-tier daily timetables",
+              "In-depth visual analytics and performance reports"
+            ],
+            isActive: true
           }
-        } catch (planErr) {
-          console.warn("Pricing plans table or columns may not exist yet, defaulting:", planErr);
-        }
+        ]);
 
         if (session?.user?.email === 'gongidikalyan08@gmail.com') {
           try {
@@ -638,7 +675,7 @@ export default function App() {
     }
   };
 
-  const updateUserTier = async (userId: string, tier: string, habitsLimit: number, amountPaid?: string, planId?: string) => {
+  const updateUserTier = async (userId: string, tier: string, habitsLimit: number, amountPaid?: string, planId?: string, paymentMethod: string = 'stripe') => {
     if (!isSupabaseConfigured() || bypassConfig) {
       // Local Fallback if offline
       if (session?.user?.id === userId || userId === "local-user") {
@@ -659,7 +696,7 @@ export default function App() {
           amount: parseFloat(amountPaid.replace(/[^0-9.]/g, '')) || 0,
           currency: amountPaid.includes('₹') || amountPaid.includes('INR') ? 'INR' : 'USD',
           status: 'completed',
-          payment_method: 'stripe',
+          payment_method: paymentMethod,
           created_at: new Date().toISOString()
         };
         const updatedOrders = [orderData, ...orders];
@@ -696,7 +733,7 @@ export default function App() {
           amount: parseFloat(amountPaid.replace(/[^0-9.]/g, '')) || 0,
           currency: amountPaid.includes('₹') || amountPaid.includes('INR') ? 'INR' : 'USD',
           status: 'completed',
-          payment_method: 'stripe',
+          payment_method: paymentMethod,
           created_at: new Date().toISOString()
         };
         
@@ -870,26 +907,42 @@ export default function App() {
         </div>
 
         <nav className="flex-1 px-4 space-y-1 mt-4">
-          {modules.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => setActiveTab(m.id)}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group relative",
-                activeTab === m.id 
-                  ? "bg-black dark:bg-indigo-600 text-white shadow-lg shadow-black/10" 
-                  : "text-[#6B7280] dark:text-gray-500 hover:bg-[#F3F4F6] dark:hover:bg-gray-800 hover:text-[#1A1A1A] dark:hover:text-white"
-              )}
-            >
-              <m.icon className={cn("w-5 h-5 shrink-0", activeTab !== m.id && m.color)} />
-              {isSidebarOpen && <span className="font-medium text-sm whitespace-nowrap">{m.name}</span>}
-              {!isSidebarOpen && (
-                <div className="absolute left-16 bg-black text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-[60]">
-                  {m.name}
-                </div>
-              )}
-            </button>
-          ))}
+          {modules.map((m) => {
+            const isLocked = !hasActiveAccess && m.id !== 'pricing' && m.id !== 'blogs';
+            return (
+              <button
+                key={m.id}
+                onClick={() => {
+                  if (isLocked) {
+                    setActiveTab('pricing');
+                  } else {
+                    setActiveTab(m.id);
+                  }
+                }}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group relative",
+                  activeTab === m.id 
+                    ? "bg-black dark:bg-indigo-600 text-white shadow-lg shadow-black/10" 
+                    : "text-[#6B7280] dark:text-gray-500 hover:bg-[#F3F4F6] dark:hover:bg-gray-800 hover:text-[#1A1A1A] dark:hover:text-white",
+                  isLocked && "opacity-60 cursor-not-allowed hover:bg-transparent"
+                )}
+              >
+                <m.icon className={cn("w-5 h-5 shrink-0", activeTab !== m.id && m.color)} />
+                {isSidebarOpen && (
+                  <span className="font-medium text-sm whitespace-nowrap flex items-center justify-between w-full">
+                    <span>{m.name}</span>
+                    {isLocked && <Lock className="w-3.5 h-3.5 text-orange-500 animate-pulse" />}
+                  </span>
+                )}
+                {!isSidebarOpen && (
+                  <div className="absolute left-16 bg-black text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-[60] flex items-center gap-1.5">
+                    {m.name}
+                    {isLocked && <Lock className="w-3 h-3 text-orange-400" />}
+                  </div>
+                )}
+              </button>
+            );
+          })}
 
           {isAdmin && (
             <button 
@@ -1056,7 +1109,17 @@ export default function App() {
             </button>
             <span className="font-extrabold text-sm text-[#1A1A1A] dark:text-white tracking-tight uppercase block md:hidden">Wrindha OS</span>
           </div>
-          <div className="flex-1"></div>
+          <div className="flex-1 flex justify-center">
+            {isTrialActive && !isPremiumPaid && (
+              <button 
+                onClick={() => setActiveTab('pricing')}
+                className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20 px-3.5 py-1.5 rounded-full text-[11px] font-bold hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all shadow-sm hover:scale-105 active:scale-95"
+              >
+                <span>⚡ 5-Day Free Trial: <strong className="font-extrabold text-indigo-700 dark:text-indigo-350">{trialDaysLeft} days remaining</strong></span>
+                <span className="bg-indigo-600 text-white font-extrabold uppercase text-[8px] tracking-wider px-2 py-0.5 rounded-full shadow-sm">Upgrade</span>
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-4">
             {!session && (
               <button 
@@ -1083,11 +1146,11 @@ export default function App() {
              >
                {activeTab === 'dashboard' && <DashboardView habits={habits} tasks={tasks} expenses={expenses} currency={currency} userName={userName} setUserName={setUserName} theme={theme} setActiveTab={setActiveTab} budget={userBudget} />}
                 {activeTab === 'analytics' && <AnalyticsView expenses={expenses} habits={habits} tasks={tasks} goals={goals} courses={studyCourses} currency={currency} />}
-               {activeTab === 'habits' && <HabitsView habits={habits} setHabits={setHabits} onDelete={(id) => deleteFromSupabase('habits', id)} theme={theme} />}
-               {activeTab === 'tasks' && <TasksView tasks={tasks} setTasks={setTasks} onDelete={(id) => deleteFromSupabase('tasks', id)} />}
+               {activeTab === 'habits' && <HabitsView habits={habits} setHabits={setHabits} onDelete={(id) => deleteFromSupabase('habits', id)} theme={theme} subscriptionTier="Premium" setActiveTab={setActiveTab} />}
+               {activeTab === 'tasks' && <TasksView tasks={tasks} setTasks={setTasks} onDelete={(id) => deleteFromSupabase('tasks', id)} subscriptionTier="Premium" setActiveTab={setActiveTab} />}
                {activeTab === 'finance' && <FinanceView expenses={expenses} setExpenses={setExpenses} onDelete={(id) => deleteFromSupabase('expenses', id)} currency={currency} setCurrency={setCurrency} theme={theme} budget={userBudget} setBudget={setUserBudget} />}
-               {activeTab === 'study' && <StudyView courses={studyCourses} setCourses={setStudyCourses} onDeleteCourse={(id) => deleteFromSupabase('study_courses', id)} />}
-               {activeTab === 'goals' && <GoalsView goals={goals} setGoals={setGoals} onDelete={(id) => deleteFromSupabase('goals', id)} />}
+               {activeTab === 'study' && <StudyView courses={studyCourses} setCourses={setStudyCourses} onDeleteCourse={(id) => deleteFromSupabase('study_courses', id)} subscriptionTier="Premium" setActiveTab={setActiveTab} />}
+               {activeTab === 'goals' && <GoalsView goals={goals} setGoals={setGoals} onDelete={(id) => deleteFromSupabase('goals', id)} subscriptionTier="Premium" setActiveTab={setActiveTab} />}
                {activeTab === 'timetable' && <TimetableView entries={timetable} setEntries={setTimetable} onDelete={(id) => deleteFromSupabase('timetable', id)} theme={theme} />}
                {activeTab === 'blogs' && <BlogsView blogs={blogs} setBlogs={setBlogs} isAdmin={isAdmin} />}
                {activeTab === 'pricing' && <PricingView plans={userPlans} subscriptionTier={subscriptionTier} onUpgrade={updateUserTier} session={session} setActiveTab={setActiveTab} orders={orders} />}
@@ -1121,21 +1184,34 @@ export default function App() {
           { id: 'tasks', name: 'Tasks', icon: ListTodo },
           { id: 'blogs', name: 'Blogs', icon: FileText },
           { id: 'pricing', name: 'Pricing', icon: Award },
-        ].map((m) => (
-          <button
-            key={m.id}
-            onClick={() => setActiveTab(m.id)}
-            className={cn(
-              "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all",
-              activeTab === m.id 
-                ? "text-indigo-600 dark:text-indigo-400 scale-105 font-bold" 
-                : "text-gray-400 hover:text-gray-600"
-            )}
-          >
-            <m.icon className="w-5 h-5 shrink-0 mb-0.5" />
-            <span className="text-[9px] tracking-tight">{m.name}</span>
-          </button>
-        ))}
+        ].map((m) => {
+          const isLocked = !hasActiveAccess && m.id !== 'pricing' && m.id !== 'blogs';
+          return (
+            <button
+              key={m.id}
+              onClick={() => {
+                if (isLocked) {
+                  setActiveTab('pricing');
+                } else {
+                  setActiveTab(m.id);
+                }
+              }}
+              className={cn(
+                "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all",
+                activeTab === m.id 
+                  ? "text-indigo-600 dark:text-indigo-400 scale-105 font-bold" 
+                  : "text-gray-400 hover:text-gray-600",
+                isLocked && "opacity-60"
+              )}
+            >
+              <m.icon className="w-5 h-5 shrink-0 mb-0.5" />
+              <span className="text-[9px] tracking-tight flex items-center gap-0.5">
+                {m.name}
+                {isLocked && <Lock className="w-2.5 h-2.5 text-orange-500" />}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Absolute Password Reset Modal / Overlay */}
@@ -1166,6 +1242,63 @@ export default function App() {
               </p>
 
               <ResetPasswordForm onComplete={() => setShowResetPasswordModal(false)} />
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Global Trial Expired Paywall Overlay */}
+      {!hasActiveAccess && !isInitializing && activeTab !== 'pricing' && activeTab !== 'about' && activeTab !== 'contact' && activeTab !== 'privacy' && activeTab !== 'disclaimer' && activeTab !== 'terms' && (
+        <div className="fixed inset-0 z-[200] bg-slate-950/65 backdrop-blur-xl flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white dark:bg-gray-900 w-full max-w-lg rounded-[2.5rem] p-8 md:p-10 border border-indigo-200/50 dark:border-gray-800 shadow-2xl text-center relative overflow-hidden space-y-6"
+          >
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-red-500 via-indigo-600 to-purple-500"></div>
+            <div className="w-20 h-20 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto shadow-inner animate-pulse">
+              <Lock className="w-10 h-10" />
+            </div>
+            <div className="space-y-2">
+              <span className="text-[10px] bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400 font-extrabold uppercase tracking-widest px-3 py-1 rounded-full">
+                Trial Period Expired
+              </span>
+              <h2 className="text-3xl font-black dark:text-white">Workspace Locked</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-semibold">
+                Your <span className="font-bold text-red-500">5-day free trial</span> of Wrindha OS is complete. Wrindha is a Premium-Only space with absolutely no tracking limitations.
+              </p>
+              <div className="text-xs text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/35 py-3 px-4 rounded-xl mt-2">
+                🚀 Upgrade to Premium for only <strong className="text-lg">₹49/month</strong> to restore unlimited tracking of habits, study matrices, goals, and priority timetables!
+              </div>
+            </div>
+
+            <div className="pt-2 flex flex-col gap-2">
+              <button 
+                onClick={() => {
+                  setActiveTab('pricing');
+                }}
+                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-wider text-xs rounded-2xl transition-all shadow-lg shadow-indigo-600/20 active:scale-95"
+              >
+                Unlock Wrindha OS Premium ✨
+              </button>
+              
+              {session ? (
+                <button 
+                  onClick={async () => {
+                    await supabase.auth.signOut();
+                  }}
+                  className="w-full py-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 font-bold rounded-2xl text-xs uppercase"
+                >
+                  Sign out of account
+                </button>
+              ) : (
+                <button 
+                  onClick={() => setShowSettings(true)}
+                  className="w-full py-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-indigo-600 dark:text-indigo-400 font-bold rounded-2xl text-xs uppercase"
+                >
+                  Sign In to existing profile
+                </button>
+              )}
             </div>
           </motion.div>
         </div>
@@ -2263,28 +2396,6 @@ function DashboardView({ habits, tasks, expenses, currency, userName, setUserNam
     }).format(val);
   };
 
-  const [aiTips, setAiTips] = useState<string[]>([]);
-  const [loadingTips, setLoadingTips] = useState(false);
-
-  useEffect(() => {
-    async function fetchTips() {
-      setLoadingTips(true);
-      try {
-        const tips = await gemini.getAiSuggestions('Dashboard', { 
-          habits: habits.length, 
-          tasks: tasks.filter(t => !t.completed).length,
-          userName 
-        });
-        setAiTips(tips);
-      } catch (error) {
-        console.error("Dashboard tips error:", error);
-      } finally {
-        setLoadingTips(false);
-      }
-    }
-    fetchTips();
-  }, []);
-
   const priorityTasks = tasks.filter(t => t.quadrant === EisenhowerQuadrant.URGENT_IMPORTANT && !t.completed);
 
   return (
@@ -2456,9 +2567,10 @@ export function calculateStreak(completedDates: string[]): number {
   return streak;
 }
 
-function HabitsView({ habits, setHabits, onDelete, theme }: { habits: Habit[], setHabits: (h: Habit[]) => void, onDelete: (id: string) => void, theme: 'light' | 'dark' }) {
+function HabitsView({ habits, setHabits, onDelete, theme, subscriptionTier = 'Free', setActiveTab }: { habits: Habit[], setHabits: (h: Habit[]) => void, onDelete: (id: string) => void, theme: 'light' | 'dark', subscriptionTier?: string, setActiveTab?: (t: string) => void }) {
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
+  const [showLimitModal, setShowLimitModal] = useState(false);
 
   const weekDates = (() => {
     const current = new Date();
@@ -2479,6 +2591,10 @@ function HabitsView({ habits, setHabits, onDelete, theme }: { habits: Habit[], s
 
   const addHabit = () => {
     if (!newName.trim()) return;
+    if (subscriptionTier === 'Free' && habits.length >= 5) {
+      setShowLimitModal(true);
+      return;
+    }
     const newHabit: Habit = {
       id: Math.random().toString(36).substr(2, 9),
       name: newName,
@@ -2559,15 +2675,79 @@ function HabitsView({ habits, setHabits, onDelete, theme }: { habits: Habit[], s
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold dark:text-white">Unstoppable Streaks</h2>
-          <p className="text-gray-500 dark:text-gray-400">Habit completions directly update your graphs and streaks dynamically.</p>
+          <p className="text-gray-500 dark:text-gray-400">Habit completions update your graphs and streaks dynamically.</p>
         </div>
         <button 
-          onClick={() => setShowAdd(true)}
+          onClick={() => {
+            if (subscriptionTier === 'Free' && habits.length >= 5) {
+              setShowLimitModal(true);
+            } else {
+              setShowAdd(true);
+            }
+          }}
           className="bg-black dark:bg-indigo-600 hover:opacity-95 text-white p-3 rounded-2xl hover:scale-105 transition-transform"
         >
           <Plus className="w-5 h-5" />
         </button>
       </div>
+
+      {subscriptionTier === 'Free' && (
+        <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
+            <span>You are currently managing <strong>{habits.length} of 5 daily habits</strong> on the Free version. Unlock infinite streaks by starting a premium space.</span>
+          </div>
+          <button 
+            onClick={() => setActiveTab && setActiveTab('pricing')} 
+            className="underline font-black uppercase text-[10px] tracking-wider hover:text-indigo-900 dark:hover:text-white shrink-0"
+          >
+            Upgrade App Now &rarr;
+          </button>
+        </div>
+      )}
+
+      {showLimitModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/45 backdrop-blur-md">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[2.5rem] p-8 border border-indigo-150 dark:border-gray-800 shadow-2xl space-y-6 text-center relative"
+          >
+            <button 
+              onClick={() => setShowLimitModal(false)}
+              className="absolute top-6 right-6 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <Zap className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black dark:text-white">Professional habit Limit Reached</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                Your current <span className="font-extrabold text-indigo-600 dark:text-indigo-400">Free Tier</span> supports up to <span className="font-black text-gray-800 dark:text-gray-200">5 active habits</span>. Upgrade to unlock unlimited behaviors creation, in-depth predictive insights, and priority support.
+              </p>
+            </div>
+            <div className="pt-2 flex flex-col gap-2">
+              <button 
+                onClick={() => {
+                  setShowLimitModal(false);
+                  if (setActiveTab) setActiveTab('pricing');
+                }}
+                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-indigo-600/10 active:scale-95"
+              >
+                Upgrade to Pro Space ⚡
+              </button>
+              <button 
+                onClick={() => setShowLimitModal(false)}
+                className="w-full py-3.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold rounded-2xl transition-all text-xs"
+              >
+                Stay on Free version
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       <AnimatePresence>
         {showAdd && (
@@ -2683,14 +2863,19 @@ function HabitsView({ habits, setHabits, onDelete, theme }: { habits: Habit[], s
   );
 }
 
-function TasksView({ tasks, setTasks, onDelete }: { tasks: Task[], setTasks: (t: Task[]) => void, onDelete: (id: string) => void }) {
+function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setActiveTab }: { tasks: Task[], setTasks: (t: Task[]) => void, onDelete: (id: string) => void, subscriptionTier?: string, setActiveTab?: (t: string) => void }) {
   const [showAdd, setShowAdd] = useState<EisenhowerQuadrant | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [showLimitModal, setShowLimitModal] = useState(false);
 
   const addTask = (q: EisenhowerQuadrant) => {
     if (!newTaskTitle.trim()) return;
+    if (subscriptionTier === 'Free' && tasks.length >= 10) {
+      setShowLimitModal(true);
+      return;
+    }
     const newTask: Task = {
       id: Math.random().toString(36).substr(2, 9),
       title: newTaskTitle,
@@ -2724,6 +2909,64 @@ function TasksView({ tasks, setTasks, onDelete }: { tasks: Task[], setTasks: (t:
           </p>
         </div>
       </div>
+
+      {subscriptionTier === 'Free' && (
+        <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
+            <span>You are currently managing <strong>{tasks.length} of 10 tasks</strong> on the Free version. Upgrade now to log unlimited milestones and tasks.</span>
+          </div>
+          <button 
+            onClick={() => setActiveTab && setActiveTab('pricing')} 
+            className="underline font-black uppercase text-[10px] tracking-wider hover:text-indigo-900 dark:hover:text-white shrink-0"
+          >
+            Upgrade App &rarr;
+          </button>
+        </div>
+      )}
+
+      {showLimitModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/45 backdrop-blur-md">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[2.5rem] p-8 border border-indigo-150 dark:border-gray-800 shadow-2xl space-y-6 text-center relative"
+          >
+            <button 
+              onClick={() => setShowLimitModal(false)}
+              className="absolute top-6 right-6 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <Zap className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black dark:text-white">Milestone Matrix Limit Reached</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                Your current <span className="font-extrabold text-indigo-600 dark:text-indigo-400">Free Tier</span> supports up to <span className="font-black text-gray-800 dark:text-gray-200">10 tasks</span> in the Priority Matrix. Upgrade to a premium plan to unlock infinite task capacity, custom labels, and priority support.
+              </p>
+            </div>
+            <div className="pt-2 flex flex-col gap-2">
+              <button 
+                onClick={() => {
+                  setShowLimitModal(false);
+                  if (setActiveTab) setActiveTab('pricing');
+                }}
+                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-indigo-600/10 active:scale-95"
+              >
+                Upgrade to Pro Space ⚡
+              </button>
+              <button 
+                onClick={() => setShowLimitModal(false)}
+                className="w-full py-3.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold rounded-2xl transition-all text-xs"
+              >
+                Stay on Free version
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* Left / Main Section: Quadrants Matrix (Grid) */}
@@ -3106,10 +3349,11 @@ function FinanceView({ expenses, setExpenses, onDelete, currency, setCurrency, t
   );
 }
 
-function StudyView({ courses, setCourses, onDeleteCourse }: { courses: StudyCourse[], setCourses: (c: StudyCourse[]) => void, onDeleteCourse: (id: string) => void }) {
+function StudyView({ courses, setCourses, onDeleteCourse, subscriptionTier = 'Free', setActiveTab }: { courses: StudyCourse[], setCourses: (c: StudyCourse[]) => void, onDeleteCourse: (id: string) => void, subscriptionTier?: string, setActiveTab?: (t: string) => void }) {
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(courses[0]?.id || null);
   const [showAddCourse, setShowAddCourse] = useState(false);
   const [newCourseName, setNewCourseName] = useState("");
+  const [showLimitModal, setShowLimitModal] = useState(false);
   
   // For adding exams and materials
   const [showAddExam, setShowAddExam] = useState(false);
@@ -3122,6 +3366,10 @@ function StudyView({ courses, setCourses, onDeleteCourse }: { courses: StudyCour
 
   const addCourse = () => {
     if (!newCourseName.trim()) return;
+    if (subscriptionTier === 'Free' && courses.length >= 2) {
+      setShowLimitModal(true);
+      return;
+    }
     const newCourse: StudyCourse = {
       id: Math.random().toString(36).substr(2, 9),
       name: newCourseName,
@@ -3184,16 +3432,80 @@ function StudyView({ courses, setCourses, onDeleteCourse }: { courses: StudyCour
     <div className="space-y-8">
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-3xl font-bold">Study Command Center</h2>
-          <p className="text-gray-500">Manage your courses, exams, and study materials manually.</p>
+          <h2 className="text-3xl font-bold dark:text-white">Study Command Center</h2>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Manage your courses, exams, and study materials manually.</p>
         </div>
         <button 
-          onClick={() => setShowAddCourse(true)}
-          className="bg-black text-white px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 hover:scale-105 transition-transform"
+          onClick={() => {
+            if (subscriptionTier === 'Free' && courses.length >= 2) {
+              setShowLimitModal(true);
+            } else {
+              setShowAddCourse(true);
+            }
+          }}
+          className="bg-black dark:bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 hover:scale-105 transition-transform"
         >
           <Plus className="w-4 h-4" /> Add Course
         </button>
       </div>
+
+      {subscriptionTier === 'Free' && (
+        <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
+            <span>You are currently managing <strong>{courses.length} of 2 active courses</strong> on the Free version. Upgrade now to track infinite courses, logs, and materials.</span>
+          </div>
+          <button 
+            onClick={() => setActiveTab && setActiveTab('pricing')} 
+            className="underline font-black uppercase text-[10px] tracking-wider hover:text-indigo-900 dark:hover:text-white shrink-0"
+          >
+            Upgrade App &rarr;
+          </button>
+        </div>
+      )}
+
+      {showLimitModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/45 backdrop-blur-md">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[2.5rem] p-8 border border-indigo-150 dark:border-gray-800 shadow-2xl space-y-6 text-center relative"
+          >
+            <button 
+              onClick={() => setShowLimitModal(false)}
+              className="absolute top-6 right-6 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <Zap className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black dark:text-white">Academic Course Limit Reached</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                Your current <span className="font-extrabold text-indigo-600 dark:text-indigo-400">Free Tier</span> supports up to <span className="font-black text-gray-800 dark:text-gray-200">2 active study courses</span>. Upgrade to modern premium plans to manage your entire education path, logs, and milestones.
+              </p>
+            </div>
+            <div className="pt-2 flex flex-col gap-2">
+              <button 
+                onClick={() => {
+                  setShowLimitModal(false);
+                  if (setActiveTab) setActiveTab('pricing');
+                }}
+                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-indigo-600/10 active:scale-95"
+              >
+                Upgrade to Pro Space ⚡
+              </button>
+              <button 
+                onClick={() => setShowLimitModal(false)}
+                className="w-full py-3.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold rounded-2xl transition-all text-xs"
+              >
+                Stay on Free version
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       <AnimatePresence>
         {showAddCourse && (
@@ -3398,12 +3710,17 @@ function StudyView({ courses, setCourses, onDeleteCourse }: { courses: StudyCour
   );
 }
 
-function GoalsView({ goals, setGoals, onDelete }: { goals: Goal[], setGoals: (g: Goal[]) => void, onDelete: (id: string) => void }) {
+function GoalsView({ goals, setGoals, onDelete, subscriptionTier = 'Free', setActiveTab }: { goals: Goal[], setGoals: (g: Goal[]) => void, onDelete: (id: string) => void, subscriptionTier?: string, setActiveTab?: (t: string) => void }) {
   const [showAdd, setShowAdd] = useState(false);
   const [newGoal, setNewGoal] = useState({ title: '', type: GoalType.SHORT, date: '' });
+  const [showLimitModal, setShowLimitModal] = useState(false);
 
   const addGoal = () => {
     if (!newGoal.title || !newGoal.date) return;
+    if (subscriptionTier === 'Free' && goals.length >= 3) {
+      setShowLimitModal(true);
+      return;
+    }
     const g: Goal = {
       id: Math.random().toString(36).substr(2, 9),
       title: newGoal.title,
@@ -3427,10 +3744,77 @@ function GoalsView({ goals, setGoals, onDelete }: { goals: Goal[], setGoals: (g:
           <h2 className="text-3xl font-bold dark:text-white">Goal Architecture</h2>
           <p className="text-gray-500 dark:text-gray-400">Manual tracking for long-term vision.</p>
         </div>
-        <button onClick={() => setShowAdd(true)} className="bg-black dark:bg-indigo-600 text-white p-3 rounded-2xl hover:scale-105 transition-transform">
+        <button 
+          onClick={() => {
+            if (subscriptionTier === 'Free' && goals.length >= 3) {
+              setShowLimitModal(true);
+            } else {
+              setShowAdd(true);
+            }
+          }}
+          className="bg-black dark:bg-indigo-600 text-white p-3 rounded-2xl hover:scale-105 transition-transform"
+        >
           <Plus className="w-5 h-5" />
         </button>
       </div>
+
+      {subscriptionTier === 'Free' && (
+        <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
+            <span>You are currently managing <strong>{goals.length} of 3 active goals</strong> on the Free version. Upgrade now to structure infinite goals, milestones, and roadmaps.</span>
+          </div>
+          <button 
+            onClick={() => setActiveTab && setActiveTab('pricing')} 
+            className="underline font-black uppercase text-[10px] tracking-wider hover:text-indigo-900 dark:hover:text-white shrink-0"
+          >
+            Upgrade App &rarr;
+          </button>
+        </div>
+      )}
+
+      {showLimitModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/45 backdrop-blur-md">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[2.5rem] p-8 border border-indigo-150 dark:border-gray-800 shadow-2xl space-y-6 text-center relative"
+          >
+            <button 
+              onClick={() => setShowLimitModal(false)}
+              className="absolute top-6 right-6 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <Zap className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black dark:text-white">Vision Milestone Limit Reached</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                Your current <span className="font-extrabold text-indigo-600 dark:text-indigo-400">Free Tier</span> supports up to <span className="font-black text-gray-800 dark:text-gray-200">3 active vision goals</span>. Upgrade to unlock unlimited goals, progress metrics, and timeline projection analytics.
+              </p>
+            </div>
+            <div className="pt-2 flex flex-col gap-2">
+              <button 
+                onClick={() => {
+                  setShowLimitModal(false);
+                  if (setActiveTab) setActiveTab('pricing');
+                }}
+                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-indigo-600/10 active:scale-95"
+              >
+                Upgrade to Pro Space ⚡
+              </button>
+              <button 
+                onClick={() => setShowLimitModal(false)}
+                className="w-full py-3.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold rounded-2xl transition-all text-xs"
+              >
+                Stay on Free version
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       <AnimatePresence>
         {showAdd && (
@@ -4180,7 +4564,7 @@ function BlogsView({ blogs, setBlogs, isAdmin }: { blogs: Blog[], setBlogs: (b: 
 interface PricingViewProps {
   plans: PricingPlan[];
   subscriptionTier: string;
-  onUpgrade: (userId: string, tier: string, habitsLimit: number, amountPaid?: string, planId?: string) => Promise<void>;
+  onUpgrade: (userId: string, tier: string, habitsLimit: number, amountPaid?: string, planId?: string, paymentMethod?: string) => Promise<void>;
   session: any;
   setActiveTab: (tab: string) => void;
   orders?: any[];
@@ -4191,25 +4575,250 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
 
+  // Reactively mount Razorpay SDK script Client-Side
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
+  // SaaS states
+  const [checkoutPlan, setCheckoutPlan] = useState<PricingPlan | null>(null);
+  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
+  const [autoRenew, setAutoRenew] = useState<boolean>(() => {
+    return localStorage.getItem('wrindha_autorenew') !== 'false';
+  });
+
+  const [trialStart, setTrialStart] = useState<string>(() => {
+    const key = session?.user?.id ? `wrindha_trial_start_${session.user.id}` : 'wrindha_trial_start_local';
+    return localStorage.getItem(key) || new Date().toISOString();
+  });
+
+  const trialStartDate = new Date(trialStart || new Date());
+  const trialEndDate = new Date(trialStartDate.getTime() + 5 * 24 * 60 * 60 * 1000);
+  const msLeft = trialEndDate.getTime() - Date.now();
+  const trialDaysLeft = Math.max(0, Math.ceil(msLeft / (24 * 60 * 60 * 1000)));
+  const isTrialActive = msLeft > 0;
+
+  const isPremiumPaid = subscriptionTier.toLowerCase() === 'premium' || subscriptionTier.toLowerCase() === 'pro space' || subscriptionTier.toLowerCase() === 'ultimate matrix' || subscriptionTier.toLowerCase() === 'active';
+  const hasActiveAccess = isPremiumPaid || isTrialActive;
+
+  // Credit Card Form States
+  const [cardHolder, setCardHolder] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
+  const [checkoutStep, setCheckoutStep] = useState<number>(0); // 0: details, 1: connecting, 2: processing, 3-success
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  // UPI Form States
+  const [payMethod, setPayMethod] = useState<'card' | 'upi'>('upi');
+  const [upiId, setUpiId] = useState('');
+  const [selectedUpiApp, setSelectedUpiApp] = useState<'gpay' | 'phonepe' | 'paytm' | 'bhim' | 'other'>('gpay');
+  const [qrScanActive, setQrScanActive] = useState(false);
+
   const activePlan = plans.find(p => p.name.toLowerCase() === subscriptionTier.toLowerCase());
   const effectiveTier = (subscriptionTier === 'Free' || activePlan) ? subscriptionTier : 'Free';
 
-  const handleUpgrade = async (plan: PricingPlan) => {
-    if (!session?.user?.id) {
-       // Allow upgrade in local/bypass mode
-       setUpgradingTo(plan.id);
-       await onUpgrade("local-user", plan.name, 9999, plan.price, plan.id);
-       setUpgradingTo(null);
-       setSuccessMsg(`Congratulations! You have successfully upgraded to the ${plan.name} tier! enjoy unlimited premium features. ✨`);
-       setTimeout(() => setSuccessMsg(null), 5000);
-       return;
+  // Format Card Number
+  const handleCardNumberChange = (value: string) => {
+    const rawVal = value.replace(/\s?/g, '').replace(/\D/g, '');
+    const segments = [];
+    for (let i = 0; i < rawVal.length && i < 16; i += 4) {
+      segments.push(rawVal.substring(i, i + 4));
     }
-    setUpgradingTo(plan.id);
-    await onUpgrade(session.user.id, plan.name, 9999, plan.price, plan.id);
-    setUpgradingTo(null);
-    setSuccessMsg(`Congratulations! You have successfully upgraded to the ${plan.name} tier! enjoy unlimited premium features. ✨`);
-    setTimeout(() => setSuccessMsg(null), 5000);
+    setCardNumber(segments.join(' '));
   };
+
+  // Format Expiry Date
+  const handleExpiryChange = (value: string) => {
+    const clean = value.replace(/\D/g, '');
+    if (clean.length <= 2) {
+      setCardExpiry(clean);
+    } else {
+      setCardExpiry(`${clean.slice(0, 2)}/${clean.slice(2, 4)}`);
+    }
+  };
+
+  // Detect card brand
+  const getCardBrand = (num: string) => {
+    const raw = num.replace(/\D/g, '');
+    if (raw.startsWith('4')) return 'Visa';
+    if (raw.startsWith('5')) return 'MasterCard';
+    if (raw.startsWith('3')) return 'American Express';
+    if (raw.startsWith('6')) return 'Discover';
+    return 'Generic Card';
+  };
+
+  const toggleAutoRenew = () => {
+    const nextVal = !autoRenew;
+    setAutoRenew(nextVal);
+    localStorage.setItem('wrindha_autorenew', String(nextVal));
+  };
+
+  // Real-time Razorpay Payment Flow Gateway Linker
+  const processSecureCheckout = async () => {
+    if (!checkoutPlan) return;
+
+    if (!qrScanActive && (!upiId.trim() || !upiId.includes('@'))) {
+      setPaymentError('Please enter a valid UPI ID (e.g., yourname@okaxis, name@paytm, or username@ybl) to authorize payment.');
+      return;
+    }
+
+    setPaymentError(null);
+    setCheckoutStep(1); // Connecting to secure pay session
+
+    try {
+      // Calculate precise plan pricing
+      const rawPrice = parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''));
+      const calculatedPrice = billingPeriod === 'yearly' 
+        ? Math.floor(rawPrice * 12 * 0.8) 
+        : rawPrice;
+
+      // 1. Call custom server endpoint to initial Razorpay order session
+      const orderResponse = await fetch("/api/payments/razorpay/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planName: checkoutPlan.name,
+          amount: calculatedPrice,
+          currency: "INR"
+        })
+      });
+
+      if (!orderResponse.ok) {
+        throw new Error("HTTP connection error preparing Razorpay subscription order.");
+      }
+
+      const orderData = await orderResponse.json();
+      if (!orderData.success) {
+        throw new Error(orderData.message || "Failed to create active payment order state.");
+      }
+
+      const currentUserId = session?.user?.id || "local-user";
+
+      // 2. Determine authentic checkout vs high-fidelity design sandbox simulator
+      if (!orderData.isSandbox && (window as any).Razorpay) {
+        setCheckoutStep(2); // Initializing official overlay
+        
+        const rzpOptions = {
+          key: orderData.keyId,
+          amount: orderData.amount,
+          currency: orderData.currency,
+          name: "Wrindha OS",
+          description: `Upgrading to ${checkoutPlan.name} Subscription`,
+          order_id: orderData.orderId,
+          handler: async function (razorpayResponse: any) {
+            setCheckoutStep(2); // Performing security webhook/signature verify
+            try {
+              const verifyResponse = await fetch("/api/payments/razorpay/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  razorpay_payment_id: razorpayResponse.razorpay_payment_id,
+                  razorpay_order_id: razorpayResponse.razorpay_order_id,
+                  razorpay_signature: razorpayResponse.razorpay_signature,
+                  isSandbox: false
+                })
+              });
+
+              const verifyData = await verifyResponse.json();
+              if (verifyData.success) {
+                // Perform state persistence upgrades
+                setUpgradingTo(checkoutPlan.id);
+                await onUpgrade(
+                  currentUserId, 
+                  checkoutPlan.name, 
+                  9999, 
+                  `${calculatedPrice}`, 
+                  checkoutPlan.id, 
+                  `Razorpay Gateway (${razorpayResponse.razorpay_payment_id})`
+                );
+                setUpgradingTo(null);
+                setCheckoutStep(3); // Upgraded successfully
+                setSuccessMsg(`Congratulations! Upgraded successfully to ${checkoutPlan.name} [Paid via Razorpay Live Gateway]! Premium functions active. ✨`);
+                setTimeout(() => setSuccessMsg(null), 6000);
+              } else {
+                throw new Error(verifyData.message || "Security authorization signature is invalid.");
+              }
+            } catch (err: any) {
+              setPaymentError(err.message || "Razorpay Payment verification failure. Ledger transaction rejected.");
+              setCheckoutStep(0);
+            }
+          },
+          prefill: {
+            name: session?.user?.user_metadata?.full_name || "Productive Student",
+            email: session?.user?.email || "sandbox@wrindha.com"
+          },
+          theme: {
+            color: "#3399cc"
+          },
+          modal: {
+            ondismiss: function () {
+              setCheckoutStep(0);
+              setPaymentError("Razorpay transaction session cancelled by host.");
+            }
+          }
+        };
+
+        const razorInstance = new (window as any).Razorpay(rzpOptions);
+        razorInstance.open();
+      } else {
+        // Safe embedded beautiful simulator for local iframe testing & fallback sandbox execution
+        setCheckoutStep(2); // Remitting payment through simulated core
+        setTimeout(async () => {
+          try {
+            const verifyResponse = await fetch("/api/payments/razorpay/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_payment_id: `pay_mock_${Math.random().toString(36).substring(2, 9)}`,
+                razorpay_order_id: orderData.orderId,
+                razorpay_signature: "mock_checksum",
+                isSandbox: true
+              })
+            });
+
+            const verifyData = await verifyResponse.json();
+            if (!verifyData.success) {
+              throw new Error("Local sandbox webhook authorization error.");
+            }
+
+            // Persistence
+            setUpgradingTo(checkoutPlan.id);
+            const methodLabel = qrScanActive 
+              ? 'Razorpay Sandbox (UPI QR Scanner)' 
+              : `Razorpay Sandbox (UPI ID: ${selectedUpiApp.toUpperCase()}: ${upiId})`;
+
+            await onUpgrade(currentUserId, checkoutPlan.name, 9999, `${calculatedPrice}`, checkoutPlan.id, methodLabel);
+            setUpgradingTo(null);
+
+            setCheckoutStep(3); // Perfect
+            setSuccessMsg(`Congratulations! Upgraded successfully to ${checkoutPlan.name} [Paid ${billingPeriod === 'yearly' ? 'Yearly' : 'Monthly'} via Razorpay Sandbox]! Premium capabilities activated. ✨`);
+            setTimeout(() => setSuccessMsg(null), 6000);
+          } catch (err: any) {
+            setPaymentError(err.message || 'Error processing simulated billing upgrade.');
+            setCheckoutStep(0);
+          }
+        }, 1500);
+      }
+    } catch (err: any) {
+      setPaymentError(err.message || 'Unable to establish secure Razorpay handshake checkout.');
+      setCheckoutStep(0);
+    }
+  };
+
+  // Helper payment details
+  const latestOrder = orders[0];
+  const nextRenewalDate = (() => {
+    const date = latestOrder ? new Date(latestOrder.created_at) : new Date();
+    date.setDate(date.getDate() + 30);
+    return date.toLocaleDateString(undefined, { dateStyle: 'long' });
+  })();
 
   return (
     <div className="space-y-8 pb-20">
@@ -4232,25 +4841,97 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
         </motion.div>
       )}
 
-      {/* Current Subscription Status Panel */}
-      <div className="p-8 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2.5rem] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden group">
-        <div className="space-y-2">
-          <span className="text-[10px] bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-black uppercase tracking-widest px-3 py-1.5 rounded-full">
-            Active Tier
-          </span>
-          <h3 className="text-2xl font-black dark:text-white mt-1">{effectiveTier} Plan</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl">
-            {effectiveTier === 'Free' 
-              ? "You are currently on the free version with a limit of 5 habits. Upgrade to gain access to comprehensive widgets, more tracking entries, and AI modules." 
-              : `You are on the ${effectiveTier} plan. You have full access to unlimited habits, and expanded data insights.`}
-          </p>
+      {/* Current Subscription Status Panel - Professional SaaS Dashboard */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-2 p-8 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2.5rem] shadow-sm flex flex-col justify-between space-y-4 relative overflow-hidden group">
+          <div className="space-y-2">
+            <span className="text-[10px] bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-black uppercase tracking-widest px-3 py-1.5 rounded-full">
+              SaaS Credentials
+            </span>
+            <h3 className="text-2xl font-black dark:text-white mt-2">
+              {isPremiumPaid ? "Premium OS Lifetime Access" : isTrialActive ? `Active 5-Day Free Trial (${trialDaysLeft} days remaining)` : "Subscription Expired"}
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-semibold">
+              {isPremiumPaid 
+                ? "You have fully unlocked the unconstrained Wrindha Premium OS tracking. Absolute data backup, unlimited habits, tasks, studies and timetables active." 
+                : isTrialActive 
+                  ? "You are currently enjoying your 5-day active trial of full premium workspace. No artificial limits or constraints are imposed. Secure your premium billing early to keep uninterrupted access!"
+                  : "Your free trial has expired. Subscribe to Wrindha Premium below for unlimited habits, tasks, budget tracking, and timetables."}
+            </p>
+          </div>
+          
+          {(isPremiumPaid || isTrialActive) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-50 dark:border-gray-800/50">
+              <div className="space-y-1">
+                <p className="text-[10px] uppercase font-bold text-gray-400">Automatic renewal billing status</p>
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    "w-2 h-2 rounded-full animate-ping",
+                    autoRenew ? "bg-emerald-500" : "bg-orange-500"
+                  )}></span>
+                  <span className="text-xs font-black dark:text-white">{autoRenew ? 'ACTIVE (Charging Enabled)' : 'PAUSED'}</span>
+                  <button 
+                    onClick={toggleAutoRenew}
+                    className="ml-2 px-2 py-0.5 bg-gray-100 dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-[10px] font-bold uppercase rounded text-indigo-600 dark:text-indigo-400"
+                  >
+                    Toggle Billing
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[10px] uppercase font-bold text-gray-400">Next Scheduled Billed Cycle</p>
+                <p className="text-xs font-extrabold dark:text-white text-gray-800">{isPremiumPaid ? nextRenewalDate : "Trial access"}</p>
+              </div>
+            </div>
+          )}
         </div>
-        <div className="flex items-center gap-3">
-          <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800 rounded-2xl flex flex-col items-center justify-center border border-gray-100 dark:border-gray-700 min-w-[120px]">
-             <span className="text-xs text-gray-400">Status</span>
-             <span className="text-lg font-black dark:text-white">Active</span>
+
+        {/* Registered mock wallet billing card */}
+        <div className="p-8 bg-gradient-to-br from-indigo-900 to-slate-900 text-white rounded-[2.5rem] shadow-md flex flex-col justify-between relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-8 opacity-10">
+            <CreditCard className="w-40 h-40" />
+          </div>
+          <div className="space-y-1.5 z-10">
+            <span className="text-[9px] bg-white/20 text-white font-black uppercase tracking-widest px-2.5 py-1 rounded-full">
+              Registered Wallet
+            </span>
+            <h4 className="text-base font-black pt-2">Active Card Status</h4>
+            <p className="text-xs text-indigo-200 leading-relaxed font-semibold">
+              {!isPremiumPaid 
+                ? "No active system checkout credential registered. Authorize premium plan checkout to enable secure wallet billing."
+                : `Active Payment: VISA •••• 4242. Real-time updates and invoices dynamically update in Supabase orders ledger.`}
+            </p>
+          </div>
+          
+          <div className="pt-4 flex items-center justify-between text-xs font-bold border-t border-white/10 mt-4 z-10">
+            <span>Billing Method:</span>
+            <span className="font-mono bg-white/15 px-2.5 py-1 rounded-md text-[10px]">RAZORPAY SECURE ENGINE</span>
           </div>
         </div>
+      </div>
+
+      {/* Switch billing cycle period */}
+      <div className="flex items-center justify-center gap-4 py-4 bg-gray-50/50 dark:bg-gray-900/10 rounded-2xl max-w-sm mx-auto border border-gray-100 dark:border-gray-800/40">
+        <button 
+          onClick={() => setBillingPeriod('monthly')}
+          className={cn(
+            "px-4 py-2 text-xs font-black rounded-lg transition-all",
+            billingPeriod === 'monthly' ? "bg-black text-white dark:bg-indigo-600" : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+          )}
+        >
+          Bill Monthly
+        </button>
+        <button 
+          onClick={() => setBillingPeriod('yearly')}
+          className={cn(
+            "px-4 py-2 text-xs font-black rounded-lg transition-all flex items-center gap-1.5",
+            billingPeriod === 'yearly' ? "bg-black text-white dark:bg-indigo-600" : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+          )}
+        >
+          Bill Annually
+          <span className="bg-emerald-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-bold">Save 20%</span>
+        </button>
       </div>
 
       {plans.length === 0 ? (
@@ -4281,6 +4962,13 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {plans.map((p) => {
           const isCurrent = subscriptionTier.toLowerCase() === p.name.toLowerCase();
+          
+          // Apply annual discount calculation display
+          const rawPrice = parseFloat(p.price.replace(/[^\d.]/g, ''));
+          const calculatedDisplayPrice = billingPeriod === 'yearly' 
+            ? Math.floor(rawPrice * 12 * 0.8) 
+            : rawPrice;
+
           return (
             <div 
               key={p.id}
@@ -4307,8 +4995,10 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
                 </div>
 
                 <div className="flex items-baseline gap-1 pt-2">
-                  <span className={cn("text-5xl font-black font-mono", isCurrent ? "text-white" : "text-gray-900 dark:text-white")}>{p.price}</span>
-                  <span className="text-gray-400 text-sm font-semibold">/ {p.period}</span>
+                  <span className={cn("text-5xl font-black font-mono", isCurrent ? "text-white" : "text-gray-900 dark:text-white")}>
+                    {p.price.startsWith('₹') ? '₹' : p.price.startsWith('$') ? '$' : '₹'}{calculatedDisplayPrice}
+                  </span>
+                  <span className="text-gray-400 text-sm font-semibold">/ {billingPeriod === 'yearly' ? 'year' : 'month'}</span>
                 </div>
 
                 <div className="h-[2px] bg-gray-100 dark:bg-gray-800/60 w-full"></div>
@@ -4319,7 +5009,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
                   </h4>
                   <ul className="space-y-3.5">
                     {p.features.map((feature, index) => (
-                      <li key={index} className="flex items-center gap-3">
+                       <li key={index} className="flex items-center gap-3">
                         <CheckCircle2 className="w-5 h-5 text-indigo-500 shrink-0 animate-none" />
                         <span className={cn("text-sm", isCurrent ? "text-gray-200" : "text-gray-650 dark:text-gray-300")}>{feature}</span>
                       </li>
@@ -4329,7 +5019,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
               </div>
 
               <button
-                onClick={() => handleUpgrade(p)}
+                onClick={() => setCheckoutPlan(p)}
                 disabled={upgradingTo !== null || isCurrent}
                 className={cn(
                   "w-full py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2",
@@ -4338,21 +5028,502 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
                     : "bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-600/10"
                 )}
               >
-                {upgradingTo === p.id ? (
-                  <span className="flex items-center gap-2">
-                    <RefreshCcw className="w-4 h-4 animate-spin" /> Upgrading...
-                  </span>
-                ) : isCurrent ? (
-                  "Active Premium Tier"
-                ) : (
-                  `Upgrade to ${p.name}`
-                )}
+                {isCurrent ? "Active Premium Tier" : `Upgrade to ${p.name}`}
               </button>
             </div>
           );
         })}
       </div>
       )}
+
+      {/* Orders & Billing History Section */}
+      <div className="pt-8 border-t border-gray-100 dark:border-gray-800 space-y-6">
+        <div>
+          <h3 className="text-xl font-black dark:text-white flex items-center gap-2.5">
+            <CreditCard className="w-5 h-5 text-indigo-500" />
+            Billing & Transaction History
+          </h3>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            Review your historical transactions, system logs, and invoice receipts securely recorded in the platform database.
+          </p>
+        </div>
+
+        {orders.length === 0 ? (
+          <div className="p-10 text-center border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-3xl bg-gray-50/30 dark:bg-gray-950/20">
+            <p className="text-xs font-semibold text-gray-400">No transactions recorded yet in this account profile.</p>
+            <p className="text-[10px] text-gray-400 dark:text-gray-600 mt-1">Upgrade or modify your plan higher to log invoices.</p>
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2rem] overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50/50 dark:bg-gray-800/20 text-[10px] font-black uppercase tracking-wider text-gray-400 border-b border-gray-100 dark:border-gray-800">
+                    <th className="py-4 px-6">Invoice ID</th>
+                    <th className="py-4 px-6">Transaction Date</th>
+                    <th className="py-4 px-6">Space Plan</th>
+                    <th className="py-4 px-6 text-right">Amount Paid</th>
+                    <th className="py-4 px-6">Status</th>
+                    <th className="py-4 px-6 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {orders.map((order) => (
+                    <tr key={order.id} className="text-xs dark:text-gray-300 font-medium hover:bg-gray-50/50 dark:hover:bg-gray-800/10 transition-colors">
+                      <td className="py-4 px-6 font-mono font-bold text-gray-400">{order.id}</td>
+                      <td className="py-4 px-6 text-gray-500">
+                        {new Date(order.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                      </td>
+                      <td className="py-4 px-6 font-bold">{order.plan_name}</td>
+                      <td className="py-4 px-6 text-right font-bold text-gray-900 dark:text-white font-mono">
+                        {order.currency === 'INR' ? '₹' : '$'}{parseFloat(order.amount).toFixed(2)}
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-900/15 text-emerald-600 dark:text-emerald-400">
+                          <CheckCircle2 className="w-3 h-3" /> {order.status}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 text-center">
+                        <button
+                          onClick={() => setSelectedReceipt(order)}
+                          className="px-3 py-1.5 bg-gray-50 dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 font-bold uppercase text-[10px] tracking-wider rounded-lg transition-all"
+                        >
+                          Invoice Details
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Invoice Receipt Modal */}
+      <AnimatePresence>
+        {selectedReceipt && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/45 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-[2.5rem] p-8 border-2 border-indigo-600 shadow-2xl relative overflow-hidden"
+            >
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <span className="text-[9px] bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 font-black uppercase tracking-widest px-2.5 py-1 rounded-full">
+                    Official Receipt
+                  </span>
+                  <h3 className="text-xl font-black mt-2 dark:text-white">Transaction details</h3>
+                </div>
+                <button
+                  onClick={() => setSelectedReceipt(null)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                >
+                  <X className="w-4 h-4 dark:text-gray-400" />
+                </button>
+              </div>
+
+              <div className="space-y-4 pt-1 pb-6 border-b border-dashed border-gray-100 dark:border-gray-800 font-mono text-xs text-gray-500 dark:text-gray-400">
+                <div className="flex justify-between">
+                  <span>Invoice Reference:</span>
+                  <span className="font-bold text-gray-900 dark:text-white">{selectedReceipt.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Transaction Date:</span>
+                  <span className="font-bold text-gray-800 dark:text-gray-200">
+                    {new Date(selectedReceipt.created_at).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Product Purchased:</span>
+                  <span className="font-bold text-indigo-600 dark:text-indigo-400">{selectedReceipt.plan_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Payment Gateway:</span>
+                  <span className="font-bold text-gray-800 dark:text-gray-200 uppercase">{selectedReceipt.payment_method}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Verification Status:</span>
+                  <span className="font-bold text-emerald-500 uppercase">{selectedReceipt.status}</span>
+                </div>
+              </div>
+
+              {/* Invoice Value Summary */}
+              <div className="py-6 flex items-baseline justify-between">
+                <span className="text-sm font-black dark:text-white font-mono">Total Paid</span>
+                <span className="text-3xl font-black font-mono text-gray-900 dark:text-white">
+                  {selectedReceipt.currency === 'INR' ? '₹' : '$'}{parseFloat(selectedReceipt.amount).toFixed(2)}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    const printContents = document.createElement("div");
+                    printContents.innerHTML = `
+                      <div style="font-family: monospace; padding: 40px; border: 2px solid #000; max-width: 400px; margin: 0 auto; background: #fff; color: #000;">
+                        <h2 style="font-weight: 900; margin-bottom: 2px;">WRINDHA OS</h2>
+                        <h4 style="text-transform: uppercase; color: #666; margin-top: 0; font-size: 11px; letter-spacing: 2px;">Receipt & Verification Details</h4>
+                        <hr style="border: 1px dashed #ccc;" />
+                        <p><strong>Invoice Reference:</strong> ${selectedReceipt.id}</p>
+                        <p><strong>Transaction Date:</strong> ${new Date(selectedReceipt.created_at).toLocaleString()}</p>
+                        <p><strong>Product:</strong> ${selectedReceipt.plan_name}</p>
+                        <p><strong>Payment Method:</strong> ${selectedReceipt.payment_method.toUpperCase()}</p>
+                        <p><strong>Status:</strong> ${selectedReceipt.status.toUpperCase()}</p>
+                        <hr style="border: 1px dashed #ccc;" />
+                        <h3 style="display: flex; justify-content: space-between; font-weight: 900; margin-top: 20px;">
+                          <span>TOTAL PAID:</span>
+                          <span>${selectedReceipt.currency === 'INR' ? '₹' : '$'}${parseFloat(selectedReceipt.amount).toFixed(2)}</span>
+                        </h3>
+                        <p style="text-align: center; color: #888; font-size: 10px; margin-top: 40px;">Thank you for upgrading! Your system credentials has been recompiled successfully.</p>
+                      </div>
+                    `;
+                    const win = window.open("", "_blank");
+                    if (win) {
+                      win.document.body.appendChild(printContents);
+                      win.print();
+                    }
+                  }}
+                  className="w-full py-4 bg-black dark:bg-indigo-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  <FileText className="w-4 h-4" /> Print Receipt
+                </button>
+                <button
+                  onClick={() => setSelectedReceipt(null)}
+                  className="w-full py-3 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 font-bold rounded-2xl text-xs uppercase tracking-wider transition-colors"
+                >
+                  Dismiss Receipt
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Stripe Sandbox Checkout modal */}
+      <AnimatePresence>
+        {checkoutPlan && (
+          <div className="fixed inset-0 z-[150] flex items-start sm:items-center justify-center p-3 sm:p-6 bg-black/50 backdrop-blur-md overflow-y-auto">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-white dark:bg-gray-900 w-full max-w-4xl rounded-3xl md:rounded-[2.5rem] p-5 sm:p-8 md:p-10 border border-gray-150 dark:border-gray-800 shadow-2xl relative my-auto overflow-hidden flex flex-col lg:flex-row gap-6 md:gap-8 items-stretch"
+            >
+              {/* Close Button */}
+              <button 
+                onClick={() => {
+                  setCheckoutPlan(null);
+                  setCheckoutStep(0);
+                  setPaymentError(null);
+                }}
+                className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2.5 rounded-full bg-gray-100/60 hover:bg-gray-200/80 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors text-gray-500 dark:text-gray-300 z-50 shadow-sm border border-gray-200/30 dark:border-gray-700/50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              {/* Left Column: Plan Summary and Virtual Credit Card Flip */}
+              <div className="flex-1 flex flex-col justify-between space-y-4 sm:space-y-6 bg-gray-50/50 dark:bg-gray-950/40 p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[2rem] border border-gray-100 dark:border-gray-800/60">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-indigo-500" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Razorpay Secure Gateway Portal</span>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black dark:text-white">Upgrade to {checkoutPlan.name}</h3>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Unlock unconstrained productivity tracking, in-depth database analytics, and customized templates via Razorpay.</p>
+                  </div>
+
+                  {/* Pricing dynamic calculation billings list */}
+                  <div className="space-y-2 pt-2">
+                    <div className="flex justify-between text-xs font-semibold text-gray-600 dark:text-gray-400">
+                      <span>Pro Space Access Plan:</span>
+                      <span>{checkoutPlan.price} / month</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-semibold text-gray-600 dark:text-gray-400">
+                      <span>Billing Interval Cycle:</span>
+                      <span className="capitalize">{billingPeriod}</span>
+                    </div>
+                    {billingPeriod === 'yearly' && (
+                      <div className="flex justify-between text-xs font-semibold text-emerald-600 dark:text-emerald-450">
+                        <span>Corporate Discount Active:</span>
+                        <span>-20% Applied</span>
+                      </div>
+                    )}
+                    <div className="h-[1px] bg-gray-200 dark:bg-gray-850/60 my-2"></div>
+                    <div className="flex justify-between items-baseline pt-1">
+                      <span className="text-sm font-black dark:text-white">Authorized Total Paid:</span>
+                      <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400 font-mono">
+                        {checkoutPlan.price.startsWith('₹') ? '₹' : checkoutPlan.price.startsWith('$') ? '$' : '₹'}
+                        {billingPeriod === 'yearly' 
+                          ? Math.floor(parseFloat(checkoutPlan.price.replace(/[^\d.]/g, '')) * 12 * 0.8)
+                          : parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''))}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Virtual UPI Voucher Representation */}
+                <div className="hidden md:flex justify-center pt-4">
+                  <div className="w-80 h-44 bg-gradient-to-br from-teal-700 via-emerald-900 to-slate-950 rounded-3xl p-6 text-white shadow-xl flex flex-col justify-between relative overflow-hidden ring-1 ring-emerald-500/20">
+                    <div className="absolute inset-0 bg-white/[0.02] pointer-events-none"></div>
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-1">
+                        <span className="text-[8px] tracking-widest uppercase text-emerald-200 font-extrabold">BHIM UPI DIGITAL</span>
+                        <p className="text-[10px] font-bold text-emerald-400">NPCI Unified Network</p>
+                      </div>
+                      <span className="text-[9px] font-black uppercase tracking-widest bg-white/15 px-2.5 py-1 rounded text-emerald-100 flex items-center gap-1 align-middle">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        SECURE
+                      </span>
+                    </div>
+                    
+                    <div className="py-2 text-center">
+                      <p className="text-[9px] text-emerald-200/65 uppercase tracking-widest">Active Virtual Address</p>
+                      <div className="font-mono text-xs tracking-wide font-black text-emerald-300 truncate px-2 mt-0.5 bg-black/20 py-2 rounded-xl border border-white/5">
+                        {upiId || 'premium@gpay'}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between text-[9px] uppercase font-bold text-emerald-200 pt-1">
+                      <div>
+                        <div className="text-[7px] text-emerald-450 uppercase tracking-wider">Gateway</div>
+                        <div>Razorpay Sandbox</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[7px] text-emerald-450 uppercase tracking-wider">Settlement</div>
+                        <div>Instant Active</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Checkout input form and payment actions */}
+              <div className="flex-1 flex flex-col justify-center space-y-4 sm:space-y-6 py-2 border-t lg:border-t-0 lg:border-l border-gray-100 dark:border-gray-800/60 pt-6 lg:pt-0 lg:pl-8">
+                {checkoutStep === 0 && (
+                  <div className="space-y-4">
+                    {/* Razorpay Brand Bar */}
+                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between pb-3 border-b border-gray-150 dark:border-gray-800/60">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-blue-600 text-white rounded px-2.5 py-1 text-[9px] font-black tracking-wider uppercase shadow-sm">
+                          RAZORPAY
+                        </span>
+                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">SECURE CHECKOUT</span>
+                      </div>
+                      <span className="text-[9px] text-emerald-500 font-extrabold flex items-center gap-1">
+                        ● SECURED 256-BIT SSL
+                      </span>
+                    </div>
+
+                    {paymentError && (
+                      <div className="p-3 bg-red-50 dark:bg-red-955/20 text-red-650 dark:text-red-400 border border-red-200 dark:border-red-900/30 rounded-xl text-xs font-bold animate-pulse">
+                        {paymentError}
+                      </div>
+                    )}
+
+                    <div className="space-y-4 animate-fadeIn">
+                      {/* UPI Payment selector type tab */}
+                      <div className="flex bg-gray-50 dark:bg-gray-950 p-1 rounded-xl border border-gray-150 dark:border-gray-800/60 w-full sm:w-fit mx-auto">
+                        <button
+                          type="button"
+                          onClick={() => setQrScanActive(false)}
+                          className={cn(
+                            "flex-1 sm:flex-initial px-3 sm:px-4 py-2 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5",
+                            !qrScanActive ? "bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-gray-400 dark:text-gray-500 hover:text-gray-850"
+                          )}
+                        >
+                          <Smartphone className="w-3.5 h-3.5" />
+                          UPI ID Setup
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQrScanActive(true);
+                            setPaymentError(null);
+                          }}
+                          className={cn(
+                            "flex-1 sm:flex-initial px-3 sm:px-4 py-2 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5",
+                            qrScanActive ? "bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-gray-400 dark:text-gray-500 hover:text-gray-850"
+                          )}
+                        >
+                          <QrCode className="w-3.5 h-3.5" />
+                          Dynamic QR Scanner
+                        </button>
+                      </div>
+
+                      {!qrScanActive ? (
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">Razorpay UPI VPA Routing</h4>
+                          
+                          <div className="space-y-4">
+                            {/* Selection of UPI App preset */}
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Select Preferring UPI App Preset</label>
+                              <div className="grid grid-cols-4 gap-2">
+                                {[
+                                  { id: 'gpay', name: 'GPay', desc: '@okaxis' },
+                                  { id: 'phonepe', name: 'PhonePe', desc: '@ybl' },
+                                  { id: 'paytm', name: 'Paytm', desc: '@paytm' },
+                                  { id: 'bhim', name: 'BHIM', desc: '@upi' }
+                                ].map((app) => (
+                                  <button
+                                    key={app.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedUpiApp(app.id as any);
+                                      const cleanVal = upiId.includes('@') ? upiId.split('@')[0] : upiId || 'premium';
+                                      setUpiId(`${cleanVal}${app.desc}`);
+                                    }}
+                                    className={cn(
+                                      "py-2 px-1 text-center rounded-xl border text-[10px] font-extrabold transition-all flex flex-col items-center justify-center gap-0.5",
+                                      selectedUpiApp === app.id
+                                        ? "border-amber-500 dark:border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/20"
+                                        : "border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-90% text-gray-500 hover:bg-gray-50 hover:text-gray-850 dark:hover:text-white"
+                                    )}
+                                  >
+                                    <span>{app.name}</span>
+                                    <span className="text-[8px] font-normal text-gray-400 uppercase tracking-tight">{app.desc}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* UPI id field input */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Virtual Private Address (UPI ID)</label>
+                              <input 
+                                type="text" 
+                                placeholder="username@okaxis"
+                                value={upiId}
+                                onChange={e => setUpiId(e.target.value)}
+                                className="w-full py-3 px-4 bg-gray-50 dark:bg-gray-850 border border-gray-150 dark:border-gray-800 rounded-xl outline-none text-sm font-mono focus:border-indigo-500 dark:text-white font-bold text-center"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="pt-4 space-y-3">
+                            <button 
+                              onClick={processSecureCheckout}
+                              className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-black uppercase tracking-widest text-xs rounded-2xl transition-all shadow-lg shadow-indigo-600/10 flex items-center justify-center gap-2"
+                            >
+                              <Zap className="w-4 h-4 text-amber-400 fill-amber-400" /> Pay via UPI ID Securely &rarr;
+                            </button>
+                            <p className="text-[10px] text-center text-gray-400 leading-relaxed max-w-xs mx-auto">
+                              🔓 Interfacing with Sandbox UPI Router. Verification finishes instantly without real bank transactions.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4 text-center">
+                          <h4 className="text-xs font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">Dynamic Scan-to-Pay QR Code</h4>
+                          
+                          {/* Visual QR Code Representational Box */}
+                          <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-inner w-52 h-52 mx-auto flex flex-col justify-between items-center relative overflow-hidden group">
+                            {/* QR code matrix mockup strictly in custom design */}
+                            <svg className="w-40 h-40 text-slate-900" viewBox="0 0 100 100" fill="currentColor">
+                              {/* Corners */}
+                              <path d="M0,0 h30 v10 h-20 v20 h-10 z" />
+                              <path d="M70,0 h30 v30 h-10 v-20 h-20 z" />
+                              <path d="M0,70 h10 v20 h20 v10 h-30 z" />
+                              <path d="M90,70 h10 v30 h-30 v-10 h20 z" />
+                              {/* Center points representation */}
+                              <rect x="15" y="15" width="15" height="15" />
+                              <rect x="70" y="15" width="15" height="15" />
+                              <rect x="15" y="70" width="15" height="15" />
+                              <rect x="40" y="40" width="20" height="20" className="text-indigo-600 animate-pulse" />
+                              {/* Scatter random dots */}
+                              <rect x="40" y="15" width="5" height="5" />
+                              <rect x="50" y="20" width="5" height="10" />
+                              <rect x="15" y="40" width="10" height="5" />
+                              <rect x="25" y="50" width="5" height="5" />
+                              <rect x="70" y="40" width="5" height="15" />
+                              <rect x="80" y="45" width="5" height="5" />
+                              <rect x="45" y="70" width="10" height="5" />
+                              <rect x="55" y="80" width="5" height="5" />
+                              <rect x="70" y="70" width="15" height="15" />
+                            </svg>
+                            
+                            <div className="absolute inset-x-0 bottom-0 bg-indigo-600 text-white text-[9px] font-black uppercase text-center py-1 tracking-wider">
+                              BHIM UPI SECURE
+                            </div>
+                          </div>
+
+                          <div className="text-center space-y-1">
+                            <p className="text-xs font-black dark:text-white">Amount to pay: ₹{
+                              billingPeriod === 'yearly'
+                                ? Math.floor(parseFloat(checkoutPlan.price.replace(/[^\d.]/g, '')) * 12 * 0.8)
+                                : parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''))
+                            }.00</p>
+                            <p className="text-[10px] text-gray-400 font-semibold max-w-xs mx-auto">
+                              Scan using any compatible UPI app (Google Pay, PhonePe, Paytm, BHIM, Mobikwik, WhatsApp Pay) to verify instantly.
+                            </p>
+                          </div>
+
+                          <div className="pt-2">
+                            <button
+                              onClick={processSecureCheckout}
+                              className="w-full py-4 bg-amber-500 hover:bg-amber-600 active:scale-98 text-white font-black uppercase tracking-widest text-xs rounded-2xl transition-all shadow-lg shadow-amber-500/15 flex items-center justify-center gap-2"
+                            >
+                              <QrCode className="w-4 h-4" /> Verify QR Scan & Upgrade &rarr;
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Transition loading screens */}
+                {(checkoutStep === 1 || checkoutStep === 2) && (
+                  <div className="text-center py-10 space-y-6">
+                    <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <div className="space-y-2">
+                      <h4 className="text-lg font-black dark:text-white">
+                        {checkoutStep === 1 
+                          ? 'Connecting to Razorpay UPI Handshake Gateway...' 
+                          : 'Verifying Razorpay UPI Remittance Receipt Ledger...'}
+                      </h4>
+                      <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed">
+                        Validating real-time VPA endpoint token authentication. Completing premium active directory update. Please wait.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Success Checkout Landing screen */}
+                {checkoutStep === 3 && (
+                  <div className="text-center py-6 space-y-6">
+                    <div className="w-20 h-20 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-500 rounded-full flex items-center justify-center mx-auto shadow-inner animate-bounce">
+                      <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="text-2xl font-black dark:text-white">Transaction Verified!</h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto leading-relaxed">
+                        The checkout transaction was logged and Supabase profiles was auto-upgraded to <span className="font-bold text-indigo-500">{checkoutPlan.name}</span>. You can now use unlimited daily habit streaks, priorities matrices, and academic planners.
+                      </p>
+                    </div>
+                    
+                    <div className="pt-4 flex flex-col gap-2">
+                      <button 
+                        onClick={() => {
+                          setCheckoutPlan(null);
+                          setCheckoutStep(0);
+                        }}
+                        className="w-full py-3.5 bg-black dark:bg-indigo-600 font-bold text-white rounded-2xl text-xs uppercase tracking-widest active:scale-95 transition-all"
+                      >
+                        Open Workspace Dashboards &rarr;
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Orders & Billing History Section */}
       <div className="pt-8 border-t border-gray-100 dark:border-gray-800 space-y-6">
