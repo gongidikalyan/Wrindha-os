@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   BarChart3, 
   Calendar, 
@@ -50,7 +50,10 @@ import {
   Play,
   Zap,
   QrCode,
-  Smartphone
+  Smartphone,
+  Tag,
+  Ban,
+  RotateCcw
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn, formatCurrency, getStorage, setStorage } from "@/src/lib/utils";
@@ -60,6 +63,7 @@ import { supabase, isSupabaseConfigured, getSupabaseError, supabaseUrl } from ".
 import AnalyticsView from "./components/AnalyticsView";
 import PomodoroTimer from "./components/PomodoroTimer";
 import TaskNotesEditor from "./components/TaskNotesEditor";
+import CareerPlannerView from "./components/CareerPlannerView";
 
 // Modules
 const modules = [
@@ -79,8 +83,10 @@ const infoModules = [
   { id: 'about', name: 'About Us', icon: Info },
   { id: 'contact', name: 'Contact Us', icon: MessageCircle },
   { id: 'privacy', name: 'Privacy Policy', icon: ShieldCheck },
-  { id: 'disclaimer', name: 'Disclaimer', icon: AlertCircle },
   { id: 'terms', name: 'Terms of Use', icon: Scale },
+  { id: 'refund', name: 'Refund Policy', icon: RotateCcw },
+  { id: 'cancellation', name: 'Cancellation Policy', icon: Ban },
+  { id: 'disclaimer', name: 'Disclaimer', icon: AlertCircle },
 ];
 
 export default function App() {
@@ -95,6 +101,27 @@ export default function App() {
   });
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('wrindha_theme') as 'light' | 'dark') || 'light');
   const [showSettings, setShowSettings] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent | TouchEvent) {
+      if (
+        showProfileMenu &&
+        profileContainerRef.current &&
+        !profileContainerRef.current.contains(event.target as Node)
+      ) {
+        setShowProfileMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [showProfileMenu]);
+
   const [session, setSession] = useState<any>(null);
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
   const [isPasswordRecoveryActive, setIsPasswordRecoveryActive] = useState(false);
@@ -118,33 +145,74 @@ export default function App() {
     return saved ? parseInt(saved) : 9999;
   });
 
-  const [trialStart, setTrialStart] = useState<string>(() => {
-    const key = session?.user?.id ? `wrindha_trial_start_${session.user.id}` : 'wrindha_trial_start_local';
-    let saved = localStorage.getItem(key);
-    if (!saved) {
-      saved = new Date().toISOString();
-      localStorage.setItem(key, saved);
-    }
-    return saved;
+  const [trialStartDateStr, setTrialStartDateStr] = useState<string>(() => {
+    return localStorage.getItem('wrindha_trial_start_date') || new Date().toISOString();
+  });
+  const [trialEndDateStr, setTrialEndDateStr] = useState<string>(() => {
+    return localStorage.getItem('wrindha_trial_end_date') || new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+  });
+  const [isTrialActivated, setIsTrialActivated] = useState<boolean>(() => {
+    return localStorage.getItem('wrindha_is_trial_activated') === 'true';
+  });
+  const [hasPaid, setHasPaid] = useState<boolean>(() => {
+    return localStorage.getItem('wrindha_has_paid') === 'true';
   });
 
   useEffect(() => {
-    const key = session?.user?.id ? `wrindha_trial_start_${session.user.id}` : 'wrindha_trial_start_local';
-    let saved = localStorage.getItem(key);
-    if (!saved) {
-      saved = new Date().toISOString();
-      localStorage.setItem(key, saved);
+    if (!isSupabaseConfigured() || bypassConfig) {
+      if (!isTrialActivated) {
+        const start = new Date().toISOString();
+        const end = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+        setTrialStartDateStr(start);
+        setTrialEndDateStr(end);
+        setIsTrialActivated(true);
+        localStorage.setItem('wrindha_trial_start_date', start);
+        localStorage.setItem('wrindha_trial_end_date', end);
+        localStorage.setItem('wrindha_is_trial_activated', 'true');
+      }
     }
-    setTrialStart(saved);
-  }, [session?.user?.id]);
+  }, [isTrialActivated, bypassConfig]);
 
-  const trialStartDate = new Date(trialStart || new Date());
-  const trialEndDate = new Date(trialStartDate.getTime() + 5 * 24 * 60 * 60 * 1000);
+  const trialStartDate = new Date(trialStartDateStr);
+  const trialEndDate = new Date(trialEndDateStr);
   const msLeft = trialEndDate.getTime() - Date.now();
   const trialDaysLeft = Math.max(0, Math.ceil(msLeft / (24 * 60 * 60 * 1000)));
   const isTrialActive = msLeft > 0;
 
-  const isPremiumPaid = subscriptionTier.toLowerCase() === 'premium' || subscriptionTier.toLowerCase() === 'pro space' || subscriptionTier.toLowerCase() === 'ultimate matrix' || subscriptionTier.toLowerCase() === 'active';
+  const cancellationInfo = (() => {
+    if (!subscriptionTier || !subscriptionTier.includes('Cancelled:')) {
+      return { isCancelled: false, expiryDate: null };
+    }
+    try {
+      const parts = subscriptionTier.split('Cancelled:');
+      const expiryStr = parts[1];
+      return { isCancelled: true, expiryDate: new Date(expiryStr) };
+    } catch (e) {
+      return { isCancelled: true, expiryDate: new Date(0) };
+    }
+  })();
+
+  const isBillingPeriodActive = cancellationInfo.isCancelled && cancellationInfo.expiryDate
+    ? cancellationInfo.expiryDate.getTime() > Date.now()
+    : false;
+
+  const parsedCleanTier = subscriptionTier.includes('Cancelled:') 
+    ? 'premium' 
+    : subscriptionTier.toLowerCase();
+
+  const isPremiumPaid = (() => {
+    const isBasePremium = parsedCleanTier === 'premium' || 
+                          parsedCleanTier === 'pro space' || 
+                          parsedCleanTier === 'ultimate matrix' || 
+                          parsedCleanTier === 'active' || 
+                          hasPaid;
+    
+    if (cancellationInfo.isCancelled) {
+      return isBillingPeriodActive;
+    }
+    return isBasePremium;
+  })();
+
   const hasActiveAccess = isPremiumPaid || isTrialActive;
 
   const [userPlans, setUserPlans] = useState<PricingPlan[]>(() => {
@@ -232,13 +300,19 @@ export default function App() {
                 last_active: new Date().toISOString() 
               }).eq('id', session.user.id).then();
             } else {
+              const startStr = new Date().toISOString();
+              const endStr = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
               supabase.from('profiles').insert({ 
                 id: session.user.id, 
                 email: session.user.email,
                 full_name: uName,
                 last_active: new Date().toISOString(),
                 budget: userBudget,
-                currency: currency
+                currency: currency,
+                is_trial_activated: true,
+                trial_start_date: startStr,
+                trial_end_date: endStr,
+                has_paid: false
               }).then();
             }
           });
@@ -273,13 +347,19 @@ export default function App() {
                 last_active: new Date().toISOString() 
               }).eq('id', session.user.id).then();
             } else {
+              const startStr = new Date().toISOString();
+              const endStr = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
               supabase.from('profiles').insert({ 
                 id: session.user.id, 
                 email: session.user.email,
                 full_name: uName,
                 last_active: new Date().toISOString(),
                 budget: userBudget,
-                currency: currency
+                currency: currency,
+                is_trial_activated: true,
+                trial_start_date: startStr,
+                trial_end_date: endStr,
+                has_paid: false
               }).then();
             }
           });
@@ -302,12 +382,20 @@ export default function App() {
         setSubscriptionTier("Free");
         setMaxHabits(5);
         
+        // Reset local trial values
+        setTrialStartDateStr(new Date().toISOString());
+        setTrialEndDateStr(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString());
+        setIsTrialActivated(false);
+        setHasPaid(false);
+        
         // Clear all personal data and configuration settings from localStorage
         const keys = [
           'wrindha_habits', 'wrindha_tasks', 'wrindha_expenses', 
           'wrindha_goals', 'wrindha_timetable', 'wrindha_study',
           'wrindha_user_name', 'wrindha_budget', 'wrindha_currency',
-          'wrindha_subscription_tier', 'wrindha_max_habits'
+          'wrindha_subscription_tier', 'wrindha_max_habits',
+          'wrindha_trial_start_date', 'wrindha_trial_end_date',
+          'wrindha_is_trial_activated', 'wrindha_has_paid'
         ];
         keys.forEach(k => localStorage.removeItem(k));
 
@@ -367,7 +455,169 @@ export default function App() {
 
   const [blogs, setBlogs] = useState<Blog[]>(() => {
     const saved = localStorage.getItem('wrindha_blogs');
-    return saved ? JSON.parse(saved) : [
+    const defaultBlogs: Blog[] = [
+      {
+        id: "f-habits",
+        title: "The Wrindha OS Habit Tracker: How to Build Unshakeable Daily Rituals",
+        content: `Developing healthy habits is the foundation of long-term personal success. Think of habits as compound interest for your self-improvement—small investments daily that yield massive returns over time.
+
+🌟 WHAT IS ITS USE?
+The Habit Tracker inside Wrindha OS is designed to remove the friction from daily progress. Instead of relying on random motivation, the tracker keeps you accountable by visualizing consistency, habit streaks, and comprehensive calendars.
+
+It solves the three biggest habit-building hurdles:
+1. Short-term forgetfulness
+2. Missing incremental progress
+3. Breaking consistency chains
+
+🚀 HOW TO USE IT:
+Step 1: Add your Habit
+Go to the "Habit Tracker" tab and click "Add Habit". Enter a clear, action-oriented title (e.g., "30 Mins Coding" or "Read 10 Pages"). Pick the frequency and click "Create".
+
+Step 2: Log Daily Progress
+As you complete your habit each day, simply click the checkbox next to it. Doing so instantly awards you active completion points, triggers status changes, and fires up your habit streak counter!
+
+Step 3: Analyze the Consistency Matrix
+Scroll down to view your monthly completion heatmap. This visual calendar highlights days of high density in vivid indicators, showcasing exactly when you are most productive.
+
+💡 PRO TIP: Habit-Stacking
+Anchor your new habit to a current automated one. For instance, "Right after I grind my morning coffee (automated), I will read 10 book pages (new habit)." Write this statement in the description of your habit to keep it front of mind!`,
+        author: "Admin",
+        category: "Habits",
+        createdAt: "2026-05-31T00:00:00Z",
+        imageUrl: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=600&auto=format&fit=crop"
+      },
+      {
+        id: "f-tasks",
+        title: "The Eisenhower Matrix: Prioritizing Your Daily Tasks for High Impact",
+        content: `Are you busy, or are you productive? There is a profound difference. Often, we exhaust our days answering urgent but ultimately unimportant emails, completely ignoring the major goals that actually advance our lives.
+
+🌟 WHAT IS ITS USE?
+The Wrindha OS Task System uses the legendary Eisenhower Matrix (engineered by US President Dwight D. Eisenhower). It organizes tasks along two axes: Urgency and Importance.
+
+This divides your focus into 4 clear, actionable quadrants:
+1. Do First (Urgent & Important) — High-impact crises and deadlines. Action: Do immediately.
+2. Schedule (Important but Not Urgent) — Growth, studying, habits, relationship-building. Action: Schedule a specific time slot.
+3. Delegate (Urgent but Not Important) — Interruptions, scheduling, minor requests. Action: Delegate or automate.
+4. Eliminate (Neither Urgent nor Important) — Time sinks, distractions, endless feeds. Action: Eliminate ruthlessly.
+
+🚀 HOW TO USE IT:
+Step 1: Open the Task & Matrix Tab
+Navigate to the "Tasks & Matrix" section. You will see a quadrant board dividing your tasks visually.
+
+Step 2: Create and Categorize your Tasks
+Click "Add Task". Input your task name, set a description, and select the Quadrant. Wrindha OS will automatically distribute it into the correct grid space.
+
+Step 3: Execute in Order of Priority
+1. Deal with Quadrant 1 (Do First) immediately.
+2. Spend the majority of your deliberate planning time on Quadrant 2 (Schedule) to prevent future crises.
+3. Delegate or automate Quadrant 3.
+4. Eliminate Quadrant 4 tasks.
+
+Check off completed tasks to archive them and move your overall daily productivity score higher!`,
+        author: "Admin",
+        category: "Productivity",
+        createdAt: "2026-05-31T01:00:00Z",
+        imageUrl: "https://images.unsplash.com/photo-1540350394557-8d14678e7f91?q=80&w=600&auto=format&fit=crop"
+      },
+      {
+        id: "f-finance",
+        title: "Mastering Personal Finances: Budgeting & Expense Tracking with Wrindha OS",
+        content: `Managing your money is about freedom, not restriction. Tracking where every single rupee goes provides you with the data needed to make informed life adjustments.
+
+🌟 WHAT IS ITS USE?
+The Expenses module in Wrindha OS helps you monitor both your income and outgoings through intuitive category clusters and direct visual indicators.
+
+By comparing total expenses to a set monthly budget limit, it helps prevent overspending before it happens and provides historical insights into spending patterns.
+
+🚀 HOW TO USE IT:
+Step 1: Set Your Overall Budget
+First, input your maximum monthly spending budget in the budget field at the top of the "Expenses" pane. This serves as your threshold.
+
+Step 2: Log Your Transactions
+Whenever you spend money or receive an income, open the form and input:
+1. The numeric amount.
+2. The transaction type (Expense or Income).
+3. The exact Category (e.g., Food, Travel, Subscriptions, Entertainment).
+4. Date and brief notes.
+
+Step 3: Monitor Thresholds & Distribution
+Look at your budget progress bar. Green indicates you are safely in budget, amber reminds you to be cautious, and red warns you of threshold breach. Use the analytics breakdown to see exactly which category is eating most of your revenue!`,
+        author: "Admin",
+        category: "Finance",
+        createdAt: "2026-05-31T02:00:00Z",
+        imageUrl: "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?q=80&w=600&auto=format&fit=crop"
+      },
+      {
+        id: "f-study",
+        title: "Optimizing the Study Planner: Managing Syllabus and Pomodoro Timers",
+        content: `Traditional cramming doesn't work. True retention comes from distributed practice, continuous tracking, and highly focused learning cycles.
+
+🌟 WHAT IS ITS USE?
+The Study Planner is designed to organize your active academic or professional courses. It features live timers, checklist breakdowns for course syllabus items, and a robust bookmarks tray to keep learning materials close.
+
+It turns overwhelming subjects into structured daily lessons.
+
+🚀 HOW TO USE IT:
+Step 1: Create a Course
+Go to the "Study Planner" tab, click "Add Course", and select a category.
+
+Step 2: Outline Your Syllabus
+Under the active course, write down key syllabus topics or milestones as individual checkpoints (e.g., "Lecture 1: Basic Syntaxes" or "Chapter 4: Advanced Database Queries"). You can check these off as you attend lessons to automatically update the course completion percentage!
+
+Step 3: Run the Pomodoro Study Timer
+Click on the Study Timer. Use the structured 25-minute study intervals followed by a 5-minute break. This keeps your mind fresh and prevents burn-out.
+
+Step 4: Save Study Materials
+Paste custom URLs, textbook chapter numbers, or reference slides under the "Materials & Bookmarks" input box to never lose track of resources.`,
+        author: "Admin",
+        category: "Study",
+        createdAt: "2026-05-31T03:00:00Z",
+        imageUrl: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=600&auto=format&fit=crop"
+      },
+      {
+        id: "f-goals",
+        title: "The Wrindha OS Goal System: Translating Vision into Milestones",
+        content: `A goal without a plan is just a wish. High-achievers don't just dream of the destination; they blueprint the track to get there.
+
+🌟 WHAT IS ITS USE?
+The Goal module forces structural planning, breaking down abstract intentions into actionable concrete steps. It prevents overwhelm by tracking specific metrics and milestone sequences, and calculates overall progress automatically.
+
+🚀 HOW TO USE IT:
+Step 1: Set Your Long-term Goal
+Open the "Goal System" tab. Click "Create Goal", write a highly motivating title, select its target category, and choose a firm deadline.
+
+Step 2: Add Milestone Key Steps
+Under your newly listed goal, add specific sub-tasks or milestones (e.g., "Develop MVP", "Conduct 10 User Tests", "Draft Launch Plan").
+
+Step 3: Progress and Celebrate
+Each time you tick a milestone, the dynamic goal circle updates itself automatically. Watching that circle fill up activates dopamine paths in your brain, reinforcing momentum to complete the remaining steps!`,
+        author: "Admin",
+        category: "Goals",
+        createdAt: "2026-05-31T04:00:00Z",
+        imageUrl: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=600&auto=format&fit=crop"
+      },
+      {
+        id: "f-timetable",
+        title: "Designing a Structured Weekly Timetable for Balanced Focus",
+        content: `If you don't schedule your day, someone else will. Timeblocking is the most effective approach to taking back control of your 24 hours.
+
+🌟 WHAT IS ITS USE?
+The Timetable module provides a weekly planning board to lock down specific high-priority blocks (e.g., study time, gym sessions, work sprints). Visually scheduling your week creates clear mental boundaries and shields your time from distractions.
+
+🚀 HOW TO USE IT:
+Step 1: Open the Timetable Tab
+Navigate to the "Timetable" module. You will see a sleek weekly overview grid spanning Monday to Sunday.
+
+Step 2: Add Your Time Block Slots
+Click "Add Slot". Choose your targeting Day, set the Start time & End time. Fill in the specific Activity Name and select a Category tag (Study, Habit, Recreation, Work, Personal).
+
+Step 3: Color-Coded Execution
+Wrindha OS maps these slots onto your calendar with beautiful category-driven colors. Use this grid every morning to see what your focus area is for the hour! Keep your schedule balanced so you avoid mental fatigue.`,
+        author: "Admin",
+        category: "Productivity",
+        createdAt: "2026-05-31T05:00:00Z",
+        imageUrl: "https://images.unsplash.com/photo-1506784365847-bbad939e9335?q=80&w=600&auto=format&fit=crop"
+      },
       {
         id: "1",
         title: "Productivity Hacks for Students & Professionals",
@@ -387,6 +637,20 @@ export default function App() {
         imageUrl: "https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?q=80&w=600&auto=format&fit=crop"
       }
     ];
+
+    if (!saved) return defaultBlogs;
+    try {
+      const parsed: Blog[] = JSON.parse(saved);
+      const merged = [...parsed];
+      for (const df of defaultBlogs) {
+        if (!merged.some(item => item.id === df.id)) {
+          merged.push(df);
+        }
+      }
+      return merged.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    } catch (e) {
+      return defaultBlogs;
+    }
   });
 
   const [isInitializing, setIsInitializing] = useState(true);
@@ -447,6 +711,45 @@ export default function App() {
           if (profileData.full_name) setUserName(profileData.full_name);
           if (profileData.subscription_tier) setSubscriptionTier(profileData.subscription_tier);
           if (profileData.max_habits) setMaxHabits(profileData.max_habits);
+
+          // Support robust trial system synced live from DB
+          const dbIsTrialActivated = !!profileData.is_trial_activated;
+          const dbHasPaid = !!profileData.has_paid;
+
+          if (dbIsTrialActivated) {
+            const startStr = profileData.trial_start_date || new Date().toISOString();
+            const endStr = profileData.trial_end_date || new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+            setTrialStartDateStr(startStr);
+            setTrialEndDateStr(endStr);
+            setIsTrialActivated(true);
+            setHasPaid(dbHasPaid);
+
+            localStorage.setItem('wrindha_trial_start_date', startStr);
+            localStorage.setItem('wrindha_trial_end_date', endStr);
+            localStorage.setItem('wrindha_is_trial_activated', 'true');
+            localStorage.setItem('wrindha_has_paid', dbHasPaid ? 'true' : 'false');
+          } else {
+            // First time login activation flow (requirement 2 & 5)
+            const startStr = new Date().toISOString();
+            const endStr = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+
+            await supabase.from('profiles').update({
+              is_trial_activated: true,
+              trial_start_date: startStr,
+              trial_end_date: endStr,
+              has_paid: false
+            }).eq('id', userId);
+
+            setTrialStartDateStr(startStr);
+            setTrialEndDateStr(endStr);
+            setIsTrialActivated(true);
+            setHasPaid(false);
+
+            localStorage.setItem('wrindha_trial_start_date', startStr);
+            localStorage.setItem('wrindha_trial_end_date', endStr);
+            localStorage.setItem('wrindha_is_trial_activated', 'true');
+            localStorage.setItem('wrindha_has_paid', 'false');
+          }
         }
 
         // Bypassed database pricing plan query to keep standard premium OS ₹49 rate custom-configured
@@ -559,13 +862,187 @@ export default function App() {
         // Globally load blogs (any user can view them)
         try {
           const { data: blogsData } = await supabase.from('blogs').select('*').order('created_at', { ascending: false });
+          const defaultBlogsList: Blog[] = [
+            {
+              id: "f-habits",
+              title: "The Wrindha OS Habit Tracker: How to Build Unshakeable Daily Rituals",
+              content: `Developing healthy habits is the foundation of long-term personal success. Think of habits as compound interest for your self-improvement—small investments daily that yield massive returns over time.
+
+🌟 WHAT IS ITS USE?
+The Habit Tracker inside Wrindha OS is designed to remove the friction from daily progress. Instead of relying on random motivation, the tracker keeps you accountable by visualizing consistency, habit streaks, and comprehensive calendars.
+
+It solves the three biggest habit-building hurdles:
+1. Short-term forgetfulness
+2. Missing incremental progress
+3. Breaking consistency chains
+
+🚀 HOW TO USE IT:
+Step 1: Add your Habit
+Go to the "Habit Tracker" tab and click "Add Habit". Enter a clear, action-oriented title (e.g., "30 Mins Coding" or "Read 10 Pages"). Pick the frequency and click "Create".
+
+Step 2: Log Daily Progress
+As you complete your habit each day, simply click the checkbox next to it. Doing so instantly awards you active completion points, triggers status changes, and fires up your habit streak counter!
+
+Step 3: Analyze the Consistency Matrix
+Scroll down to view your monthly completion heatmap. This visual calendar highlights days of high density in vivid indicators, showcasing exactly when you are most productive.
+
+💡 PRO TIP: Habit-Stacking
+Anchor your new habit to a current automated one. For instance, "Right after I grind my morning coffee (automated), I will read 10 book pages (new habit)." Write this statement in the description of your habit to keep it front of mind!`,
+              author: "Admin",
+              category: "Habits",
+              createdAt: "2026-05-31T00:00:00Z",
+              imageUrl: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=600&auto=format&fit=crop"
+            },
+            {
+              id: "f-tasks",
+              title: "The Eisenhower Matrix: Prioritizing Your Daily Tasks for High Impact",
+              content: `Are you busy, or are you productive? There is a profound difference. Often, we exhaust our days answering urgent but ultimately unimportant emails, completely ignoring the major goals that actually advance our lives.
+
+🌟 WHAT IS ITS USE?
+The Wrindha OS Task System uses the legendary Eisenhower Matrix (engineered by US President Dwight D. Eisenhower). It organizes tasks along two axes: Urgency and Importance.
+
+This divides your focus into 4 clear, actionable quadrants:
+1. Do First (Urgent & Important) — High-impact crises and deadlines. Action: Do immediately.
+2. Schedule (Important but Not Urgent) — Growth, studying, habits, relationship-building. Action: Schedule a specific time slot.
+3. Delegate (Urgent but Not Important) — Interruptions, scheduling, minor requests. Action: Delegate or automate.
+4. Eliminate (Neither Urgent nor Important) — Time sinks, distractions, endless feeds. Action: Eliminate ruthlessly.
+
+🚀 HOW TO USE IT:
+Step 1: Open the Task & Matrix Tab
+Navigate to the "Tasks & Matrix" section. You will see a quadrant board dividing your tasks visually.
+
+Step 2: Create and Categorize your Tasks
+Click "Add Task". Input your task name, set a description, and select the Quadrant. Wrindha OS will automatically distribute it into the correct grid space.
+
+Step 3: Execute in Order of Priority
+1. Deal with Quadrant 1 (Do First) immediately.
+2. Spend the majority of your deliberate planning time on Quadrant 2 (Schedule) to prevent future crises.
+3. Delegate or automate Quadrant 3.
+4. Eliminate Quadrant 4 tasks.
+
+Check off completed tasks to archive them and move your overall daily productivity score higher!`,
+              author: "Admin",
+              category: "Productivity",
+              createdAt: "2026-05-31T01:00:00Z",
+              imageUrl: "https://images.unsplash.com/photo-1540350394557-8d14678e7f91?q=80&w=600&auto=format&fit=crop"
+            },
+            {
+              id: "f-finance",
+              title: "Mastering Personal Finances: Budgeting & Expense Tracking with Wrindha OS",
+              content: `Managing your money is about freedom, not restriction. Tracking where every single rupee goes provides you with the data needed to make informed life adjustments.
+
+🌟 WHAT IS ITS USE?
+The Expenses module in Wrindha OS helps you monitor both your income and outgoings through intuitive category clusters and direct visual indicators.
+
+By comparing total expenses to a set monthly budget limit, it helps prevent overspending before it happens and provides historical insights into spending patterns.
+
+🚀 HOW TO USE IT:
+Step 1: Set Your Overall Budget
+First, input your maximum monthly spending budget in the budget field at the top of the "Expenses" pane. This serves as your threshold.
+
+Step 2: Log Your Transactions
+Whenever you spend money or receive an income, open the form and input:
+1. The numeric amount.
+2. The transaction type (Expense or Income).
+3. The exact Category (e.g., Food, Travel, Subscriptions, Entertainment).
+4. Date and brief notes.
+
+Step 3: Monitor Thresholds & Distribution
+Look at your budget progress bar. Green indicates you are safely in budget, amber reminds you to be cautious, and red warns you of threshold breach. Use the analytics breakdown to see exactly which category is eating most of your revenue!`,
+              author: "Admin",
+              category: "Finance",
+              createdAt: "2026-05-31T02:00:00Z",
+              imageUrl: "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?q=80&w=600&auto=format&fit=crop"
+            },
+            {
+              id: "f-study",
+              title: "Optimizing the Study Planner: Managing Syllabus and Pomodoro Timers",
+              content: `Traditional cramming doesn't work. True retention comes from distributed practice, continuous tracking, and highly focused learning cycles.
+
+🌟 WHAT IS ITS USE?
+The Study Planner is designed to organize your active academic or professional courses. It features live timers, checklist breakdowns for course syllabus items, and a robust bookmarks tray to keep learning materials close.
+
+It turns overwhelming subjects into structured daily lessons.
+
+🚀 HOW TO USE IT:
+Step 1: Create a Course
+Go to the "Study Planner" tab, click "Add Course", and select a category.
+
+Step 2: Outline Your Syllabus
+Under the active course, write down key syllabus topics or milestones as individual checkpoints (e.g., "Lecture 1: Basic Syntaxes" or "Chapter 4: Advanced Database Queries"). You can check these off as you attend lessons to automatically update the course completion percentage!
+
+Step 3: Run the Pomodoro Study Timer
+Click on the Study Timer. Use the structured 25-minute study intervals followed by a 5-minute break. This keeps your mind fresh and prevents burn-out.
+
+Step 4: Save Study Materials
+Paste custom URLs, textbook chapter numbers, or reference slides under the "Materials & Bookmarks" input box to never lose track of resources.`,
+              author: "Admin",
+              category: "Study",
+              createdAt: "2026-05-31T03:00:00Z",
+              imageUrl: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=600&auto=format&fit=crop"
+            },
+            {
+              id: "f-goals",
+              title: "The Wrindha OS Goal System: Translating Vision into Milestones",
+              content: `A goal without a plan is just a wish. High-achievers don't just dream of the destination; they blueprint the track to get there.
+
+🌟 WHAT IS ITS USE?
+The Goal module forces structural planning, breaking down abstract intentions into actionable concrete steps. It prevents overwhelm by tracking specific metrics and milestone sequences, and calculates overall progress automatically.
+
+🚀 HOW TO USE IT:
+Step 1: Set Your Long-term Goal
+Open the "Goal System" tab. Click "Create Goal", write a highly motivating title, select its target category, and choose a firm deadline.
+
+Step 2: Add Milestone Key Steps
+Under your newly listed goal, add specific sub-tasks or milestones (e.g., "Develop MVP", "Conduct 10 User Tests", "Draft Launch Plan").
+
+Step 3: Progress and Celebrate
+Each time you tick a milestone, the dynamic goal circle updates itself automatically. Watching that circle fill up activates dopamine paths in your brain, reinforcing momentum to complete the remaining steps!`,
+              author: "Admin",
+              category: "Goals",
+              createdAt: "2026-05-31T04:00:00Z",
+              imageUrl: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=600&auto=format&fit=crop"
+            },
+            {
+              id: "f-timetable",
+              title: "Designing a Structured Weekly Timetable for Balanced Focus",
+              content: `If you don't schedule your day, someone else will. Timeblocking is the most effective approach to taking back control of your 24 hours.
+
+🌟 WHAT IS ITS USE?
+The Timetable module provides a weekly planning board to lock down specific high-priority blocks (e.g., study time, gym sessions, work sprints). Visually scheduling your week creates clear mental boundaries and shields your time from distractions.
+
+🚀 HOW TO USE IT:
+Step 1: Open the Timetable Tab
+Navigate to the "Timetable" module. You will see a sleek weekly overview grid spanning Monday to Sunday.
+
+Step 2: Add Your Time Block Slots
+Click "Add Slot". Choose your targeting Day, set the Start time & End time. Fill in the specific Activity Name and select a Category tag (Study, Habit, Recreation, Work, Personal).
+
+Step 3: Color-Coded Execution
+Wrindha OS maps these slots onto your calendar with beautiful category-driven colors. Use this grid every morning to see what your focus area is for the hour! Keep your schedule balanced so you avoid mental fatigue.`,
+              author: "Admin",
+              category: "Productivity",
+              createdAt: "2026-05-31T05:00:00Z",
+              imageUrl: "https://images.unsplash.com/photo-1506784365847-bbad939e9335?q=80&w=600&auto=format&fit=crop"
+            }
+          ];
+
           if (blogsData && blogsData.length > 0) {
             const mappedBlogs = blogsData.map(b => ({
               ...b,
               imageUrl: b.image_url || b.imageUrl || undefined,
               createdAt: b.created_at || b.createdAt || new Date().toISOString()
             }));
-            setBlogs(mappedBlogs);
+
+            const merged = [...mappedBlogs];
+            for (const df of defaultBlogsList) {
+              if (!merged.some(item => item.id === df.id)) {
+                merged.push(df);
+              }
+            }
+            setBlogs(merged.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+          } else {
+            setBlogs(defaultBlogsList);
           }
         } catch (blogError) {
           console.warn("Table 'blogs' might not be created in Supabase yet. Using local state fallback.", blogError);
@@ -681,8 +1158,10 @@ export default function App() {
       if (session?.user?.id === userId || userId === "local-user") {
         setSubscriptionTier(tier);
         setMaxHabits(habitsLimit);
+        setHasPaid(true);
         localStorage.setItem('wrindha_subscription_tier', tier);
         localStorage.setItem('wrindha_max_habits', habitsLimit.toString());
+        localStorage.setItem('wrindha_has_paid', 'true');
       }
 
       // Record offline order
@@ -708,14 +1187,17 @@ export default function App() {
     try {
       await supabase.from('profiles').update({ 
         subscription_tier: tier,
-        max_habits: habitsLimit
+        max_habits: habitsLimit,
+        has_paid: true
       }).eq('id', userId);
       
       if (session?.user?.id === userId) {
         setSubscriptionTier(tier);
         setMaxHabits(habitsLimit);
+        setHasPaid(true);
         localStorage.setItem('wrindha_subscription_tier', tier);
         localStorage.setItem('wrindha_max_habits', habitsLimit.toString());
+        localStorage.setItem('wrindha_has_paid', 'true');
       }
       
       if (session?.user?.email === 'gongidikalyan08@gmail.com') {
@@ -749,6 +1231,46 @@ export default function App() {
       }
     } catch (err) {
       console.error("Error updating user tier:", err);
+    }
+  };
+
+  const cancelUserSubscription = async (userId: string) => {
+    const latestOrder = orders[0];
+    const expiryDate = latestOrder ? new Date(latestOrder.created_at) : new Date();
+    expiryDate.setDate(expiryDate.getDate() + 30);
+    const expiryStr = expiryDate.toISOString();
+    const cancelledTierVal = `Premium-Cancelled:${expiryStr}`;
+
+    if (!isSupabaseConfigured() || bypassConfig) {
+      setSubscriptionTier(cancelledTierVal);
+      setMaxHabits(9999);
+      setHasPaid(true);
+      localStorage.setItem('wrindha_subscription_tier', cancelledTierVal);
+      localStorage.setItem('wrindha_max_habits', '9999');
+      localStorage.setItem('wrindha_has_paid', 'true');
+      return;
+    }
+    try {
+      await supabase.from('profiles').update({ 
+        subscription_tier: cancelledTierVal,
+        max_habits: 9999
+      }).eq('id', userId);
+      
+      if (session?.user?.id === userId || userId === "local-user") {
+        setSubscriptionTier(cancelledTierVal);
+        setMaxHabits(9999);
+        setHasPaid(true);
+        localStorage.setItem('wrindha_subscription_tier', cancelledTierVal);
+        localStorage.setItem('wrindha_max_habits', '9999');
+        localStorage.setItem('wrindha_has_paid', 'true');
+      }
+      
+      if (session?.user?.email === 'gongidikalyan08@gmail.com') {
+        setAllUserProfiles(prev => prev.map(p => p.userId === userId ? { ...p, subscriptionTier: cancelledTierVal, maxHabits: 9999 } : p));
+      }
+    } catch (err) {
+      console.error("Error cancelling subscription in Supabase:", err);
+      throw err;
     }
   };
 
@@ -1059,28 +1581,21 @@ export default function App() {
                            className="rounded border-gray-300 dark:border-gray-700 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
                          />
                       </div>
-                      <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
-                        <span className="text-sm font-medium dark:text-gray-300">Supabase</span>
-                        <div className="flex items-center gap-2">
-                          <div className={cn("w-2 h-2 rounded-full", isSupabaseConfigured() ? "bg-emerald-500" : "bg-amber-500")}></div>
-                          <span className="text-xs font-bold uppercase dark:text-gray-400">
-                            {isSupabaseConfigured() ? "Connected" : "Local Only"}
-                          </span>
+                      {session && (
+                        <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                          <span className="text-sm font-medium dark:text-gray-300">Account</span>
+                          <button 
+                            onClick={async () => {
+                              await supabase.auth.signOut();
+                              setShowSettings(false);
+                              setActiveTab('dashboard');
+                            }}
+                            className="text-xs font-bold uppercase text-red-500 hover:text-white px-3 py-1.5 bg-red-50 dark:bg-red-900/10 hover:bg-red-500 dark:hover:bg-red-600 rounded-lg transition-all flex items-center gap-2"
+                          >
+                            <LogOut className="w-3 h-3" /> Logout
+                          </button>
                         </div>
-                      </div>
-                      <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
-                        <span className="text-sm font-medium dark:text-gray-300">Account</span>
-                        <button 
-                          onClick={async () => {
-                            await supabase.auth.signOut();
-                            setShowSettings(false);
-                            setActiveTab('dashboard');
-                          }}
-                          className="text-xs font-bold uppercase text-red-500 hover:text-white px-3 py-1.5 bg-red-50 dark:bg-red-900/10 hover:bg-red-500 dark:hover:bg-red-600 rounded-lg transition-all flex items-center gap-2"
-                        >
-                          <LogOut className="w-3 h-3" /> Logout
-                        </button>
-                      </div>
+                      )}
                     </div>
                  </div>
               </div>
@@ -1129,8 +1644,96 @@ export default function App() {
                 <LogIn className="w-4 h-4" /> Sign In / Sign Up
               </button>
             )}
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 border border-white dark:border-gray-800 shadow-sm overflow-hidden">
-               <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`} alt="Avatar" />
+            <div className="relative" ref={profileContainerRef}>
+              <button 
+                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 border border-white dark:border-gray-800 shadow-sm overflow-hidden flex items-center justify-center cursor-pointer transition-transform hover:scale-105 active:scale-95"
+                aria-label="Profile Menu"
+              >
+                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`} alt="Avatar" className="w-full h-full object-cover" />
+              </button>
+
+              <AnimatePresence>
+                {showProfileMenu && (
+                  <>
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xl rounded-3xl p-5 z-50 space-y-4"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 border border-white dark:border-gray-800 shadow-sm overflow-hidden shrink-0">
+                          <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`} alt="Avatar" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="min-w-0 flex-1 text-left">
+                          <input
+                            type="text"
+                            value={userName}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setUserName(val);
+                              localStorage.setItem('wrindha_user_name', val);
+                            }}
+                            className="bg-transparent border-none p-0 text-sm font-bold focus:ring-0 dark:text-white outline-none w-full focus:bg-gray-50 dark:focus:bg-gray-800/50 px-1 rounded transition-colors text-left"
+                            placeholder="Enter Display Name"
+                          />
+                          <p className="text-[10px] text-gray-400 font-medium">Click to edit name</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 pt-3 border-t border-gray-100 dark:border-gray-800 text-xs text-left">
+                        <div className="flex justify-between items-center gap-2">
+                          <span className="font-bold text-gray-400 uppercase text-[10px] shrink-0">Email</span>
+                          <span className="font-semibold dark:text-white text-gray-700 truncate max-w-[150px]" title={session?.user?.email || "sandbox@wrindha.com"}>
+                            {session?.user?.email || "sandbox@wrindha.com"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center gap-2">
+                          <span className="font-bold text-gray-400 uppercase text-[10px] shrink-0">Current Plan</span>
+                          <span className="inline-block text-[10px] bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 font-extrabold uppercase px-2.5 py-0.5 rounded-full border border-indigo-150/30">
+                            {subscriptionTier.includes('Cancelled:') ? 'Premium (Cancelled)' : subscriptionTier}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex flex-col gap-2">
+                        <button
+                          onClick={() => {
+                            setActiveTab('pricing');
+                            setShowProfileMenu(false);
+                          }}
+                          className="w-full py-2.5 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 text-xs font-bold rounded-xl transition-all text-center flex items-center justify-center gap-2"
+                        >
+                          <Award className="w-3.5 h-3.5" /> Plans & Upgrades
+                        </button>
+                        {session ? (
+                          <button
+                            onClick={async () => {
+                              await supabase.auth.signOut();
+                              setShowProfileMenu(false);
+                              setActiveTab('dashboard');
+                            }}
+                            className="w-full py-2.5 bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 text-xs font-bold rounded-xl transition-all text-center flex items-center justify-center gap-2"
+                          >
+                            <LogOut className="w-3.5 h-3.5" /> Logout
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setShowSettings(true);
+                              setShowProfileMenu(false);
+                            }}
+                            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all text-center flex items-center justify-center gap-2"
+                          >
+                            <LogIn className="w-3.5 h-3.5" /> Sign In / Sign Up
+                          </button>
+                        )}
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </header>
@@ -1150,10 +1753,24 @@ export default function App() {
                {activeTab === 'tasks' && <TasksView tasks={tasks} setTasks={setTasks} onDelete={(id) => deleteFromSupabase('tasks', id)} subscriptionTier="Premium" setActiveTab={setActiveTab} />}
                {activeTab === 'finance' && <FinanceView expenses={expenses} setExpenses={setExpenses} onDelete={(id) => deleteFromSupabase('expenses', id)} currency={currency} setCurrency={setCurrency} theme={theme} budget={userBudget} setBudget={setUserBudget} />}
                {activeTab === 'study' && <StudyView courses={studyCourses} setCourses={setStudyCourses} onDeleteCourse={(id) => deleteFromSupabase('study_courses', id)} subscriptionTier="Premium" setActiveTab={setActiveTab} />}
-               {activeTab === 'goals' && <GoalsView goals={goals} setGoals={setGoals} onDelete={(id) => deleteFromSupabase('goals', id)} subscriptionTier="Premium" setActiveTab={setActiveTab} />}
+               {activeTab === 'goals' && (
+                 <GoalsView 
+                   goals={goals} 
+                   setGoals={setGoals} 
+                   onDelete={(id) => deleteFromSupabase('goals', id)} 
+                   subscriptionTier="Premium" 
+                   setActiveTab={setActiveTab}
+                   habits={habits}
+                   setHabits={setHabits}
+                   tasks={tasks}
+                   setTasks={setTasks}
+                   studyCourses={studyCourses}
+                   setStudyCourses={setStudyCourses}
+                 />
+               )}
                {activeTab === 'timetable' && <TimetableView entries={timetable} setEntries={setTimetable} onDelete={(id) => deleteFromSupabase('timetable', id)} theme={theme} />}
                {activeTab === 'blogs' && <BlogsView blogs={blogs} setBlogs={setBlogs} isAdmin={isAdmin} />}
-               {activeTab === 'pricing' && <PricingView plans={userPlans} subscriptionTier={subscriptionTier} onUpgrade={updateUserTier} session={session} setActiveTab={setActiveTab} orders={orders} />}
+               {activeTab === 'pricing' && <PricingView plans={userPlans} subscriptionTier={subscriptionTier} onUpgrade={updateUserTier} onCancelSubscription={cancelUserSubscription} session={session} setActiveTab={setActiveTab} orders={orders} />}
                {activeTab === 'admin' && isAdmin && (
                  <AdminView 
                    plans={userPlans} 
@@ -1166,6 +1783,8 @@ export default function App() {
                {activeTab === 'about' && <AboutView />}
                {activeTab === 'contact' && <ContactView />}
                {activeTab === 'privacy' && <PrivacyView />}
+               {activeTab === 'refund' && <RefundView />}
+               {activeTab === 'cancellation' && <CancellationView />}
                {activeTab === 'disclaimer' && <DisclaimerView />}
                {activeTab === 'terms' && <TermsView />}
              </motion.div>
@@ -1261,14 +1880,16 @@ export default function App() {
             </div>
             <div className="space-y-2">
               <span className="text-[10px] bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400 font-extrabold uppercase tracking-widest px-3 py-1 rounded-full">
-                Trial Period Expired
+                {subscriptionTier.toLowerCase() === 'free' || subscriptionTier.includes('Cancelled:') ? 'Membership Cancelled' : 'Trial Period Expired'}
               </span>
               <h2 className="text-3xl font-black dark:text-white">Workspace Locked</h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-semibold">
-                Your <span className="font-bold text-red-500">5-day free trial</span> of Wrindha OS is complete. Wrindha is a Premium-Only space with absolutely no tracking limitations.
+                {subscriptionTier.toLowerCase() === 'free' || subscriptionTier.includes('Cancelled:') 
+                  ? 'Your premium membership has been cancelled or has expired. To restore access and continue using Wrindha OS, please renew your subscription.' 
+                  : 'Your 5-day free trial has ended. Please subscribe to continue using Wrindha OS.'}
               </p>
               <div className="text-xs text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/35 py-3 px-4 rounded-xl mt-2">
-                🚀 Upgrade to Premium for only <strong className="text-lg">₹49/month</strong> to restore unlimited tracking of habits, study matrices, goals, and priority timetables!
+                🚀 Subscribe to Premium for only <strong className="text-lg">₹49/month</strong> to restore unlimited tracking of habits, study matrices, goals, and priority timetables!
               </div>
             </div>
 
@@ -1808,10 +2429,144 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan }
   const [userCount, setUserCount] = useState<number | null>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [adminTab, setAdminTab] = useState<'overview' | 'users' | 'plans' | 'config'>('overview');
+  const [adminTab, setAdminTab] = useState<'overview' | 'users' | 'plans' | 'config' | 'coupons'>('overview');
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingTier, setEditingTier] = useState<string>('Free');
+
+  // Coupon configuration states list
+  const [coupons, setCoupons] = useState<any[]>([]);
+  const [usages, setUsages] = useState<any[]>([]);
+  const [loadingCoupons, setLoadingCoupons] = useState(false);
+  const [couponFormActive, setCouponFormActive] = useState(false);
+  
+  // New coupon form states
+  const [newCode, setNewCode] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+  const [newType, setNewType] = useState<'percentage' | 'fixed'>('fixed');
+  const [newValue, setNewValue] = useState<string>('20');
+  const [newMaxUses, setNewMaxUses] = useState<string>('');
+  const [newIsActive, setNewIsActive] = useState(true);
+  const [newStartDate, setNewStartDate] = useState('');
+  const [newEndDate, setNewEndDate] = useState('');
+
+  // Editing coupon state
+  const [editingCouponId, setEditingCouponId] = useState<string | null>(null);
+  const [editDesc, setEditDesc] = useState('');
+  const [editMaxUses, setEditMaxUses] = useState('');
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [editEndDate, setEditEndDate] = useState('');
+
+  const fetchCouponsData = async () => {
+    setLoadingCoupons(true);
+    try {
+      const res = await fetch("/api/admin/coupons");
+      const data = await res.json();
+      if (data.success) {
+        setCoupons(data.coupons || []);
+      }
+      
+      const statsRes = await fetch("/api/admin/coupon-stats");
+      const statsData = await statsRes.json();
+      if (statsData.success) {
+        setUsages(statsData.usages || []);
+      }
+    } catch (err) {
+      console.error("Failed fetching coupons admin data:", err);
+    } finally {
+      setLoadingCoupons(false);
+    }
+  };
+
+  const handleCreateCoupon = async (e: any) => {
+    e.preventDefault();
+    if (!newCode.trim()) return;
+
+    try {
+      const res = await fetch("/api/admin/coupons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          coupon_code: newCode.trim().toUpperCase(),
+          description: newDesc,
+          discount_type: newType,
+          discount_value: parseFloat(newValue) || 0,
+          start_date: newStartDate || undefined,
+          end_date: newEndDate || null,
+          max_uses: newMaxUses ? parseInt(newMaxUses) : null,
+          is_active: newIsActive
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCouponFormActive(false);
+        setNewCode('');
+        setNewDesc('');
+        setNewType('fixed');
+        setNewValue('20');
+        setNewMaxUses('');
+        setNewIsActive(true);
+        setNewStartDate('');
+        setNewEndDate('');
+        fetchCouponsData();
+      } else {
+        alert(data.message || "Failed creating coupon.");
+      }
+    } catch (err) {
+      console.error("Create coupon error:", err);
+    }
+  };
+
+  const handleDeleteCoupon = async (id: string) => {
+    if (!window.confirm("Are you absolutely sure you want to delete this coupon? This is permanent.")) return;
+    try {
+      const res = await fetch(`/api/admin/coupons/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        fetchCouponsData();
+      }
+    } catch (err) {
+      console.error("Delete coupon error:", err);
+    }
+  };
+
+  const handleToggleActive = async (coupon: any) => {
+    try {
+      const res = await fetch(`/api/admin/coupons/${coupon.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_active: !coupon.is_active })
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchCouponsData();
+      }
+    } catch (err) {
+      console.error("Toggle coupon state error:", err);
+    }
+  };
+
+  const handleUpdateCoupon = async (id: string) => {
+    try {
+      const res = await fetch(`/api/admin/coupons/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          description: editDesc,
+          max_uses: editMaxUses ? parseInt(editMaxUses) : null,
+          is_active: editIsActive,
+          end_date: editEndDate || null
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEditingCouponId(null);
+        fetchCouponsData();
+      }
+    } catch (err) {
+      console.error("Update coupon error:", err);
+    }
+  };
 
   const fetchStats = async () => {
     setLoading(true);
@@ -1841,6 +2596,7 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan }
 
   useEffect(() => {
     fetchStats();
+    fetchCouponsData();
   }, []);
 
   return (
@@ -1855,13 +2611,16 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan }
         </div>
         <div className="flex items-center gap-2">
           <button 
-            onClick={() => fetchStats()}
+            onClick={() => {
+              fetchStats();
+              fetchCouponsData();
+            }}
             className="p-3 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 hover:shadow-md transition-all active:scale-95"
           >
-            <RefreshCcw className={cn("w-5 h-5 dark:text-gray-300", loading && "animate-spin")} />
+            <RefreshCcw className={cn("w-5 h-5 dark:text-gray-300", (loading || loadingCoupons) && "animate-spin")} />
           </button>
           <div className="p-1 bg-gray-100 dark:bg-gray-800 rounded-2xl flex flex-wrap gap-1">
-            {(['overview', 'users', 'plans', 'config'] as const).map((tab) => (
+            {(['overview', 'users', 'plans', 'config', 'coupons'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setAdminTab(tab)}
@@ -2350,6 +3109,325 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan }
             </div>
           </motion.div>
         )}
+
+        {adminTab === 'coupons' && (
+          <motion.div
+            key="coupons"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            className="space-y-8"
+          >
+            {/* Top Stats counters related to coupons */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-6 bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-[2rem] shadow-sm">
+                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Total Discount Campaigns Run</p>
+                <p className="text-3xl font-black text-gray-850 dark:text-white mt-1 font-mono">{coupons.length}</p>
+                <p className="text-xs text-gray-400 mt-1">Capped & percentage campaigns</p>
+              </div>
+              <div className="p-6 bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-[2rem] shadow-sm">
+                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Total Coupon Redemptions</p>
+                <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400 mt-1 font-mono">
+                  {coupons.reduce((sum, cp) => sum + (cp.current_uses || 0), 0) + (usages.length || 0)}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">Directly correlated checkouts</p>
+              </div>
+              <div className="p-6 bg-gradient-to-br from-emerald-950/25 to-teal-900/10 dark:from-emerald-950/40 dark:to-teal-950/20 border border-emerald-500/20 rounded-[2rem] shadow-sm">
+                <p className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-450">Remittance Revenue via Promos</p>
+                <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
+                  ₹{Math.round(coupons.reduce((sum, cp) => sum + (parseFloat(cp.total_revenue_generated) || 0), 0))}
+                </p>
+                <p className="text-xs text-gray-550 mt-1">Verified checkout transactions</p>
+              </div>
+            </div>
+
+            {/* Campaign control bar */}
+            <div className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-[2.5rem] p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div>
+                <h3 className="text-xl font-bold dark:text-white">Active Campaigns & Secure Vouchers Pool</h3>
+                <p className="text-sm text-gray-400">Create, edit, suspend, and drop secure coupon discount codes applied on active checkouts.</p>
+              </div>
+              <button
+                onClick={() => setCouponFormActive(!couponFormActive)}
+                className="px-6 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all hover:shadow-lg hover:shadow-indigo-600/20 active:scale-95 flex items-center gap-2"
+              >
+                <Tag className="w-4 h-4" /> {couponFormActive ? "Close Form Panel" : "Create New Coupon Code"}
+              </button>
+            </div>
+
+            {/* Creation Form block */}
+            {couponFormActive && (
+              <motion.div
+                initial={{ opacity: 0, y: -15 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white dark:bg-gray-900 border border-indigo-150 dark:border-indigo-950 p-8 rounded-[2.5rem] shadow-inner space-y-6"
+              >
+                <h4 className="text-md font-black dark:text-white uppercase tracking-wider font-mono">Configure New Promo Code</h4>
+                <form onSubmit={handleCreateCoupon} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-wide text-gray-400">Coupon Code / Voucher Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. FIFTYOFF"
+                      value={newCode}
+                      onChange={e => setNewCode(e.target.value)}
+                      className="w-full py-2.5 px-4 bg-gray-50 dark:bg-gray-850 border border-gray-150 dark:border-gray-800 rounded-xl outline-none text-xs font-mono font-bold uppercase focus:border-indigo-500 dark:text-white"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-wide text-gray-400">Campaign Description</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. 50% Off Wrindha OS subscription"
+                      value={newDesc}
+                      onChange={e => setNewDesc(e.target.value)}
+                      className="w-full py-2.5 px-4 bg-gray-50 dark:bg-gray-850 border border-gray-150 dark:border-gray-800 rounded-xl outline-none text-xs font-bold focus:border-indigo-500 dark:text-white"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-wide text-gray-400">Discount Allocation Type</label>
+                    <select
+                      value={newType}
+                      onChange={e => setNewType(e.target.value as any)}
+                      className="w-full py-2.5 px-4 bg-gray-50 dark:bg-gray-850 border border-gray-150 dark:border-gray-800 rounded-xl outline-none text-xs font-bold focus:border-indigo-500 dark:text-white"
+                    >
+                      <option value="fixed">Fixed Flat INR Amount (₹)</option>
+                      <option value="percentage">Percentage Discount (%)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-wide text-gray-400">Discount Value</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      placeholder="e.g. 20"
+                      value={newValue}
+                      onChange={e => setNewValue(e.target.value)}
+                      className="w-full py-2.5 px-4 bg-gray-50 dark:bg-gray-850 border border-gray-150 dark:border-gray-800 rounded-xl outline-none text-xs font-mono font-bold focus:border-indigo-500 dark:text-white"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-wide text-gray-400">Maximum Usage Threshold (Capped)</label>
+                    <input
+                      type="number"
+                      placeholder="Unlimited (keep empty)"
+                      value={newMaxUses}
+                      onChange={e => setNewMaxUses(e.target.value)}
+                      className="w-full py-2.5 px-4 bg-gray-50 dark:bg-gray-850 border border-gray-150 dark:border-gray-800 rounded-xl outline-none text-xs font-mono focus:border-indigo-500 dark:text-white"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-wide text-gray-400">Expiry End Date (Optional)</label>
+                    <input
+                      type="date"
+                      value={newEndDate}
+                      onChange={e => setNewEndDate(e.target.value)}
+                      className="w-full py-2.5 px-4 bg-gray-50 dark:bg-gray-850 border border-gray-150 dark:border-gray-800 rounded-xl outline-none text-xs focus:border-indigo-500 dark:text-white"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-6">
+                    <input
+                      type="checkbox"
+                      id="campaign_active"
+                      checked={newIsActive}
+                      onChange={e => setNewIsActive(e.target.checked)}
+                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                    />
+                    <label htmlFor="campaign_active" className="text-xs font-black uppercase tracking-wider text-gray-400 cursor-pointer">Activate Campaign Immediately</label>
+                  </div>
+
+                  <div className="md:col-span-2 lg:col-span-3 flex justify-end gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setCouponFormActive(false)}
+                      className="px-5 py-2.5 border border-gray-200 dark:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl text-xs font-bold transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:shadow-md"
+                    >
+                      Publish Voucher
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            )}
+
+            {/* Coupons Listing Table */}
+            <div className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-[2.5rem] overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50/50 dark:bg-gray-800/10">
+                      <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-gray-500">Voucher Promo Code</th>
+                      <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-gray-500">Description</th>
+                      <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-gray-500">Allocation Benefit</th>
+                      <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-gray-500">Redemptions Status</th>
+                      <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-gray-500">Campaign Period</th>
+                      <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-gray-500">suspension toggle</th>
+                      <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-gray-500">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingCoupons ? (
+                      <tr>
+                        <td colSpan={7} className="px-8 py-20 text-center text-gray-400">Loading coupons database ledgers...</td>
+                      </tr>
+                    ) : coupons.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-8 py-20 text-center text-gray-400">No promo coupons published yet. Generate your first offer above!</td>
+                      </tr>
+                    ) : (
+                      coupons.map((coupon) => (
+                        <tr key={coupon.id} className="border-t border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/20 transition-colors">
+                          <td className="px-8 py-6">
+                            <span className="px-3 py-1.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 rounded-xl text-xs font-mono font-black tracking-wide uppercase border border-indigo-100/40 dark:border-indigo-950/40">
+                              {coupon.coupon_code}
+                            </span>
+                          </td>
+                          <td className="px-8 py-6">
+                            {editingCouponId === coupon.id ? (
+                              <input
+                                type="text"
+                                value={editDesc}
+                                onChange={e => setEditDesc(e.target.value)}
+                                className="py-1 px-2.5 bg-gray-50 dark:bg-gray-800 text-xs font-bold border rounded-lg focus:border-indigo-500 dark:text-white outline-none w-48"
+                              />
+                            ) : (
+                              <div className="flex flex-col">
+                                <span className="font-bold dark:text-gray-100 text-sm">{coupon.description || "Subscribers Reward Campaign"}</span>
+                                <span className="text-[10px] text-gray-400 mt-0.5">Total Revenue: ₹{Math.round(coupon.total_revenue_generated || 0)}</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-8 py-6 font-mono text-xs font-black dark:text-emerald-400 text-emerald-600">
+                            {coupon.discount_type === "percentage" ? `${coupon.discount_value}% Off` : `₹${coupon.discount_value} Off`}
+                          </td>
+                          <td className="px-8 py-6">
+                            {editingCouponId === coupon.id ? (
+                              <div className="space-y-1">
+                                <label className="text-[9px] uppercase font-black text-gray-400 font-bold">Max Uses</label>
+                                <input
+                                  type="number"
+                                  placeholder="Unlimited"
+                                  value={editMaxUses}
+                                  onChange={e => setEditMaxUses(e.target.value)}
+                                  className="py-1 px-2.5 bg-gray-50 dark:bg-gray-800 text-xs border rounded-lg focus:border-indigo-500 dark:text-white outline-none w-20 font-mono"
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex flex-col gap-1 w-24">
+                                <span className="text-xs font-extrabold dark:text-gray-200">
+                                  {coupon.current_uses || 0} / {coupon.max_uses ? coupon.max_uses : "∞"}
+                                </span>
+                                <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-indigo-600 rounded-full"
+                                    style={{
+                                      width: `${coupon.max_uses ? Math.min(100, ((coupon.current_uses || 0) / coupon.max_uses) * 100) : 32}%`
+                                    }}
+                                  ></div>
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-8 py-6">
+                            {editingCouponId === coupon.id ? (
+                              <div className="space-y-1">
+                                <label className="text-[9px] uppercase font-black text-gray-400 font-bold">Expiry Date</label>
+                                <input
+                                  type="date"
+                                  value={editEndDate ? editEndDate.split('T')[0] : ''}
+                                  onChange={e => setEditEndDate(e.target.value)}
+                                  className="py-1 px-1.5 text-[10px] bg-gray-50 dark:bg-gray-800 text-xs border rounded-lg focus:border-indigo-500 dark:text-white outline-none"
+                                />
+                              </div>
+                            ) : (
+                              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5" />
+                                {coupon.end_date ? new Date(coupon.end_date).toLocaleDateString(undefined, { dateStyle: 'short' }) : "Never Expires"}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-8 py-6">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleActive(coupon)}
+                              className={cn(
+                                "px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-colors",
+                                coupon.is_active
+                                  ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 hover:bg-emerald-100"
+                                  : "bg-red-50 text-red-650 dark:bg-red-500/10 dark:text-red-400 hover:bg-red-100"
+                              )}
+                            >
+                              {coupon.is_active ? "● Active" : "○ Inactive"}
+                            </button>
+                          </td>
+                          <td className="px-8 py-6">
+                            {editingCouponId === coupon.id ? (
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateCoupon(coupon.id)}
+                                  className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-black uppercase whitespace-nowrap shadow"
+                                >
+                                  Save Change
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingCouponId(null)}
+                                  className="px-2 py-1 bg-gray-100 dark:bg-gray-805 text-gray-500 dark:text-gray-400 rounded-lg text-[10px] font-bold"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingCouponId(coupon.id);
+                                    setEditDesc(coupon.description || '');
+                                    setEditMaxUses(coupon.max_uses ? String(coupon.max_uses) : '');
+                                    setEditIsActive(coupon.is_active);
+                                    setEditEndDate(coupon.end_date || '');
+                                  }}
+                                  className="p-2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors bg-gray-50 dark:bg-gray-800/40 hover:bg-indigo-50 dark:hover:bg-indigo-950/10 rounded-xl"
+                                  title="Edit Coupon Configuration"
+                                >
+                                  <Settings2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCoupon(coupon.id)}
+                                  className="p-2 text-gray-400 hover:text-red-500 transition-colors bg-gray-50 dark:bg-gray-800/40 hover:bg-red-50 dark:hover:bg-red-950/10 rounded-xl"
+                                  title="Delete Promo Coupon Permanently"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
@@ -2695,7 +3773,7 @@ function HabitsView({ habits, setHabits, onDelete, theme, subscriptionTier = 'Fr
         <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
-            <span>You are currently managing <strong>{habits.length} of 5 daily habits</strong> on the Free version. Unlock infinite streaks by starting a premium space.</span>
+            <span>You are currently managing <strong>{habits.length} of 5 daily habits</strong> under standard limit rules. Unlock infinite streaks by starting a premium space.</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
@@ -2914,7 +3992,7 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
         <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
-            <span>You are currently managing <strong>{tasks.length} of 10 tasks</strong> on the Free version. Upgrade now to log unlimited milestones and tasks.</span>
+            <span>You are currently managing <strong>{tasks.length} of 10 tasks</strong> under standard limit rules. Upgrade now to log unlimited milestones and tasks.</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
@@ -3453,7 +4531,7 @@ function StudyView({ courses, setCourses, onDeleteCourse, subscriptionTier = 'Fr
         <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
-            <span>You are currently managing <strong>{courses.length} of 2 active courses</strong> on the Free version. Upgrade now to track infinite courses, logs, and materials.</span>
+            <span>You are currently managing <strong>{courses.length} of 2 active courses</strong> under standard limit rules. Upgrade now to track infinite courses, logs, and materials.</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
@@ -3710,7 +4788,32 @@ function StudyView({ courses, setCourses, onDeleteCourse, subscriptionTier = 'Fr
   );
 }
 
-function GoalsView({ goals, setGoals, onDelete, subscriptionTier = 'Free', setActiveTab }: { goals: Goal[], setGoals: (g: Goal[]) => void, onDelete: (id: string) => void, subscriptionTier?: string, setActiveTab?: (t: string) => void }) {
+function GoalsView({ 
+  goals, 
+  setGoals, 
+  onDelete, 
+  subscriptionTier = 'Free', 
+  setActiveTab,
+  habits,
+  setHabits,
+  tasks,
+  setTasks,
+  studyCourses,
+  setStudyCourses
+}: { 
+  goals: Goal[], 
+  setGoals: (g: Goal[]) => void, 
+  onDelete: (id: string) => void, 
+  subscriptionTier?: string, 
+  setActiveTab?: (t: string) => void,
+  habits: Habit[],
+  setHabits: React.Dispatch<React.SetStateAction<Habit[]>>,
+  tasks: Task[],
+  setTasks: React.Dispatch<React.SetStateAction<Task[]>>,
+  studyCourses: StudyCourse[],
+  setStudyCourses: React.Dispatch<React.SetStateAction<StudyCourse[]>>
+}) {
+  const [goalsTab, setGoalsTab] = useState<'board' | 'career'>('board');
   const [showAdd, setShowAdd] = useState(false);
   const [newGoal, setNewGoal] = useState({ title: '', type: GoalType.SHORT, date: '' });
   const [showLimitModal, setShowLimitModal] = useState(false);
@@ -3739,30 +4842,67 @@ function GoalsView({ goals, setGoals, onDelete, subscriptionTier = 'Free', setAc
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-3xl font-bold dark:text-white">Goal Architecture</h2>
-          <p className="text-gray-500 dark:text-gray-400">Manual tracking for long-term vision.</p>
-        </div>
-        <button 
-          onClick={() => {
-            if (subscriptionTier === 'Free' && goals.length >= 3) {
-              setShowLimitModal(true);
-            } else {
-              setShowAdd(true);
-            }
-          }}
-          className="bg-black dark:bg-indigo-600 text-white p-3 rounded-2xl hover:scale-105 transition-transform"
+      {/* Visual Sub Tabs Segment Navigator for Career and Goal Board */}
+      <div className="flex bg-gray-50 dark:bg-gray-950 p-1.5 rounded-2xl max-w-sm border border-gray-100 dark:border-gray-800">
+        <button
+          onClick={() => setGoalsTab('board')}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            goalsTab === 'board'
+              ? 'bg-white dark:bg-gray-900 text-indigo-600 dark:text-indigo-400 shadow-sm border border-gray-150 dark:border-gray-800'
+              : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+          }`}
         >
-          <Plus className="w-5 h-5" />
+          <Target className="w-4 h-4 text-indigo-500" /> Goal Board
+        </button>
+        <button
+          onClick={() => setGoalsTab('career')}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 relative cursor-pointer ${
+            goalsTab === 'career'
+              ? 'bg-white dark:bg-gray-900 text-indigo-600 dark:text-indigo-400 shadow-sm border border-gray-150 dark:border-gray-800'
+              : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+          }`}
+        >
+          <Award className="w-4 h-4 text-indigo-500" /> Career Trajectory
         </button>
       </div>
+
+      {goalsTab === 'career' ? (
+        <CareerPlannerView 
+          habits={habits}
+          setHabits={setHabits}
+          tasks={tasks}
+          setTasks={setTasks}
+          goals={goals}
+          setGoals={setGoals}
+          studyCourses={studyCourses}
+          setStudyCourses={setStudyCourses}
+        />
+      ) : (
+        <div className="space-y-8">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-3xl font-bold dark:text-white">Goal Architecture</h2>
+              <p className="text-gray-500 dark:text-gray-400">Manual tracking for long-term vision.</p>
+            </div>
+            <button 
+              onClick={() => {
+                if (subscriptionTier === 'Free' && goals.length >= 3) {
+                  setShowLimitModal(true);
+                } else {
+                  setShowAdd(true);
+                }
+              }}
+              className="bg-black dark:bg-indigo-600 text-white p-3 rounded-2xl hover:scale-105 transition-transform"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          </div>
 
       {subscriptionTier === 'Free' && (
         <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
-            <span>You are currently managing <strong>{goals.length} of 3 active goals</strong> on the Free version. Upgrade now to structure infinite goals, milestones, and roadmaps.</span>
+            <span>You are currently managing <strong>{goals.length} of 3 active goals</strong> under standard limit rules. Upgrade now to structure infinite goals, milestones, and roadmaps.</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
@@ -3896,6 +5036,8 @@ function GoalsView({ goals, setGoals, onDelete, subscriptionTier = 'Free', setAc
           </div>
         ))}
       </div>
+      </div>
+      )}
     </div>
   );
 }
@@ -4047,58 +5189,69 @@ function PlaceholderView({ name }: { name: string }) {
 
 function AboutView() {
   return (
-    <div className="max-w-4xl mx-auto py-12">
+    <div className="max-w-4xl mx-auto py-12 px-4">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         className="space-y-12"
       >
+        {/* Header Hero Section */}
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
-            <Info className="w-8 h-8 text-indigo-600" />
+          <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/40 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-indigo-100 dark:border-indigo-900/40 shadow-sm">
+            <Info className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
           </div>
-          <h1 className="text-5xl font-black dark:text-white tracking-tight">About Us</h1>
-          <p className="text-xl text-gray-500 dark:text-gray-400 font-medium">Empowering the next generation of focused learners.</p>
+          <h1 className="text-4xl sm:text-5xl font-black dark:text-white tracking-tight">About WrindhaOS</h1>
+          <p className="text-lg text-gray-500 dark:text-gray-400 font-medium max-w-2xl mx-auto leading-relaxed">
+            An all-in-one productivity platform built to help students, professionals, UPSC aspirants, fitness enthusiasts, and goal-oriented individuals manage their daily lives efficiently.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-            <div className="space-y-6">
-              <h2 className="text-3xl font-bold dark:text-white">The Mission</h2>
-              <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-lg">
-                Welcome to <span className="font-bold text-indigo-600">Wrindha OS</span>. My name is <span className="font-bold dark:text-white">Kalyan</span>, and I'm a B.Tech student passionate about bridging the gap between raw potential and structured execution.
-              </p>
-              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                As a student myself, I realized that the hurdles to academic success aren't just about intelligence, but about organization and consistency. This platform was born from that necessity.
+        {/* Dynamic Grid: Mission & Bullets */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+          <div className="bg-white dark:bg-gray-900 p-8 sm:p-10 rounded-[2.5rem] border border-gray-150 dark:border-gray-800/80 shadow-sm flex flex-col justify-between">
+            <div className="space-y-4">
+              <span className="text-[10px] uppercase font-black tracking-widest text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-3.5 py-1.5 rounded-full border border-indigo-100/50 dark:border-indigo-900/50">Our Mission</span>
+              <h2 className="text-2xl font-bold dark:text-white pt-2">Beyond Limits. Built for Future.</h2>
+              <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-sm">
+                Our mission is to simplify productivity and help users achieve consistency, focus, and growth. We believe that by providing robust, seamless utilities, we can help reduce the planning friction so you can invest fully in raw action and consistency.
               </p>
             </div>
-            <div className="bg-white dark:bg-gray-900 p-8 rounded-[3rem] border border-gray-100 dark:border-gray-800 shadow-xl">
-               <h3 className="font-bold text-indigo-600 uppercase tracking-widest text-xs mb-6">Built-in Modules</h3>
-               <div className="grid grid-cols-2 gap-4">
-                 {[
-                   { name: 'Study Planner', icon: GraduationCap },
-                   { name: 'Habit Tracker', icon: Flame },
-                   { name: 'Expense Tracker', icon: Wallet },
-                   { name: 'Goal Setting', icon: Target },
-                   { name: 'Matrix Mode', icon: Brain },
-                   { name: 'Timetable', icon: Calendar }
-                 ].map(item => (
-                   <div key={item.name} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl">
-                     <item.icon className="w-4 h-4 text-gray-400" />
-                     <span className="text-xs font-bold dark:text-gray-300">{item.name}</span>
-                   </div>
-                 ))}
-               </div>
+            
+            {/* Founder details in card */}
+            <div className="border-t border-gray-100 dark:border-gray-800/80 pt-6 mt-8 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-pink-500 flex items-center justify-center text-white font-black text-sm uppercase">
+                KG
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">Founder</p>
+                <p className="text-sm font-bold dark:text-white">Kalyan Gongidi</p>
+                <a href="mailto:wrindhaos@gmail.com" className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">wrindhaos@gmail.com</a>
+              </div>
             </div>
-        </div>
-
-        <div className="bg-black dark:bg-indigo-600 rounded-[3rem] p-12 text-white relative overflow-hidden">
-          <div className="relative z-10">
-            <h2 className="text-3xl font-bold mb-6">Our Vision</h2>
-            <p className="text-lg opacity-80 leading-relaxed max-w-2xl">
-              "Our mission is to help students become more organized, productive, and focused in their daily lives. We believe that by providing practical tools, we can help reduce the friction of planning and allow the focus to remain on learning."
-            </p>
           </div>
-          <div className="absolute right-0 top-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
+
+          <div className="bg-white dark:bg-gray-900 p-8 sm:p-10 rounded-[2.5rem] border border-gray-150 dark:border-gray-800/80 shadow-sm">
+            <h3 className="font-black text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-6">What Platform Offers</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {[
+                { name: 'Habit Tracking', icon: Flame, color: 'text-orange-500' },
+                { name: 'Expense Tracking', icon: Wallet, color: 'text-emerald-500' },
+                { name: 'Goal Management', icon: Target, color: 'text-purple-500' },
+                { name: 'Study Planning', icon: GraduationCap, color: 'text-indigo-500' },
+                { name: 'Timetable Generation', icon: Calendar, color: 'text-cyan-500' },
+                { name: 'Eisenhower Matrix', icon: Brain, color: 'text-pink-500' },
+                { name: 'Weekly, Monthly & Yearly Analytics', icon: BarChart3, color: 'text-indigo-500' },
+                { name: 'Productivity Blogs and Guides', icon: FileText, color: 'text-rose-500' }
+              ].map(item => (
+                <div key={item.name} className="flex items-center gap-3.5 p-3.5 bg-gray-50 dark:bg-gray-850/50 rounded-2xl border border-gray-100/50 dark:border-gray-800/30">
+                  <div className="p-2 bg-white dark:bg-gray-800 rounded-xl shadow-xs shrink-0 border border-gray-100 dark:border-gray-700">
+                    <item.icon className={`w-4 h-4 ${item.color}`} />
+                  </div>
+                  <span className="text-xs font-bold dark:text-gray-300 leading-tight">{item.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </motion.div>
     </div>
@@ -4106,60 +5259,84 @@ function AboutView() {
 }
 
 function ContactView() {
+  const [submitted, setSubmitted] = useState(false);
+  const handleSubmit = (e: any) => {
+    e.preventDefault();
+    setSubmitted(true);
+    setTimeout(() => {
+      setSubmitted(false);
+    }, 4000);
+  };
+
   return (
-    <div className="max-w-4xl mx-auto py-12">
+    <div className="max-w-4xl mx-auto py-12 px-4">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         className="space-y-12"
       >
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
-            <MessageCircle className="w-8 h-8 text-emerald-600" />
+          <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-950/40 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-emerald-100 dark:border-emerald-900/40 shadow-sm">
+            <MessageCircle className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <h1 className="text-5xl font-black dark:text-white tracking-tight">Contact Us</h1>
-          <p className="text-xl text-gray-500 dark:text-gray-400 font-medium">We're here to help if you have any questions.</p>
+          <h1 className="text-4xl sm:text-5xl font-black dark:text-white tracking-tight">Contact Us</h1>
+          <p className="text-lg text-gray-500 dark:text-gray-400 font-medium max-w-2xl mx-auto">
+            We would love to hear from you. Reach out for any questions, feedback, or business inquiries.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="md:col-span-2 bg-white dark:bg-gray-900 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-800 shadow-sm space-y-8">
+          <div className="md:col-span-2 bg-white dark:bg-gray-900 p-8 sm:p-10 rounded-[2.5rem] border border-gray-150 dark:border-gray-800/80 shadow-sm space-y-8">
             <h2 className="text-2xl font-bold dark:text-white">Send a Message</h2>
-            <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Full Name</label>
-                  <input type="text" className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white px-5 py-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all" placeholder="Enter your name" />
+            {submitted ? (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-250 dark:border-emerald-900/40 p-6 rounded-2xl text-center"
+              >
+                <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+                <p className="text-sm font-bold text-emerald-800 dark:text-emerald-400">Message Transferred Securely!</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Thank you. We will get back to you within 24–48 hours.</p>
+              </motion.div>
+            ) : (
+              <form className="space-y-6" onSubmit={handleSubmit}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Full Name</label>
+                    <input required type="text" className="w-full bg-gray-50 dark:bg-gray-850 dark:text-white px-5 py-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 outline-none focus:border-emerald-500 transition-all text-xs font-bold" placeholder="Your Name" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Email Address</label>
+                    <input required type="email" className="w-full bg-gray-50 dark:bg-gray-850 dark:text-white px-5 py-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 outline-none focus:border-emerald-500 transition-all text-xs font-bold" placeholder="your@email.com" />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Email Address</label>
-                  <input type="email" className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white px-5 py-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all" placeholder="your@email.com" />
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Message / Inquiry Details</label>
+                  <textarea required rows={4} className="w-full bg-gray-50 dark:bg-gray-850 dark:text-white px-5 py-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 outline-none focus:border-emerald-500 transition-all text-sm font-medium resize-none" placeholder="For support, feedback, business inquiries, or partnership opportunities, please contact us..."></textarea>
                 </div>
-              </div>
-              <div className="space-y-2">
-                   <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Message</label>
-                   <textarea rows={4} className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white px-5 py-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all resize-none" placeholder="How can we help?"></textarea>
-              </div>
-              <button type="submit" className="w-full bg-black dark:bg-indigo-600 text-white py-4 rounded-2xl font-bold uppercase tracking-widest text-xs hover:scale-[1.02] active:scale-[0.98] transition-all">Send Message</button>
-            </form>
+                <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-md">Send Message</button>
+              </form>
+            )}
           </div>
 
           <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col items-center text-center">
-               <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl mb-4">
-                 <Mail className="w-6 h-6 text-gray-400" />
-               </div>
-               <h3 className="font-bold text-sm mb-1 dark:text-white">Email Us</h3>
-               <p className="text-xs text-gray-400 mb-4">For all inquiries</p>
-               <a href="mailto:wrindhaos@gmail.com" className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline">wrindhaos@gmail.com</a>
+            <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-150 dark:border-gray-800/80 shadow-sm flex flex-col items-center text-center">
+              <div className="p-4 bg-gray-50 dark:bg-gray-850 rounded-2xl mb-4 border border-gray-100 dark:border-gray-800">
+                <Mail className="w-6 h-6 text-gray-400" />
+              </div>
+              <h3 className="font-bold text-sm mb-1 dark:text-white">Founder Contact</h3>
+              <p className="text-xs text-gray-400 mb-4">Kalyan Gongidi</p>
+              <a href="mailto:wrindhaos@gmail.com" className="font-bold text-sm text-indigo-600 dark:text-indigo-400 hover:underline font-mono">wrindhaos@gmail.com</a>
             </div>
-            <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col items-center text-center">
-               <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl mb-4">
-                 <Clock className="w-6 h-6 text-gray-400" />
-               </div>
-               <h3 className="font-bold text-sm mb-1 dark:text-white">Response Time</h3>
-               <p className="text-xs text-gray-400 leading-relaxed px-4">
-                 We usually respond within <span className="text-indigo-600 font-bold">24–48 hours</span>.
-               </p>
+
+            <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-150 dark:border-gray-800/80 shadow-sm flex flex-col items-center text-center">
+              <div className="p-4 bg-gray-50 dark:bg-gray-850 rounded-2xl mb-4 border border-gray-100 dark:border-gray-800">
+                <Clock className="w-6 h-6 text-gray-400" />
+              </div>
+              <h3 className="font-bold text-sm mb-1 dark:text-white">Response Time</h3>
+              <p className="text-xs text-gray-400 leading-relaxed px-4">
+                Within <span className="text-emerald-500 font-extrabold font-mono">24–48</span> business hours.
+              </p>
             </div>
           </div>
         </div>
@@ -4170,53 +5347,126 @@ function ContactView() {
 
 function PrivacyView() {
   return (
-    <div className="max-w-3xl mx-auto py-12">
+    <div className="max-w-3xl mx-auto py-12 px-4">
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="bg-white dark:bg-gray-900 p-12 rounded-[3.5rem] border border-gray-100 dark:border-gray-800 shadow-xl space-y-10"
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white dark:bg-gray-900 p-8 sm:p-12 rounded-[2.5rem] sm:rounded-[3.5rem] border border-gray-150 dark:border-gray-800/85 shadow-sm space-y-10"
       >
-        <div className="flex items-center gap-6 pb-8 border-b border-gray-50 dark:border-gray-800">
-          <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/20 rounded-[1.5rem] flex items-center justify-center">
-            <ShieldCheck className="w-8 h-8 text-indigo-600" />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-6 pb-8 border-b border-gray-100 dark:border-gray-800">
+          <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/40 rounded-[1.5rem] flex items-center justify-center shrink-0 border border-indigo-100/50 dark:border-indigo-900/30">
+            <ShieldCheck className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
           </div>
           <div>
             <h1 className="text-3xl font-black dark:text-white">Privacy Policy</h1>
-            <p className="text-gray-400 font-medium">Effective Date: May 9, 2026</p>
+            <p className="text-gray-400 font-medium text-xs uppercase tracking-wider mt-1">Welcome to WrindhaOS. Your privacy is important to us.</p>
           </div>
         </div>
 
+        {/* Section 1: Collection */}
         <section className="space-y-4">
-          <h2 className="text-xl font-bold dark:text-white flex items-center gap-2">
-            <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
-            Data Collection
+          <h2 className="text-lg font-bold dark:text-white flex items-center gap-2.5">
+            <div className="w-1.5 h-5 bg-indigo-600 rounded-full"></div>
+            Information We Collect
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-            At Wrindha OS, we value your privacy. We strictly limit the data we collect to what is necessary for providing a high-quality experience. This may include:
+          <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-sm">
+            We may collect the following information to facilitate your productivity workflows on WrindhaOS:
           </p>
-          <ul className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-4">
-            {['Browser type', 'Device information', 'Cookies', 'Usage analytics'].map(item => (
-              <li key={item} className="flex items-center gap-2 text-sm text-gray-500">
-                <CheckCircle2 className="w-3 h-3 text-emerald-500" /> {item}
-              </li>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-2">
+            {[
+              "Name",
+              "Email Address",
+              "Account Information",
+              "Usage Data",
+              "Subscription Information",
+              "Payment Details (processed securely through third-party payment providers)"
+            ].map(item => (
+              <div key={item} className="flex items-start gap-2.5 text-xs text-gray-500 dark:text-gray-400">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <span>{item}</span>
+              </div>
             ))}
-          </ul>
+          </div>
         </section>
 
+        {/* Section 2: Use */}
         <section className="space-y-4">
-          <h2 className="text-xl font-bold dark:text-white flex items-center gap-2">
-            <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+          <h2 className="text-lg font-bold dark:text-white flex items-center gap-2.5">
+            <div className="w-1.5 h-5 bg-indigo-600 rounded-full"></div>
+            How We Use Your Information
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-sm">
+            We use the collected details to consistently expand, safeguard, and deliver efficient products:
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-2">
+            {[
+              "Provide and maintain our services",
+              "Improve user experience",
+              "Manage subscriptions",
+              "Send important updates and notifications",
+              "Respond to customer support requests"
+            ].map(item => (
+              <div key={item} className="flex items-start gap-2.5 text-xs text-gray-500 dark:text-gray-400">
+                <Check className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Section 3: Security */}
+        <section className="space-y-4">
+          <h2 className="text-lg font-bold dark:text-white flex items-center gap-2.5">
+            <div className="w-1.5 h-5 bg-indigo-600 rounded-full"></div>
+            Data Security
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-sm">
+            We implement reasonable security measures to protect user information from unauthorized access, disclosure, modify, or misuse.
+          </p>
+        </section>
+
+        {/* Section 4: Third-parties */}
+        <section className="space-y-4">
+          <h2 className="text-lg font-bold dark:text-white flex items-center gap-2.5">
+            <div className="w-1.5 h-5 bg-indigo-600 rounded-full"></div>
             Third-Party Services
           </h2>
           <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-sm">
-            Third-party services such as <span className="font-bold">Google Analytics</span> and <span className="font-bold">Google AdSense</span> may use cookies to serve personalized content and advertisements. We do not sell personal information to third parties.
+            WrindhaOS may use third-party services such as payment gateways, analytics providers, and hosting services. These providers may have their own privacy policies. We encourage users to inspect external policies closely.
           </p>
         </section>
 
-        <div className="p-8 bg-gray-50 dark:bg-gray-800/50 rounded-3xl border border-gray-100 dark:border-gray-700">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-300 italic text-center">
-            "By using our website, you agree to this privacy policy."
+        {/* Section 5: Data Sharing */}
+        <section className="space-y-4">
+          <h2 className="text-lg font-bold dark:text-white flex items-center gap-2.5">
+            <div className="w-1.5 h-5 bg-indigo-600 rounded-full"></div>
+            Data Sharing
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-sm col-span-2">
+            We do not sell, rent, or trade your personal information to third parties under any circumstances.
           </p>
+        </section>
+
+        {/* Section 6: Changes */}
+        <section className="space-y-4">
+          <h2 className="text-lg font-bold dark:text-white flex items-center gap-2.5">
+            <div className="w-1.5 h-5 bg-indigo-600 rounded-full"></div>
+            Changes to This Policy
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-sm text-justify">
+            We may update this Privacy Policy from time to time. Changes will be posted explicitly on this page. By continuing usage, you recognize the latest posted changes.
+          </p>
+        </section>
+
+        {/* Signoff / Contact information */}
+        <div className="pt-8 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-xs">
+          <div>
+            <p className="font-bold dark:text-white">Founder: Kalyan Gongidi</p>
+            <p className="text-gray-400 mt-0.5">Email: wrindhaos@gmail.com</p>
+          </div>
+          <a href="mailto:wrindhaos@gmail.com" className="px-4 py-2 bg-gray-50 hover:bg-gray-100 dark:bg-gray-850 dark:hover:bg-gray-800 text-indigo-600 dark:text-indigo-400 font-bold rounded-xl border border-gray-200 dark:border-gray-850 transition-colors">
+            Contact Founder
+          </a>
         </div>
       </motion.div>
     </div>
@@ -4225,26 +5475,54 @@ function PrivacyView() {
 
 function DisclaimerView() {
   return (
-    <div className="max-w-3xl mx-auto py-12">
+    <div className="max-w-3xl mx-auto py-12 px-4">
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="bg-[#FFFBEB] dark:bg-amber-900/10 p-12 rounded-[3.5rem] border-2 border-amber-200 dark:border-amber-900/30 space-y-8"
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-amber-50/50 dark:bg-amber-950/15 p-8 sm:p-12 rounded-[2.5rem] sm:rounded-[3.5rem] border-2 border-amber-200/50 dark:border-amber-900/30 space-y-10"
       >
-        <div className="flex items-center gap-6">
-          <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/40 rounded-[2rem] flex items-center justify-center">
-            <AlertCircle className="w-8 h-8 text-amber-600" />
+        <div className="flex items-center gap-6 pb-6 border-b border-amber-200/30 dark:border-amber-900/20">
+          <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center shrink-0">
+            <AlertCircle className="w-8 h-8 text-amber-600 dark:text-amber-400" />
           </div>
-          <h1 className="text-4xl font-black text-amber-900 dark:text-amber-100">Disclaimer</h1>
+          <div>
+            <h1 className="text-3xl font-black text-amber-950 dark:text-amber-100">Disclaimer</h1>
+            <p className="text-xs uppercase tracking-wider text-amber-800 dark:text-amber-400 font-black mt-1 font-mono">Productivity & Informational Boundaries</p>
+          </div>
         </div>
 
-        <div className="space-y-6 text-amber-900/80 dark:text-amber-100/60 leading-relaxed text-lg">
+        <div className="space-y-6 text-amber-900/80 dark:text-amber-200/70 leading-relaxed text-sm sm:text-base text-justify">
           <p>
-            The tools, calculators, planners, trackers, and educational content available on this website are provided for <span className="font-bold text-amber-700 dark:text-amber-400 underline decoration-amber-300">informational and productivity purposes only</span>.
+            WrindhaOS provides productivity, planning, habit tracking, study management, and personal organization tools for informational and organizational purposes only.
           </p>
-          <p>
-            While we strive for accuracy, we do not guarantee completeness or suitability for every individual situation. Users are responsible for how they use the information and tools provided on this website.
+
+          <p className="font-bold border-l-4 border-amber-500 pl-4 py-1 dark:text-amber-300">
+            We do not guarantee:
           </p>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-4">
+            {[
+              "Academic success",
+              "Examination results",
+              "Career outcomes",
+              "Financial gains",
+              "Personal achievements"
+            ].map(item => (
+              <li key={item} className="flex items-center gap-3 text-sm text-amber-900/90 dark:text-amber-350">
+                <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+                {item}
+              </li>
+            ))}
+          </ul>
+
+          <p className="pt-2 text-sm">
+            Results depend strictly on individual effort and circumstances. Users are solely and strictly responsible for their decisions, actions, and daily study outputs.
+          </p>
+        </div>
+
+        {/* Footer info lockup */}
+        <div className="pt-8 border-t border-amber-200/30 dark:border-amber-900/20 text-xs">
+          <p className="font-bold text-amber-950 dark:text-amber-200">Founder: Kalyan Gongidi</p>
+          <span className="text-amber-800/80 dark:text-amber-400/80">Contact Email: wrindhaos@gmail.com</span>
         </div>
       </motion.div>
     </div>
@@ -4253,57 +5531,260 @@ function DisclaimerView() {
 
 function TermsView() {
   return (
-    <div className="max-w-3xl mx-auto py-12">
+    <div className="max-w-3xl mx-auto py-12 px-4">
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="bg-white dark:bg-gray-900 p-12 rounded-[3.5rem] border border-gray-100 dark:border-gray-800 shadow-xl space-y-12"
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white dark:bg-gray-900 p-8 sm:p-12 rounded-[2.5rem] sm:rounded-[3.5rem] border border-gray-150 dark:border-gray-800/85 shadow-sm space-y-12"
       >
         <div className="text-center">
-          <Scale className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h1 className="text-4xl font-black dark:text-white">Terms & Conditions</h1>
-          <p className="text-gray-400 mt-2 font-medium uppercase tracking-widest text-[10px]">Your agreement with Wrindha OS</p>
+          <Scale className="w-12 h-12 text-indigo-600 dark:text-indigo-400 mx-auto mb-4" />
+          <h1 className="text-3xl sm:text-4xl font-black dark:text-white tracking-tight">Terms of Use</h1>
+          <p className="text-gray-400 mt-2 font-medium uppercase tracking-widest text-[9px] font-mono">By accessing and using WrindhaOS, you agree to comply with these Terms of Use.</p>
         </div>
 
-        <div className="space-y-8">
+        <div className="space-y-6">
+          {/* Item 1 */}
+          <div className="p-6 bg-gray-50 dark:bg-gray-850/50 rounded-2xl border border-gray-100 dark:border-gray-800/30">
+            <h3 className="font-extrabold text-base dark:text-white flex items-center gap-2 mb-2">
+              <span className="text-indigo-600 dark:text-indigo-400">01.</span> Account Responsibilities
+            </h3>
+            <p className="text-xs text-gray-550 dark:text-gray-450 leading-relaxed mb-3">Users must strictly fulfill these commitments:</p>
+            <ul className="space-y-2 pl-2">
+              {[
+                "Provide accurate, integral information during registration.",
+                "Maintain the precise security of their account credentials.",
+                "Be responsible for all activities executed under their registered account."
+              ].map(bullet => (
+                <li key={bullet} className="flex items-start gap-2 text-xs text-gray-500 dark:text-gray-400">
+                  <span className="text-indigo-500 font-bold mt-0.5">•</span>
+                  <span>{bullet}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Item 2 */}
+          <div className="p-6 bg-gray-50 dark:bg-gray-850/50 rounded-2xl border border-gray-100 dark:border-gray-800/30">
+            <h3 className="font-extrabold text-base dark:text-white flex items-center gap-2 mb-2">
+              <span className="text-indigo-600 dark:text-indigo-400">02.</span> Acceptable Use
+            </h3>
+            <p className="text-xs text-gray-550 dark:text-gray-450 leading-relaxed mb-3">You explicitly agree not to perform any of the following restricted actions:</p>
+            <ul className="space-y-2 pl-2">
+              {[
+                "Violate any applicable local, national, or international laws.",
+                "Attempt unauthorized access to our core database systems, user nodes, or API servers.",
+                "Distribute harmful software, malware, viruses, or malicious script content.",
+                "Abuse, exploit, spam, or otherwise misuse the productivity platform."
+              ].map(bullet => (
+                <li key={bullet} className="flex items-start gap-2 text-xs text-gray-500 dark:text-gray-400">
+                  <span className="text-red-500 font-bold mt-0.5">✕</span>
+                  <span>{bullet}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Item 3 */}
+          <div className="p-6 bg-gray-50 dark:bg-gray-850/50 rounded-2xl border border-gray-100 dark:border-gray-800/30">
+            <h3 className="font-extrabold text-base dark:text-white flex items-center gap-2 mb-2">
+              <span className="text-indigo-600 dark:text-indigo-400">03.</span> Intellectual Property
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+              All content, core features, interactive designs, branding assets, logos, databases, and software algorithms associated with WrindhaOS are the exclusive property of WrindhaOS unless otherwise explicitly stated.
+            </p>
+          </div>
+
+          {/* Item 4 */}
+          <div className="p-6 bg-gray-50 dark:bg-gray-850/50 rounded-2xl border border-gray-100 dark:border-gray-800/30">
+            <h3 className="font-extrabold text-base dark:text-white flex items-center gap-2 mb-2">
+              <span className="text-indigo-600 dark:text-indigo-400">04.</span> Subscription Services
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+              Access to premium, unrestricted analytic tools and modules requires a valid, active subscription. Feature rosters and subscription benefits may change over time to align with software development improvements.
+            </p>
+          </div>
+
+          {/* Item 5 */}
+          <div className="p-6 bg-gray-50 dark:bg-gray-850/50 rounded-2xl border border-gray-100 dark:border-gray-800/30">
+            <h3 className="font-extrabold text-base dark:text-white flex items-center gap-2 mb-2">
+              <span className="text-indigo-600 dark:text-indigo-400">05.</span> Account Suspension
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+              WrindhaOS reserves the absolute right to suspend, freeze, or terminate account nodes and subscription privileges that violate any of these established terms without delay.
+            </p>
+          </div>
+
+          {/* Item 6 */}
+          <div className="p-6 bg-gray-50 dark:bg-gray-850/50 rounded-2xl border border-gray-100 dark:border-gray-800/30">
+            <h3 className="font-extrabold text-base dark:text-white flex items-center gap-2 mb-2">
+              <span className="text-indigo-600 dark:text-indigo-400">06.</span> Limitation of Liability
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+              WrindhaOS and its founders shall not be held liable for any indirect, incidental, or consequential damages arising from the use or inability to use our productivity suite.
+            </p>
+          </div>
+        </div>
+
+        {/* Founder credentials bottom signature */}
+        <div className="pt-8 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-xs">
+          <div>
+            <p className="font-bold dark:text-white">Founder: Kalyan Gongidi</p>
+            <p className="text-gray-400 mt-0.5">Email: wrindhaos@gmail.com</p>
+          </div>
+          <p className="text-gray-400 max-w-xs text-[10px] text-right italic">
+            "By continuing to access and use the app, you unconditionally pledge compliance."
+          </p>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function RefundView() {
+  return (
+    <div className="max-w-3xl mx-auto py-12 px-4">
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white dark:bg-gray-900 p-8 sm:p-12 rounded-[2.5rem] sm:rounded-[3.5rem] border border-gray-150 dark:border-gray-800/85 shadow-sm space-y-10"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center gap-6 pb-8 border-b border-gray-100 dark:border-gray-800">
+          <div className="w-16 h-16 bg-rose-50 dark:bg-rose-950/40 rounded-[1.5rem] flex items-center justify-center shrink-0 border border-rose-100/50 dark:border-rose-900/30">
+            <RotateCcw className="w-8 h-8 text-rose-500" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-black dark:text-white">Refund Policy</h1>
+            <p className="text-gray-500 dark:text-gray-400 font-bold text-xs uppercase tracking-wider mt-1 font-mono">Thank you for subscribing to WrindhaOS.</p>
+          </div>
+        </div>
+
+        {/* Section 1: Refund Eligibility Cases */}
+        <section className="space-y-4">
+          <h2 className="text-lg font-bold dark:text-white flex items-center gap-2.5">
+            <div className="w-1.5 h-5 bg-indigo-600 rounded-full animate-pulse"></div>
+            Refund Eligibility
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-sm">
+            Refunds may be considered to restore user balances only under the following explicit criteria:
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {[
+              { title: "Duplicate Payment", desc: "Two or more charges made concurrently for the same subscription period." },
+              { title: "Incorrect Billing Amount", desc: "System errors resulting in billing rates deviating from published prices." },
+              { title: "Technical Issues", desc: "Severe faults preventing premium tier resource provisioning despite successful payment." }
+            ].map((elig, i) => (
+              <div key={i} className="p-5 bg-emerald-500/5 dark:bg-emerald-500-[0.02] border border-emerald-500/20 dark:border-emerald-500/10 rounded-2xl space-y-2">
+                <span className="text-[10px] uppercase tracking-wider font-extrabold text-emerald-600 font-mono">Case {i + 1}</span>
+                <h4 className="font-black dark:text-emerald-400 text-sm">{elig.title}</h4>
+                <p className="text-xs text-gray-550 dark:text-gray-450 leading-relaxed">{elig.desc}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Section 2: Non Eligibility Cases */}
+        <section className="space-y-4">
+          <h2 className="text-lg font-bold dark:text-white flex items-center gap-2.5">
+            <div className="w-1.5 h-5 bg-indigo-600 rounded-full"></div>
+            Non-Refundable Cases
+          </h2>
+          <p className="text-gray-650 dark:text-gray-400 leading-relaxed text-sm">
+            Due to digital delivery, refunds will generally not be provided for circumstances involving:
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-2">
+            {[
+              "Change of mind after active feature usage.",
+              "Partial or localized usage of the paid subscription period.",
+              "Failure to trigger the cancel action before recurring renewal dates.",
+              "General user dissatisfaction not associated directly with systematic technical issues."
+            ].map(item => (
+              <div key={item} className="flex items-start gap-2.5 text-xs text-gray-500 dark:text-gray-400">
+                <X className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Section 3: Timeline & Process */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+          <div className="p-6 bg-gray-50 dark:bg-gray-850/50 rounded-2xl border border-gray-100 dark:border-gray-800">
+            <h4 className="font-extrabold text-sm dark:text-white mb-2 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-gray-400" /> Refund Request Period
+            </h4>
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+              All formal refund queries must be submitted within <span className="font-bold text-gray-900 dark:text-white">7 days</span> of the initial payment transaction date.
+            </p>
+          </div>
+          <div className="p-6 bg-gray-50 dark:bg-gray-850/50 rounded-2xl border border-gray-100 dark:border-gray-800">
+            <h4 className="font-extrabold text-sm dark:text-white mb-2 flex items-center gap-2">
+              <RefreshCcw className="w-4 h-4 text-gray-400 animate-spin-slow" /> Approved Processing
+            </h4>
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+              Approved cases will be returned to the original checkout payment method within <span className="font-bold text-gray-900 dark:text-white">7–14 business days</span>.
+            </p>
+          </div>
+        </section>
+
+        {/* Contact info element */}
+        <div className="pt-8 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-xs">
+          <div>
+            <p className="font-bold dark:text-white">Founder: Kalyan Gongidi</p>
+            <p className="text-gray-400 mt-0.5">Email / Support Ticket: wrindhaos@gmail.com</p>
+          </div>
+          <a href="mailto:wrindhaos@gmail.com" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold uppercase tracking-widest text-[10px] shadow transition-transform active:scale-95 text-center">
+            Submit Refund Request
+          </a>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function CancellationView() {
+  return (
+    <div className="max-w-3xl mx-auto py-12 px-4">
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white dark:bg-gray-900 p-8 sm:p-12 rounded-[2.5rem] sm:rounded-[3.5rem] border border-gray-150 dark:border-gray-800/85 shadow-sm space-y-10"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center gap-6 pb-8 border-b border-gray-100 dark:border-gray-800">
+          <div className="w-16 h-16 bg-red-50 dark:bg-red-950/40 rounded-[1.5rem] flex items-center justify-center shrink-0 border border-red-100/50 dark:border-red-900/30">
+            <Ban className="w-8 h-8 text-red-500" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-black dark:text-white">Cancellation Policy</h1>
+            <p className="text-gray-500 dark:text-gray-400 font-medium text-xs uppercase tracking-wider mt-1">Manage, pause, or end subscriptions at any time.</p>
+          </div>
+        </div>
+
+        {/* Core Bullet Cards */}
+        <div className="space-y-4">
           {[
-            { 
-              title: "Lawful Usage", 
-              desc: "Use this website only for lawful purposes in accordance with local and international regulations.",
-              icon: Handshake
-            },
-            { 
-              title: "Acceptable Use", 
-              desc: "Do not attempt to misuse, copy, or disrupt our services or infrastructure.",
-              icon: X
-            },
-            { 
-              title: "Intellectual Property", 
-              desc: "All content, tools, and designs belong to Wrindha OS and its creators.",
-              icon: Lock
-            },
-            { 
-              title: "Modifications", 
-              desc: "We reserve the right to update or modify services and these terms without prior notice.",
-              icon: RefreshCcw
-            }
-          ].map((term, i) => (
-            <div key={i} className="flex gap-6 p-6 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-[2rem] transition-all group">
-              <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-800 border-2 border-transparent group-hover:border-indigo-600/30 flex items-center justify-center shrink-0 transition-all">
-                <term.icon className="w-5 h-5 text-gray-400 group-hover:text-indigo-600" />
+            { title: "Cancel at Your Discretion", desc: "Users may cancel their registered subscription at any time. There are no locking periods or cancellation fees.", icon: Handshake },
+            { title: "No Future Recurring Payments", desc: "Cancellation stops subsequent automated payments and cycles instantly.", icon: Ban },
+            { title: "Retain Workspace Access", desc: "Access to all premium features and custom analytics remains fully active until your current active billing period ends.", icon: Clock },
+            { title: "No Prorated Fees Return", desc: "No partial or prorated refunds will be issued for unused fragments of active subscription billing periods.", icon: RotateCcw },
+            { title: "Post Expiry Adjustments", desc: "Following actual subscription expiry, accounts will return to standard free tier limits until a renewal is completed.", icon: ShieldAlert }
+          ].map((item, index) => (
+            <div key={index} className="flex gap-5 p-5 bg-gray-50/50 dark:bg-gray-850/30 rounded-2xl border border-gray-100/50 dark:border-gray-800/20 hover:border-indigo-600/20 dark:hover:border-indigo-400/20 transition-all">
+              <div className="w-10 h-10 rounded-xl bg-white dark:bg-gray-850 shadow-xs flex items-center justify-center shrink-0 border border-gray-100 dark:border-gray-800 select-none">
+                <item.icon className="w-4 h-4 text-gray-400" />
               </div>
               <div className="space-y-1">
-                <h3 className="font-bold text-lg dark:text-gray-200">{term.title}</h3>
-                <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">{term.desc}</p>
+                <h4 className="font-extrabold text-sm dark:text-white">{item.title}</h4>
+                <p className="text-xs text-gray-550 dark:text-gray-400 leading-relaxed">{item.desc}</p>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="pt-8 border-t border-gray-50 dark:border-gray-800 text-center">
-          <p className="text-xs text-gray-400">
-            "Continued use of this website means acceptance of these terms."
-          </p>
+        {/* Founder signature info */}
+        <div className="pt-8 border-t border-gray-100 dark:border-gray-800 text-xs">
+          <p className="font-bold dark:text-white">Founder: Kalyan Gongidi</p>
+          <span className="text-gray-400">Email Contact: wrindhaos@gmail.com</span>
         </div>
       </motion.div>
     </div>
@@ -4565,15 +6046,42 @@ interface PricingViewProps {
   plans: PricingPlan[];
   subscriptionTier: string;
   onUpgrade: (userId: string, tier: string, habitsLimit: number, amountPaid?: string, planId?: string, paymentMethod?: string) => Promise<void>;
+  onCancelSubscription?: (userId: string) => Promise<void>;
   session: any;
   setActiveTab: (tab: string) => void;
   orders?: any[];
 }
 
-function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab, orders = [] }: PricingViewProps) {
+function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription, session, setActiveTab, orders = [] }: PricingViewProps) {
   const [upgradingTo, setUpgradingTo] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  const handleCancelClick = () => {
+    setShowCancelModal(true);
+  };
+
+  const handleCancelConfirm = async () => {
+    setCancelling(true);
+    setPaymentError(null);
+    try {
+      if (onCancelSubscription) {
+        const userId = session?.user?.id || 'local-user';
+        await onCancelSubscription(userId);
+      }
+      setHasPaidLocal(false);
+      setTrialEnd('1970-01-01T00:00:00Z');
+      setShowCancelModal(false);
+      setSuccessMsg("Successfully cancelled your subscription! Your active membership has been ended, and your workspace limits have been updated.");
+      setTimeout(() => setSuccessMsg(null), 6000);
+    } catch (err: any) {
+      setPaymentError(err.message || "Failed to cancel subscription. Please contact support.");
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   // Reactively mount Razorpay SDK script Client-Side
   useEffect(() => {
@@ -4594,17 +6102,114 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
   });
 
   const [trialStart, setTrialStart] = useState<string>(() => {
-    const key = session?.user?.id ? `wrindha_trial_start_${session.user.id}` : 'wrindha_trial_start_local';
-    return localStorage.getItem(key) || new Date().toISOString();
+    return localStorage.getItem('wrindha_trial_start_date') || new Date().toISOString();
+  });
+  const [trialEnd, setTrialEnd] = useState<string>(() => {
+    return localStorage.getItem('wrindha_trial_end_date') || new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+  });
+  const [hasPaidLocal, setHasPaidLocal] = useState<boolean>(() => {
+    return localStorage.getItem('wrindha_has_paid') === 'true';
   });
 
-  const trialStartDate = new Date(trialStart || new Date());
-  const trialEndDate = new Date(trialStartDate.getTime() + 5 * 24 * 60 * 60 * 1000);
+  const [typedCoupon, setTypedCoupon] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<any | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+
+  useEffect(() => {
+    setAppliedCoupon(null);
+    setTypedCoupon('');
+    setCouponError(null);
+  }, [billingPeriod, checkoutPlan?.id]);
+
+  const handleApplyCoupon = async () => {
+    const code = typedCoupon.trim().toUpperCase();
+    if (!code) {
+      setCouponError("Please type a coupon code.");
+      return;
+    }
+    if (!checkoutPlan) return;
+
+    setValidatingCoupon(true);
+    setCouponError(null);
+
+    const rawPrice = parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''));
+    const originalPrice = billingPeriod === 'yearly' 
+      ? Math.floor(rawPrice * 12 * 0.8) 
+      : rawPrice;
+
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          couponCode: code,
+          originalPrice
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAppliedCoupon(data);
+        setSuccessMsg(`Coupon "${data.couponCode}" successfully applied! ₹${data.discountAmount} saved.`);
+        setTimeout(() => setSuccessMsg(null), 4000);
+      } else {
+        setCouponError(data.message || "Invalid or inactive coupon code.");
+        setAppliedCoupon(null);
+      }
+    } catch (err: any) {
+      setCouponError("Error checking coupon validation with API.");
+      setAppliedCoupon(null);
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setTypedCoupon('');
+    setCouponError(null);
+  };
+
+  const trialStartDate = new Date(trialStart);
+  const trialEndDate = new Date(trialEnd);
   const msLeft = trialEndDate.getTime() - Date.now();
   const trialDaysLeft = Math.max(0, Math.ceil(msLeft / (24 * 60 * 60 * 1000)));
   const isTrialActive = msLeft > 0;
 
-  const isPremiumPaid = subscriptionTier.toLowerCase() === 'premium' || subscriptionTier.toLowerCase() === 'pro space' || subscriptionTier.toLowerCase() === 'ultimate matrix' || subscriptionTier.toLowerCase() === 'active';
+  const cancellationInfo = (() => {
+    if (!subscriptionTier || !subscriptionTier.includes('Cancelled:')) {
+      return { isCancelled: false, expiryDate: null };
+    }
+    try {
+      const parts = subscriptionTier.split('Cancelled:');
+      const expiryStr = parts[1];
+      return { isCancelled: true, expiryDate: new Date(expiryStr) };
+    } catch (e) {
+      return { isCancelled: true, expiryDate: new Date(0) };
+    }
+  })();
+
+  const isBillingPeriodActive = cancellationInfo.isCancelled && cancellationInfo.expiryDate
+    ? cancellationInfo.expiryDate.getTime() > Date.now()
+    : false;
+
+  const parsedCleanTier = subscriptionTier.includes('Cancelled:') 
+    ? 'premium' 
+    : subscriptionTier.toLowerCase();
+
+  const isPremiumPaid = (() => {
+    const isBasePremium = parsedCleanTier === 'premium' || 
+                          parsedCleanTier === 'pro space' || 
+                          parsedCleanTier === 'ultimate matrix' || 
+                          parsedCleanTier === 'active' || 
+                          hasPaidLocal;
+    
+    if (cancellationInfo.isCancelled) {
+      return isBillingPeriodActive;
+    }
+    return isBasePremium;
+  })();
+
   const hasActiveAccess = isPremiumPaid || isTrialActive;
 
   // Credit Card Form States
@@ -4621,8 +6226,8 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
   const [selectedUpiApp, setSelectedUpiApp] = useState<'gpay' | 'phonepe' | 'paytm' | 'bhim' | 'other'>('gpay');
   const [qrScanActive, setQrScanActive] = useState(false);
 
-  const activePlan = plans.find(p => p.name.toLowerCase() === subscriptionTier.toLowerCase());
-  const effectiveTier = (subscriptionTier === 'Free' || activePlan) ? subscriptionTier : 'Free';
+  const activePlan = plans.find(p => p.name.toLowerCase() === parsedCleanTier.toLowerCase());
+  const effectiveTier = (subscriptionTier === 'Free' || subscriptionTier.includes('Cancelled:') || activePlan) ? (subscriptionTier.includes('Cancelled:') ? 'Premium' : subscriptionTier) : 'Free';
 
   // Format Card Number
   const handleCardNumberChange = (value: string) => {
@@ -4679,6 +6284,8 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
         ? Math.floor(rawPrice * 12 * 0.8) 
         : rawPrice;
 
+      const finalPriceToOrder = appliedCoupon ? appliedCoupon.payableAmount : calculatedPrice;
+
       // 1. Call custom server endpoint to initial Razorpay order session
       const orderResponse = await fetch("/api/payments/razorpay/order", {
         method: "POST",
@@ -4686,7 +6293,8 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
         body: JSON.stringify({
           planName: checkoutPlan.name,
           amount: calculatedPrice,
-          currency: "INR"
+          currency: "INR",
+          couponCode: appliedCoupon ? appliedCoupon.couponCode : undefined
         })
       });
 
@@ -4722,7 +6330,12 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
                   razorpay_payment_id: razorpayResponse.razorpay_payment_id,
                   razorpay_order_id: razorpayResponse.razorpay_order_id,
                   razorpay_signature: razorpayResponse.razorpay_signature,
-                  isSandbox: false
+                  isSandbox: false,
+                  couponCode: appliedCoupon ? appliedCoupon.couponCode : undefined,
+                  userId: currentUserId,
+                  userEmail: session?.user?.email || "sandbox@wrindha.com",
+                  discountApplied: appliedCoupon ? appliedCoupon.discountAmount : 0,
+                  paidAmount: finalPriceToOrder
                 })
               });
 
@@ -4734,7 +6347,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
                   currentUserId, 
                   checkoutPlan.name, 
                   9999, 
-                  `${calculatedPrice}`, 
+                  `${finalPriceToOrder}`, 
                   checkoutPlan.id, 
                   `Razorpay Gateway (${razorpayResponse.razorpay_payment_id})`
                 );
@@ -4779,7 +6392,12 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
                 razorpay_payment_id: `pay_mock_${Math.random().toString(36).substring(2, 9)}`,
                 razorpay_order_id: orderData.orderId,
                 razorpay_signature: "mock_checksum",
-                isSandbox: true
+                isSandbox: true,
+                couponCode: appliedCoupon ? appliedCoupon.couponCode : undefined,
+                userId: currentUserId,
+                userEmail: session?.user?.email || "sandbox@wrindha.com",
+                discountApplied: appliedCoupon ? appliedCoupon.discountAmount : 0,
+                paidAmount: finalPriceToOrder
               })
             });
 
@@ -4794,7 +6412,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
               ? 'Razorpay Sandbox (UPI QR Scanner)' 
               : `Razorpay Sandbox (UPI ID: ${selectedUpiApp.toUpperCase()}: ${upiId})`;
 
-            await onUpgrade(currentUserId, checkoutPlan.name, 9999, `${calculatedPrice}`, checkoutPlan.id, methodLabel);
+            await onUpgrade(currentUserId, checkoutPlan.name, 9999, `${finalPriceToOrder}`, checkoutPlan.id, methodLabel);
             setUpgradingTo(null);
 
             setCheckoutStep(3); // Perfect
@@ -4849,40 +6467,75 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
               SaaS Credentials
             </span>
             <h3 className="text-2xl font-black dark:text-white mt-2">
-              {isPremiumPaid ? "Premium OS Lifetime Access" : isTrialActive ? `Active 5-Day Free Trial (${trialDaysLeft} days remaining)` : "Subscription Expired"}
+              {cancellationInfo.isCancelled 
+                ? "Premium OS (Cancelled)" 
+                : isPremiumPaid 
+                  ? "Premium OS Lifetime Access" 
+                  : isTrialActive 
+                    ? `Active 5-Day Free Trial (${trialDaysLeft} days remaining)` 
+                    : "Subscription Expired"}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-semibold">
-              {isPremiumPaid 
-                ? "You have fully unlocked the unconstrained Wrindha Premium OS tracking. Absolute data backup, unlimited habits, tasks, studies and timetables active." 
-                : isTrialActive 
-                  ? "You are currently enjoying your 5-day active trial of full premium workspace. No artificial limits or constraints are imposed. Secure your premium billing early to keep uninterrupted access!"
-                  : "Your free trial has expired. Subscribe to Wrindha Premium below for unlimited habits, tasks, budget tracking, and timetables."}
+              {cancellationInfo.isCancelled 
+                ? `Your subscription has been cancelled, but your premium access remains fully active until your billing period ends on ${nextRenewalDate}. After this date, your workspace will be locked unless you renew.`
+                : isPremiumPaid 
+                  ? "You have fully unlocked the unconstrained Wrindha Premium OS tracking. Absolute data backup, unlimited habits, tasks, studies and timetables active." 
+                  : isTrialActive 
+                    ? "You are currently enjoying your 5-day active trial of full premium workspace. No artificial limits or constraints are imposed. Secure your premium billing early to keep uninterrupted access!"
+                    : "Your free trial has expired. Subscribe to Wrindha Premium below for unlimited habits, tasks, budget tracking, and timetables."}
             </p>
           </div>
           
           {(isPremiumPaid || isTrialActive) && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-50 dark:border-gray-800/50">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-50 dark:border-gray-800/50 w-full">
               <div className="space-y-1">
                 <p className="text-[10px] uppercase font-bold text-gray-400">Automatic renewal billing status</p>
                 <div className="flex items-center gap-2">
                   <span className={cn(
                     "w-2 h-2 rounded-full animate-ping",
-                    autoRenew ? "bg-emerald-500" : "bg-orange-500"
+                    cancellationInfo.isCancelled ? "bg-red-500" : autoRenew ? "bg-emerald-500" : "bg-orange-500"
                   )}></span>
-                  <span className="text-xs font-black dark:text-white">{autoRenew ? 'ACTIVE (Charging Enabled)' : 'PAUSED'}</span>
-                  <button 
-                    onClick={toggleAutoRenew}
-                    className="ml-2 px-2 py-0.5 bg-gray-100 dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-[10px] font-bold uppercase rounded text-indigo-600 dark:text-indigo-400"
-                  >
-                    Toggle Billing
-                  </button>
+                  <span className="text-xs font-black dark:text-white">
+                    {cancellationInfo.isCancelled ? 'CANCELLED' : autoRenew ? 'ACTIVE (Charging Enabled)' : 'PAUSED'}
+                  </span>
+                  {!cancellationInfo.isCancelled && (
+                    <button 
+                      onClick={toggleAutoRenew}
+                      className="ml-2 px-2 py-0.5 bg-gray-100 dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-[10px] font-bold uppercase rounded text-indigo-600 dark:text-indigo-400"
+                    >
+                      Toggle Billing
+                    </button>
+                  )}
                 </div>
               </div>
 
               <div className="space-y-1">
-                <p className="text-[10px] uppercase font-bold text-gray-400">Next Scheduled Billed Cycle</p>
-                <p className="text-xs font-extrabold dark:text-white text-gray-800">{isPremiumPaid ? nextRenewalDate : "Trial access"}</p>
+                <p className="text-[10px] uppercase font-bold text-gray-400">Next Scheduled Billed Cycle / Expiration</p>
+                <p className="text-xs font-extrabold dark:text-white text-gray-800">
+                  {cancellationInfo.isCancelled ? `Expires on ${nextRenewalDate}` : isPremiumPaid ? nextRenewalDate : "Trial access"}
+                </p>
               </div>
+
+              {isPremiumPaid && (
+                <div className="sm:col-span-2 pt-4 border-t border-gray-50 dark:border-gray-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase font-bold text-rose-505">Subscription Actions</p>
+                    <p className="text-[11px] text-gray-400 leading-relaxed">
+                      {cancellationInfo.isCancelled 
+                        ? `This subscription will terminate on ${nextRenewalDate}. You can buy a plan below at any time to renew your subscription.` 
+                        : "You can cancel your active Premium OS membership at any time. This will instantly revert your account back to standard baseline limits."}
+                    </p>
+                  </div>
+                  {!cancellationInfo.isCancelled && (
+                    <button
+                      onClick={() => setShowCancelModal(true)}
+                      className="px-4 py-2 bg-rose-50 dark:bg-rose-950/20 hover:bg-rose-100 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-450 text-[10px] uppercase font-black tracking-widest rounded-xl transition-all border border-rose-100 dark:border-rose-900/30 shrink-0 select-none"
+                    >
+                      Cancel Subscription
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -4960,8 +6613,8 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {plans.map((p) => {
-          const isCurrent = subscriptionTier.toLowerCase() === p.name.toLowerCase();
+          {plans.map((p) => {
+          const isCurrent = parsedCleanTier.toLowerCase() === p.name.toLowerCase() && !cancellationInfo.isCancelled;
           
           // Apply annual discount calculation display
           const rawPrice = parseFloat(p.price.replace(/[^\d.]/g, ''));
@@ -5201,6 +6854,64 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
           </div>
         )}
       </AnimatePresence>
+      
+      {/* Cancellation Confirmation Modal */}
+      <AnimatePresence>
+        {showCancelModal && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/45 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-[2.5rem] p-8 border border-red-500/35 dark:border-red-900/40 shadow-2xl relative overflow-hidden"
+            >
+              <div className="flex justify-between items-start mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/20 border border-rose-100/50 dark:border-rose-900/30 flex items-center justify-center">
+                  <ShieldAlert className="w-6 h-6 text-rose-600 dark:text-rose-400" />
+                </div>
+                <button
+                  onClick={() => setShowCancelModal(false)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                >
+                  <X className="w-4 h-4 dark:text-gray-400" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-xl font-black dark:text-white">Cancel Subscription?</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-semibold">
+                  We are sorry to see you go! If you proceed with this cancellation, your registered profile will lose its premium features and return to standard limits.
+                </p>
+                <div className="p-4 bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200/50 dark:border-amber-900/20 rounded-2xl text-[11px] text-amber-800 dark:text-amber-400 leading-relaxed">
+                  <strong className="font-extrabold block mb-1">What will change immediately:</strong>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Habit tracking limit resets back to 5.</li>
+                    <li>Premium dashboard analytics are locked.</li>
+                    <li>Advanced study planners become restricted.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="space-y-2 mt-6">
+                <button
+                  disabled={cancelling}
+                  onClick={handleCancelConfirm}
+                  className="w-full py-3.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-extrabold uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-md text-center"
+                >
+                  {cancelling ? "Processing Cancellation..." : "Yes, Cancel Membership"}
+                </button>
+                <button
+                  disabled={cancelling}
+                  onClick={() => setShowCancelModal(false)}
+                  className="w-full py-3.5 bg-gray-150 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-extrabold rounded-xl text-[10px] uppercase tracking-widest transition-colors text-center shadow-sm border border-gray-200 dark:border-gray-700/50"
+                >
+                  No, Keep Premium Access
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Stripe Sandbox Checkout modal */}
       <AnimatePresence>
@@ -5255,12 +6966,28 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
                     <div className="h-[1px] bg-gray-200 dark:bg-gray-850/60 my-2"></div>
                     <div className="flex justify-between items-baseline pt-1">
                       <span className="text-sm font-black dark:text-white">Authorized Total Paid:</span>
-                      <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400 font-mono">
-                        {checkoutPlan.price.startsWith('₹') ? '₹' : checkoutPlan.price.startsWith('$') ? '$' : '₹'}
-                        {billingPeriod === 'yearly' 
-                          ? Math.floor(parseFloat(checkoutPlan.price.replace(/[^\d.]/g, '')) * 12 * 0.8)
-                          : parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''))}
-                      </span>
+                      <div className="text-right">
+                        {appliedCoupon ? (
+                          <>
+                            <span className="text-xs line-through text-gray-400 mr-2 font-mono">
+                              ₹{billingPeriod === 'yearly'
+                                ? Math.floor(parseFloat(checkoutPlan.price.replace(/[^\d.]/g, '')) * 12 * 0.8)
+                                : parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''))}
+                            </span>
+                            <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                              ₹{appliedCoupon.payableAmount}
+                            </span>
+                            <p className="text-[10px] text-emerald-500 font-extrabold mt-0.5">₹{appliedCoupon.discountAmount} Coupon Saved!</p>
+                          </>
+                        ) : (
+                          <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400 font-mono">
+                            {checkoutPlan.price.startsWith('₹') ? '₹' : checkoutPlan.price.startsWith('$') ? '$' : '₹'}
+                            {billingPeriod === 'yearly' 
+                              ? Math.floor(parseFloat(checkoutPlan.price.replace(/[^\d.]/g, '')) * 12 * 0.8)
+                              : parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''))}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -5323,6 +7050,65 @@ function PricingView({ plans, subscriptionTier, onUpgrade, session, setActiveTab
                         {paymentError}
                       </div>
                     )}
+
+                    {/* Secure Coupon Code Input Section */}
+                    <div className="bg-gradient-to-r from-gray-50 to-indigo-50/20 dark:from-gray-950 dark:to-indigo-950/10 p-3.5 rounded-2xl border border-gray-150 dark:border-gray-800/80 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1">
+                          <Tag className="w-3 h-3 text-indigo-500" /> Apply Promo Code / Coupon
+                        </span>
+                        {appliedCoupon && (
+                          <span className="text-[9px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">
+                            ACTIVE
+                          </span>
+                        )}
+                      </div>
+
+                      {appliedCoupon ? (
+                        <div className="flex items-center justify-between bg-emerald-500/5 border border-emerald-500/25 p-2 rounded-xl">
+                          <div className="space-y-0.5">
+                            <p className="text-xs font-black text-emerald-600 dark:text-emerald-400 tracking-wide font-mono">
+                              {appliedCoupon.couponCode}
+                            </p>
+                            <p className="text-[10px] text-gray-500 font-medium">
+                              {appliedCoupon.description}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={removeCoupon}
+                            className="bg-transparent hover:bg-red-500/10 p-1 text-gray-400 hover:text-red-500 rounded-lg transition-colors text-xs font-bold"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Promo / Coupon Code"
+                            value={typedCoupon}
+                            onChange={(e) => {
+                              setTypedCoupon(e.target.value);
+                              setCouponError(null);
+                            }}
+                            className="flex-1 py-1.5 px-3 bg-white dark:bg-gray-90% border border-gray-200 dark:border-gray-850 rounded-xl outline-none text-xs font-mono font-bold dark:text-white uppercase placeholder-gray-400 focus:border-indigo-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleApplyCoupon}
+                            disabled={validatingCoupon}
+                            className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-colors shadow-sm"
+                          >
+                            {validatingCoupon ? "Checking..." : "Apply"}
+                          </button>
+                        </div>
+                      )}
+
+                      {couponError && (
+                        <p className="text-[10px] text-red-500 font-bold tracking-wide animate-pulse">{couponError}</p>
+                      )}
+                    </div>
 
                     <div className="space-y-4 animate-fadeIn">
                       {/* UPI Payment selector type tab */}
