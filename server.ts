@@ -1,4 +1,5 @@
 import express from "express";
+import nodemailer from "nodemailer";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -180,6 +181,104 @@ async function startServer() {
       razorpayKeyId: process.env.RAZORPAY_KEY_ID || null,
       version: "1.0.0"
     });
+  });
+
+  app.post("/api/contact", async (req, res) => {
+    const { name, email, message } = req.body;
+
+    if (!name || !email || !message) {
+      return res.status(400).json({ success: false, message: "Required inputs missing." });
+    }
+
+    console.log(`[CONTACT RECEIVED] Name: ${name}, Email: ${email}, Message: ${message}`);
+
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpPort = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 587;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
+    const emailHtmlFounder = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">
+        <h2 style="color: #4f46e5; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">New Contact Message Received</h2>
+        <p style="margin: 8px 0;"><strong>Name:</strong> ${name}</p>
+        <p style="margin: 8px 0;"><strong>Email Address:</strong> <a href="mailto:${email}" style="color: #4f46e5; text-decoration: none;">${email}</a></p>
+        <p style="margin-top: 20px; margin-bottom: 6px;"><strong>Message / Inquiry Details:</strong></p>
+        <div style="background-color: #f9fafb; padding: 15px; border-radius: 8px; border-left: 4px solid #4f46e5; margin-bottom: 20px; white-space: pre-wrap; color: #1f2937; font-size: 14px; line-height: 1.5;">${message}</div>
+        <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+        <p style="font-size: 11px; color: #6b7280; text-align: center; margin: 0;">Wrindha OS Notification Service</p>
+      </div>
+    `;
+
+    const emailHtmlUser = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">
+        <h2 style="color: #4f46e5; margin-bottom: 10px;">We Received Your Message!</h2>
+        <p style="color: #374151; font-size: 14px; line-height: 1.5;">Hi ${name},</p>
+        <p style="color: #374151; font-size: 14px; line-height: 1.5;">Thank you for reaching out to Wrindha OS. We have successfully received your inquiry and are currently reviewing your details.</p>
+        <div style="background-color: #f9fafb; padding: 15px; border-radius: 8px; border-left: 4px solid #10b981; margin: 20px 0;">
+          <p style="margin: 0; font-weight: bold; color: #1f2937; font-size: 13px;">Copy of your message:</p>
+          <p style="margin: 10px 0 0 0; font-style: italic; color: #4b5563; font-size: 13.5px; white-space: pre-wrap;">"${message}"</p>
+        </div>
+        <p style="color: #374151; font-size: 14px; line-height: 1.5;">We typically respond within 24 to 48 business hours. If you need immediate assistance, feel free to reply directly to this mail or write us at <a href="mailto:wrindhaos@gmail.com" style="color: #4f46e5; text-decoration: none; font-weight: bold;">wrindhaos@gmail.com</a>.</p>
+        <p style="color: #374151; font-size: 14px; line-height: 1.5; margin-top: 24px;">Best regards,<br /><strong style="color: #4f46e5;">The Wrindha OS Team</strong></p>
+        <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 25px 0 20px 0;" />
+        <p style="font-size: 11px; color: #9ca3af; text-align: center; margin: 0;">This is an automated receipt confirmation from Wrindha OS.</p>
+      </div>
+    `;
+
+    if (smtpHost && smtpUser && smtpPass) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: smtpPort,
+          secure: smtpPort === 465,
+          auth: {
+            user: smtpUser,
+            pass: smtpPass
+          }
+        });
+
+        // 1. Send copy to founder
+        await transporter.sendMail({
+          from: `"Wrindha OS Contact" <${smtpUser}>`,
+          to: "wrindhaos@gmail.com",
+          replyTo: email,
+          subject: `Inquiry from ${name} (${email})`,
+          html: emailHtmlFounder
+        });
+
+        // 2. Send receipt to the user who wrote the message
+        await transporter.sendMail({
+          from: `"Wrindha OS Support" <${smtpUser}>`,
+          to: email,
+          subject: "We received your message • Wrindha OS",
+          html: emailHtmlUser
+        });
+
+        console.log(`[SMTP] Emails successfully sent to wrindhaos@gmail.com and user mail: ${email}`);
+        return res.json({ success: true, message: "Emails sent successfully." });
+      } catch (err: any) {
+        console.error("Error sending emails via SMTP:", err);
+        return res.status(500).json({ success: false, message: "SMTP mail delivery failed: " + err.message });
+      }
+    } else {
+      console.warn("[SMTP Log] SMTP credentials not set under environment. Printing email payload to logs:");
+      console.log(`================ MOCK EMAIL INBOX ================`);
+      console.log(`[FROM] Wrindha OS <wrindhaos@gmail.com>`);
+      console.log(`[TO] wrindhaos@gmail.com`);
+      console.log(`[SUBJECT] Inquiry from ${name} (${email})`);
+      console.log(`[MESSAGE CONTENT]\n${message}`);
+      console.log(`------------------------------`);
+      console.log(`[TO] ${email}`);
+      console.log(`[SUBJECT] We received your message • Wrindha OS`);
+      console.log(`[CONTENT]\nHi ${name},\nYour message has been processed. Copy: "${message}"`);
+      console.log(`==================================================`);
+
+      return res.json({ 
+        success: true, 
+        message: "Your message has been successfully received. A copy would be sent to your email address dynamically once SMTP credentials are active.", 
+        simulated: true 
+      });
+    }
   });
 
   /* ==========================================

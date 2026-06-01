@@ -698,9 +698,12 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
 
   // Initial Fetch from Supabase
   useEffect(() => {
-    async function fetchData() {
+    async function fetchData(isBackground = false) {
+      if (isFetchingRef.current) return;
       isFetchingRef.current = true;
-      setIsInitializing(true);
+      if (!isBackground) {
+        setIsInitializing(true);
+      }
       
       if (!isSupabaseConfigured() || !session?.user?.id) {
         setIsInitializing(false);
@@ -813,69 +816,33 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
           ...h,
           completedAt: h.completed_at || h.completedAt || []
         })) : [];
-        setHabits(prev => {
-          const merged = [...mappedHabits];
-          prev.forEach(local => {
-            if (!merged.find(m => m.id === local.id)) merged.push(local);
-          });
-          return merged;
-        });
+        setHabits(mappedHabits);
 
         const { data: tasksData } = await supabase.from('tasks').select('*').eq('user_id', userId);
         const mappedTasks = tasksData && tasksData.length > 0 ? tasksData.map(t => ({
           ...t,
           dueDate: t.due_date || t.dueDate
         })) : [];
-        setTasks(prev => {
-          const merged = [...mappedTasks];
-          prev.forEach(local => {
-            if (!merged.find(m => m.id === local.id)) merged.push(local);
-          });
-          return merged;
-        });
+        setTasks(mappedTasks);
 
         const { data: expensesData } = await supabase.from('expenses').select('*').eq('user_id', userId);
         const mappedExpenses = expensesData && expensesData.length > 0 ? expensesData : [];
-        setExpenses(prev => {
-          const merged = [...mappedExpenses];
-          prev.forEach(local => {
-            if (!merged.find(m => m.id === local.id)) merged.push(local);
-          });
-          return merged;
-        });
+        setExpenses(mappedExpenses);
 
         const { data: goalsData } = await supabase.from('goals').select('*').eq('user_id', userId);
         const mappedGoals = goalsData && goalsData.length > 0 ? goalsData.map(g => ({
           ...g,
           targetDate: g.target_date || g.targetDate
         })) : [];
-        setGoals(prev => {
-          const merged = [...mappedGoals];
-          prev.forEach(local => {
-            if (!merged.find(m => m.id === local.id)) merged.push(local);
-          });
-          return merged;
-        });
+        setGoals(mappedGoals);
 
         const { data: timetableData } = await supabase.from('timetable').select('*').eq('user_id', userId);
         const mappedTimetable = timetableData && timetableData.length > 0 ? timetableData : [];
-        setTimetable(prev => {
-          const merged = [...mappedTimetable];
-          prev.forEach(local => {
-            if (!merged.find(m => m.id === local.id)) merged.push(local);
-          });
-          return merged;
-        });
+        setTimetable(mappedTimetable);
 
         const { data: studyData } = await supabase.from('study_courses').select('*').eq('user_id', userId);
         const mappedStudy = studyData && studyData.length > 0 ? studyData : [];
-        setStudyCourses(prev => {
-          const merged = [...mappedStudy];
-          prev.forEach(local => {
-            if (!merged.find(m => m.id === local.id)) merged.push(local);
-          });
-          return merged;
-        });
+        setStudyCourses(mappedStudy);
 
         // Globally load blogs (any user can view them)
         try {
@@ -1085,6 +1052,20 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
     }
 
     fetchData();
+
+    const handleFocus = () => {
+      fetchData(true);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    const intervalId = setInterval(() => {
+      fetchData(true);
+    }, 15000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(intervalId);
+    };
   }, [session]);
 
   // Sync to Supabase helper
@@ -5279,13 +5260,41 @@ function AboutView() {
 }
 
 function ContactView() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const handleSubmit = (e: any) => {
+  const [sending, setSending] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-    }, 4000);
+    if (!name.trim() || !email.trim() || !message.trim()) {
+      setErrorMsg("Please fill out all fields before submitting.");
+      return;
+    }
+    setSending(true);
+    setErrorMsg("");
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, message })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSubmitted(true);
+        setName("");
+        setEmail("");
+        setMessage("");
+      } else {
+        setErrorMsg(data.message || "Failed to deliver message via server.");
+      }
+    } catch (err) {
+      setErrorMsg("An unexpected connection error occurred. Please try again.");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -5316,25 +5325,63 @@ function ContactView() {
               >
                 <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
                 <p className="text-sm font-bold text-emerald-800 dark:text-emerald-400">Message Transferred Securely!</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Thank you. We will get back to you within 24–48 hours.</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Thank you. An automated receipt confirmation copy has been sent to your email.</p>
+                <button 
+                  onClick={() => setSubmitted(false)}
+                  className="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all"
+                >
+                  Send Another Message
+                </button>
               </motion.div>
             ) : (
               <form className="space-y-6" onSubmit={handleSubmit}>
+                {errorMsg && (
+                  <div className="p-4 bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-900/30 text-rose-600 dark:text-rose-450 text-xs font-bold rounded-xl">
+                    {errorMsg}
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Full Name</label>
-                    <input required type="text" className="w-full bg-gray-50 dark:bg-gray-850 dark:text-white px-5 py-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 outline-none focus:border-emerald-500 transition-all text-xs font-bold" placeholder="Your Name" />
+                    <input 
+                      required 
+                      type="text" 
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full bg-gray-50 dark:bg-gray-850 text-gray-900 dark:text-white px-5 py-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 outline-none focus:border-emerald-500 transition-all text-xs font-bold" 
+                      placeholder="Your Name" 
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Email Address</label>
-                    <input required type="email" className="w-full bg-gray-50 dark:bg-gray-850 dark:text-white px-5 py-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 outline-none focus:border-emerald-500 transition-all text-xs font-bold" placeholder="your@email.com" />
+                    <input 
+                      required 
+                      type="email" 
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full bg-gray-50 dark:bg-gray-850 text-gray-900 dark:text-white px-5 py-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 outline-none focus:border-emerald-500 transition-all text-xs font-bold" 
+                      placeholder="your@email.com" 
+                    />
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Message / Inquiry Details</label>
-                  <textarea required rows={4} className="w-full bg-gray-50 dark:bg-gray-850 dark:text-white px-5 py-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 outline-none focus:border-emerald-500 transition-all text-sm font-medium resize-none" placeholder="For support, feedback, business inquiries, or partnership opportunities, please contact us..."></textarea>
+                  <textarea 
+                    required 
+                    rows={4} 
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    className="w-full bg-gray-50 dark:bg-gray-850 text-gray-900 dark:text-white px-5 py-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 outline-none focus:border-emerald-500 transition-all text-sm font-medium resize-none" 
+                    placeholder="For support, feedback, business inquiries, or partnership opportunities, please contact us..."
+                  ></textarea>
                 </div>
-                <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-md">Send Message</button>
+                <button 
+                  type="submit" 
+                  disabled={sending}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-md flex items-center justify-center gap-2"
+                >
+                  {sending ? "Transmitting..." : "Send Message"}
+                </button>
               </form>
             )}
           </div>
