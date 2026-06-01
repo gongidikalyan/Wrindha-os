@@ -100,6 +100,17 @@ export default function CareerPlannerView({
   const [supabaseLoading, setSupabaseLoading] = useState(true);
   const [supabaseErrorState, setSupabaseErrorState] = useState<string | null>(null);
 
+  // Safe custom notification and confirmation states
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (syncToast) {
+      const timer = setTimeout(() => setSyncToast(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [syncToast]);
+
   // Local active trajectory state
   const [activePath, setActivePath] = useState<CareerPath | null>(() => {
     const saved = localStorage.getItem("wrindha_active_career_path");
@@ -587,25 +598,24 @@ export default function CareerPlannerView({
   };
 
   const clearPlanner = () => {
-    if (window.confirm("Are you sure you want to delete this career strategy roadmap?")) {
-      setActivePath(null);
-      setMilestones([]);
-      setSkills([]);
-      setPlanData({
-        roadmap: [],
-        certifications: [],
-        experience_requirements: "",
-        books_and_resources: [],
-        projects_to_complete: [],
-        monthly_learning_targets: [],
-        gap_analysis: {
-          current_state: "",
-          desired_state: "",
-          missing_experience: "",
-          suggested_actions: []
-        }
-      });
-    }
+    setActivePath(null);
+    setMilestones([]);
+    setSkills([]);
+    setPlanData({
+      roadmap: [],
+      certifications: [],
+      experience_requirements: "",
+      books_and_resources: [],
+      projects_to_complete: [],
+      monthly_learning_targets: [],
+      gap_analysis: {
+        current_state: "",
+        desired_state: "",
+        missing_experience: "",
+        suggested_actions: []
+      }
+    });
+    setSyncToast("Career trajectory plan reset completed successfully.");
   };
 
   // Integrations mapping sync to other modules
@@ -620,7 +630,7 @@ export default function CareerPlannerView({
       tags: ["Career"]
     };
     setTasks(prev => [...prev, newTask]);
-    alert(`"${title}" synchronized into your Eisenhower Matrix under "Important, Not Urgent"!`);
+    setSyncToast(`"${title}" synchronized into your Eisenhower Matrix!`);
   };
 
   const handleAddHabitIntegration = (habitName: string) => {
@@ -633,7 +643,7 @@ export default function CareerPlannerView({
       color: "bg-indigo-500"
     };
     setHabits(prev => [...prev, newHabit]);
-    alert(`"${habitName}" added to daily Habits routine!`);
+    setSyncToast(`"${habitName}" added to daily Habits routine!`);
   };
 
   const handleAddStudyCourseIntegration = (courseName: string, notes: string) => {
@@ -648,11 +658,26 @@ export default function CareerPlannerView({
       ]
     };
     setStudyCourses(prev => [...prev, newCourse]);
-    alert(`"${courseName}" created inside Study Planner courses database successfully!`);
+    setSyncToast(`"${courseName}" created inside Study Planner courses successfully!`);
   };
 
   return (
-    <div className="space-y-8" id="career-planner-module">
+    <div className="space-y-8 relative" id="career-planner-module">
+      {/* Dynamic Custom Toast Alert */}
+      <AnimatePresence>
+        {syncToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-6 right-6 z-50 flex items-center gap-2.5 bg-indigo-600 dark:bg-indigo-950 text-white px-4 py-3 rounded-2xl shadow-2xl border border-indigo-500/20 max-w-sm"
+          >
+            <CheckCircle className="w-4 h-4 text-emerald-450 shrink-0" />
+            <span className="text-xs font-black leading-tight">{syncToast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {!activePath ? (
         <motion.div 
           initial={{ opacity: 0, y: 15 }}
@@ -785,12 +810,33 @@ export default function CareerPlannerView({
               </div>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <button 
-                onClick={clearPlanner}
-                className="flex items-center gap-1.5 px-4 py-3 border border-red-200 dark:border-red-950/50 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 text-xs font-black rounded-xl transition-colors cursor-pointer"
-              >
-                <Trash2 className="w-4 h-4" /> Reset Trajectory
-              </button>
+              {showResetConfirm ? (
+                <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-901/40 p-1.5 rounded-xl">
+                  <span className="text-[10px] font-black text-red-650 dark:text-red-405 pl-2 uppercase">Confirm reset?</span>
+                  <button
+                    onClick={() => {
+                      clearPlanner();
+                      setShowResetConfirm(false);
+                    }}
+                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black rounded-lg transition-colors cursor-pointer"
+                  >
+                    Yes, Reset
+                  </button>
+                  <button
+                    onClick={() => setShowResetConfirm(false)}
+                    className="px-3 py-1.5 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-[10px] font-black rounded-lg transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => setShowResetConfirm(true)}
+                  className="flex items-center gap-1.5 px-4 py-3 border border-red-200 dark:border-red-950/50 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 text-xs font-black rounded-xl transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" /> Reset Trajectory
+                </button>
+              )}
             </div>
           </div>
 
