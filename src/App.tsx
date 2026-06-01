@@ -5293,7 +5293,7 @@ function ContactView() {
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
               <div className="p-6 bg-gray-50 dark:bg-gray-850 rounded-2xl border border-gray-100 dark:border-gray-800/50 hover:border-indigo-500/30 transition-all">
-                <p className="text-[10px] font-black uppercase tracking-widest text-[#6B7280] mb-2">Email Address</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">Email Address</p>
                 <a 
                   href="mailto:wrindhaos@gmail.com" 
                   className="text-lg font-black text-indigo-600 dark:text-indigo-400 hover:underline font-mono"
@@ -5302,8 +5302,8 @@ function ContactView() {
                 </a>
               </div>
               <div className="p-6 bg-gray-50 dark:bg-gray-850 rounded-2xl border border-gray-100 dark:border-gray-800/50 hover:border-indigo-500/30 transition-all">
-                <p className="text-[10px] font-black uppercase tracking-widest text-[#6B7280] mb-2">Founder</p>
-                <p className="text-lg font-black text-gray-800 dark:text-gray-100 tracking-tight">
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">Founder</p>
+                <p className="text-lg font-black text-indigo-600 dark:text-indigo-400 tracking-tight">
                   Kalyan Gongidi
                 </p>
               </div>
@@ -5315,52 +5315,52 @@ function ContactView() {
             
             {/* Technical Support */}
             <div className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] border border-gray-150 dark:border-gray-800/80 shadow-xs space-y-4">
-              <div className="flex items-center gap-2.5 text-rose-550 dark:text-rose-400">
+              <div className="flex items-center gap-2.5 text-rose-600 dark:text-rose-400">
                 <div className="p-2 bg-rose-50 dark:bg-rose-950/30 rounded-xl">
                   <Flame className="w-5 h-5" />
                 </div>
-                <h4 className="font-extrabold text-base dark:text-white text-gray-800">Support</h4>
+                <h4 className="font-extrabold text-base dark:text-white text-gray-800 font-sans">Support</h4>
               </div>
-              <p className="text-sm text-[#4B5563] dark:text-gray-400 leading-relaxed">
+              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed font-sans">
                 If you're experiencing any issues with your account, subscription, payments, or platform features, please contact our support team via email. We aim to respond to all inquiries as quickly as possible.
               </p>
             </div>
 
             {/* Feedback & Suggestions */}
             <div className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] border border-gray-150 dark:border-gray-800/80 shadow-xs space-y-4">
-              <div className="flex items-center gap-2.5 text-emerald-550 dark:text-emerald-400">
+              <div className="flex items-center gap-2.5 text-emerald-600 dark:text-emerald-400">
                 <div className="p-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl">
                   <Sparkles className="w-5 h-5" />
                 </div>
-                <h4 className="font-extrabold text-base dark:text-white text-gray-800">Feedback & Suggestions</h4>
+                <h4 className="font-extrabold text-base dark:text-white text-gray-800 font-sans">Feedback & Suggestions</h4>
               </div>
-              <p className="text-sm text-[#4B5563] dark:text-gray-400 leading-relaxed">
+              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed font-sans">
                 Your feedback helps us improve WrindhaOS. If you have ideas for new features, improvements, or would like to share your experience, feel free to reach out.
               </p>
             </div>
 
             {/* Business Partnerships */}
             <div className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] border border-gray-150 dark:border-gray-800/80 shadow-xs space-y-4">
-              <div className="flex items-center gap-2.5 text-cyan-550 dark:text-cyan-400">
+              <div className="flex items-center gap-2.5 text-cyan-600 dark:text-cyan-400">
                 <div className="p-2 bg-cyan-50 dark:bg-cyan-950/30 rounded-xl">
                   <Award className="w-5 h-5" />
                 </div>
-                <h4 className="font-extrabold text-base dark:text-white text-gray-800">Business & Partnership Inquiries</h4>
+                <h4 className="font-extrabold text-base dark:text-white text-gray-800 font-sans">Business & Partnership Inquiries</h4>
               </div>
-              <p className="text-sm text-[#4B5563] dark:text-gray-400 leading-relaxed">
+              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed font-sans">
                 For collaborations, partnerships, promotional opportunities, or business-related discussions, please contact us through our official email address.
               </p>
             </div>
 
             {/* Response Time */}
             <div className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] border border-gray-150 dark:border-gray-800/80 shadow-xs space-y-4">
-              <div className="flex items-center gap-2.5 text-amber-550 dark:text-amber-400">
+              <div className="flex items-center gap-2.5 text-amber-600 dark:text-amber-400">
                 <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-xl">
                   <Clock className="w-5 h-5" />
                 </div>
-                <h4 className="font-extrabold text-base dark:text-white text-gray-800">Response Time</h4>
+                <h4 className="font-extrabold text-base dark:text-white text-gray-800 font-sans">Response Time</h4>
               </div>
-              <p className="text-sm text-[#4B5563] dark:text-gray-400 leading-relaxed">
+              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed font-sans">
                 We strive to respond to all emails within <span className="text-indigo-600 dark:text-indigo-400 font-extrabold font-mono">24–48</span> business hours.
               </p>
             </div>
@@ -5712,10 +5712,10 @@ function RefundView() {
               { title: "Incorrect Billing Amount", desc: "System errors resulting in billing rates deviating from published prices." },
               { title: "Technical Issues", desc: "Severe faults preventing premium tier resource provisioning despite successful payment." }
             ].map((elig, i) => (
-              <div key={i} className="p-5 bg-emerald-500/5 dark:bg-emerald-500-[0.02] border border-emerald-500/20 dark:border-emerald-500/10 rounded-2xl space-y-2">
+              <div key={i} className="p-5 bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/20 dark:border-emerald-500/10 rounded-2xl space-y-2">
                 <span className="text-[10px] uppercase tracking-wider font-extrabold text-emerald-600 font-mono">Case {i + 1}</span>
                 <h4 className="font-black dark:text-emerald-400 text-sm">{elig.title}</h4>
-                <p className="text-xs text-gray-550 dark:text-gray-450 leading-relaxed">{elig.desc}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{elig.desc}</p>
               </div>
             ))}
           </div>
@@ -5727,7 +5727,7 @@ function RefundView() {
             <div className="w-1.5 h-5 bg-indigo-600 rounded-full"></div>
             Non-Refundable Cases
           </h2>
-          <p className="text-gray-650 dark:text-gray-400 leading-relaxed text-sm">
+          <p className="text-gray-600 dark:text-gray-400 leading-relaxed text-sm">
             Due to digital delivery, refunds will generally not be provided for circumstances involving:
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-2">
@@ -5768,8 +5768,8 @@ function RefundView() {
         {/* Contact info element */}
         <div className="pt-8 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-xs">
           <div>
-            <p className="font-bold dark:text-white">Founder: Kalyan Gongidi</p>
-            <p className="text-gray-400 mt-0.5">Email / Support Ticket: wrindhaos@gmail.com</p>
+            <p className="font-bold dark:text-white">Founder: <span className="text-indigo-600 dark:text-indigo-400 font-extrabold">Kalyan Gongidi</span></p>
+            <p className="text-gray-500 dark:text-gray-400 mt-0.5">Email / Support Ticket: <a href="mailto:wrindhaos@gmail.com" className="hover:underline text-indigo-600 dark:text-indigo-400 font-semibold font-mono">wrindhaos@gmail.com</a></p>
           </div>
           <a href="mailto:wrindhaos@gmail.com" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold uppercase tracking-widest text-[10px] shadow transition-transform active:scale-95 text-center">
             Submit Refund Request
@@ -5807,22 +5807,22 @@ function CancellationView() {
             { title: "No Prorated Fees Return", desc: "No partial or prorated refunds will be issued for unused fragments of active subscription billing periods.", icon: RotateCcw },
             { title: "Post Expiry Adjustments", desc: "Following actual subscription expiry, accounts will return to standard free tier limits until a renewal is completed.", icon: ShieldAlert }
           ].map((item, index) => (
-            <div key={index} className="flex gap-5 p-5 bg-gray-50/50 dark:bg-gray-850/30 rounded-2xl border border-gray-100/50 dark:border-gray-800/20 hover:border-indigo-600/20 dark:hover:border-indigo-400/20 transition-all">
-              <div className="w-10 h-10 rounded-xl bg-white dark:bg-gray-850 shadow-xs flex items-center justify-center shrink-0 border border-gray-100 dark:border-gray-800 select-none">
+            <div key={index} className="flex gap-5 p-5 bg-gray-50/50 dark:bg-gray-800/20 rounded-2xl border border-gray-100/50 dark:border-gray-800/20 hover:border-indigo-600/20 dark:hover:border-indigo-400/20 transition-all">
+              <div className="w-10 h-10 rounded-xl bg-white dark:bg-gray-800 shadow-xs flex items-center justify-center shrink-0 border border-gray-100 dark:border-gray-800 select-none">
                 <item.icon className="w-4 h-4 text-gray-400" />
               </div>
               <div className="space-y-1">
                 <h4 className="font-extrabold text-sm dark:text-white">{item.title}</h4>
-                <p className="text-xs text-gray-550 dark:text-gray-400 leading-relaxed">{item.desc}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{item.desc}</p>
               </div>
             </div>
           ))}
         </div>
 
         {/* Founder signature info */}
-        <div className="pt-8 border-t border-gray-100 dark:border-gray-800 text-xs">
-          <p className="font-bold dark:text-white">Founder: Kalyan Gongidi</p>
-          <span className="text-gray-400">Email Contact: wrindhaos@gmail.com</span>
+        <div className="pt-8 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400">
+          <p className="font-bold">Founder: <span className="text-indigo-600 dark:text-indigo-400 font-extrabold">Kalyan Gongidi</span></p>
+          <span className="mt-0.5 block">Email Contact: <a href="mailto:wrindhaos@gmail.com" className="hover:underline text-indigo-600 dark:text-indigo-400 font-semibold font-mono">wrindhaos@gmail.com</a></span>
         </div>
       </motion.div>
     </div>
