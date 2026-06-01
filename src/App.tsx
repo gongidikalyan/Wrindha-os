@@ -123,6 +123,7 @@ export default function App() {
   }, [showProfileMenu]);
 
   const [session, setSession] = useState<any>(null);
+  const isAdmin = session?.user?.email === 'gongidikalyan08@gmail.com';
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
   const [isPasswordRecoveryActive, setIsPasswordRecoveryActive] = useState(false);
   const [bypassConfig, setBypassConfig] = useState(() => {
@@ -201,6 +202,7 @@ export default function App() {
     : subscriptionTier.toLowerCase();
 
   const isPremiumPaid = (() => {
+    if (isAdmin) return true;
     const isBasePremium = parsedCleanTier === 'premium' || 
                           parsedCleanTier === 'pro space' || 
                           parsedCleanTier === 'ultimate matrix' || 
@@ -213,7 +215,7 @@ export default function App() {
     return isBasePremium;
   })();
 
-  const hasActiveAccess = isPremiumPaid || isTrialActive;
+  const hasActiveAccess = isAdmin || isPremiumPaid || isTrialActive;
 
   const [userPlans, setUserPlans] = useState<PricingPlan[]>(() => {
     return [
@@ -273,8 +275,6 @@ export default function App() {
       setIsPasswordRecoveryActive(true);
     }
   }, []);
-
-  const isAdmin = session?.user?.email === 'gongidikalyan08@gmail.com';
 
   useEffect(() => {
     isFetchingRef.current = true;
@@ -377,7 +377,9 @@ export default function App() {
         setTimetable([]);
         setStudyCourses([]);
         setUserName("Felix");
-        setUserBudget(5000);
+        if (localStorage.getItem('wrindha_budget_updated') !== 'true') {
+          setUserBudget(5000);
+        }
         setCurrency("INR");
         setSubscriptionTier("Free");
         setMaxHabits(5);
@@ -392,11 +394,16 @@ export default function App() {
         const keys = [
           'wrindha_habits', 'wrindha_tasks', 'wrindha_expenses', 
           'wrindha_goals', 'wrindha_timetable', 'wrindha_study',
-          'wrindha_user_name', 'wrindha_budget', 'wrindha_currency',
+          'wrindha_user_name', 'wrindha_currency',
           'wrindha_subscription_tier', 'wrindha_max_habits',
           'wrindha_trial_start_date', 'wrindha_trial_end_date',
-          'wrindha_is_trial_activated', 'wrindha_has_paid'
+          'wrindha_is_trial_activated', 'wrindha_has_paid',
+          'wrindha_active_career_path', 'wrindha_career_milestones',
+          'wrindha_career_skills', 'wrindha_career_plan_data_manual'
         ];
+        if (localStorage.getItem('wrindha_budget_updated') !== 'true') {
+          keys.push('wrindha_budget');
+        }
         keys.forEach(k => localStorage.removeItem(k));
 
         isFetchingRef.current = false;
@@ -706,7 +713,18 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
       try {
         const { data: profileData } = await supabase.from('profiles').select('*').eq('id', userId).single();
         if (profileData) {
-          if (profileData.budget !== undefined && profileData.budget !== null) setUserBudget(profileData.budget);
+          const userHasSetBudget = localStorage.getItem('wrindha_budget_updated') === 'true';
+          const localBudgetStr = localStorage.getItem('wrindha_budget');
+          const localBudget = localBudgetStr ? parseFloat(localBudgetStr) : null;
+
+          if (userHasSetBudget && localBudget !== null) {
+            setUserBudget(localBudget);
+            await supabase.from('profiles').update({ budget: localBudget }).eq('id', userId);
+          } else {
+            if (profileData.budget !== undefined && profileData.budget !== null) {
+              setUserBudget(profileData.budget);
+            }
+          }
           if (profileData.currency) setCurrency(profileData.currency as 'USD' | 'INR');
           if (profileData.full_name) setUserName(profileData.full_name);
           if (profileData.subscription_tier) setSubscriptionTier(profileData.subscription_tier);
@@ -4355,7 +4373,9 @@ function FinanceView({ expenses, setExpenses, onDelete, currency, setCurrency, t
                        <div className="flex gap-2">
                          <button 
                            onClick={() => {
-                             setBudget(parseFloat(tempBudget) || 0);
+                             const newB = parseFloat(tempBudget) || 0;
+                             setBudget(newB);
+                             localStorage.setItem('wrindha_budget_updated', 'true');
                              setIsEditingBudget(false);
                            }}
                            className="flex-1 py-2 bg-emerald-500 rounded-xl text-xs font-bold"
@@ -6197,7 +6217,10 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
     ? 'premium' 
     : subscriptionTier.toLowerCase();
 
+  const isAdmin = session?.user?.email === 'gongidikalyan08@gmail.com';
+
   const isPremiumPaid = (() => {
+    if (isAdmin) return true;
     const isBasePremium = parsedCleanTier === 'premium' || 
                           parsedCleanTier === 'pro space' || 
                           parsedCleanTier === 'ultimate matrix' || 
@@ -6210,7 +6233,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
     return isBasePremium;
   })();
 
-  const hasActiveAccess = isPremiumPaid || isTrialActive;
+  const hasActiveAccess = isAdmin || isPremiumPaid || isTrialActive;
 
   // Credit Card Form States
   const [cardHolder, setCardHolder] = useState('');
@@ -6467,22 +6490,26 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
               SaaS Credentials
             </span>
             <h3 className="text-2xl font-black dark:text-white mt-2">
-              {cancellationInfo.isCancelled 
-                ? "Premium OS (Cancelled)" 
-                : isPremiumPaid 
-                  ? "Premium OS Lifetime Access" 
-                  : isTrialActive 
-                    ? `Active 5-Day Free Trial (${trialDaysLeft} days remaining)` 
-                    : "Subscription Expired"}
+              {isAdmin 
+                ? "Admin Workspace • Unrestricted System Access"
+                : cancellationInfo.isCancelled 
+                  ? "Premium OS (Cancelled)" 
+                  : isPremiumPaid 
+                    ? "Premium OS Lifetime Access" 
+                    : isTrialActive 
+                      ? `Active 5-Day Free Trial (${trialDaysLeft} days remaining)` 
+                      : "Subscription Expired"}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-semibold">
-              {cancellationInfo.isCancelled 
-                ? `Your subscription has been cancelled, but your premium access remains fully active until your billing period ends on ${nextRenewalDate}. After this date, your workspace will be locked unless you renew.`
-                : isPremiumPaid 
-                  ? "You have fully unlocked the unconstrained Wrindha Premium OS tracking. Absolute data backup, unlimited habits, tasks, studies and timetables active." 
-                  : isTrialActive 
-                    ? "You are currently enjoying your 5-day active trial of full premium workspace. No artificial limits or constraints are imposed. Secure your premium billing early to keep uninterrupted access!"
-                    : "Your free trial has expired. Subscribe to Wrindha Premium below for unlimited habits, tasks, budget tracking, and timetables."}
+              {isAdmin 
+                ? "You are logged in as the platform administrator (gongidikalyan08@gmail.com). You have absolute, unrestricted access to all features and modules across the entire ecosystem without any active subscription or billing requirements."
+                : cancellationInfo.isCancelled 
+                  ? `Your subscription has been cancelled, but your premium access remains fully active until your billing period ends on ${nextRenewalDate}. After this date, your workspace will be locked unless you renew.`
+                  : isPremiumPaid 
+                    ? "You have fully unlocked the unconstrained Wrindha Premium OS tracking. Absolute data backup, unlimited habits, tasks, studies and timetables active." 
+                    : isTrialActive 
+                      ? "You are currently enjoying your 5-day active trial of full premium workspace. No artificial limits or constraints are imposed. Secure your premium billing early to keep uninterrupted access!"
+                      : "Your free trial has expired. Subscribe to Wrindha Premium below for unlimited habits, tasks, budget tracking, and timetables."}
             </p>
           </div>
           
@@ -6673,15 +6700,15 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
 
               <button
                 onClick={() => setCheckoutPlan(p)}
-                disabled={upgradingTo !== null || isCurrent}
+                disabled={upgradingTo !== null || isCurrent || isAdmin}
                 className={cn(
                   "w-full py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2",
-                  isCurrent 
-                    ? "bg-gray-800 text-gray-400 cursor-not-allowed dark:bg-gray-800" 
+                  isCurrent || isAdmin
+                    ? "bg-gray-200 text-gray-500 cursor-not-allowed dark:bg-gray-800 dark:text-gray-400" 
                     : "bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-600/10"
                 )}
               >
-                {isCurrent ? "Active Premium Tier" : `Upgrade to ${p.name}`}
+                {isAdmin ? "Admin Access • Unlocked" : isCurrent ? "Active Premium Tier" : `Upgrade to ${p.name}`}
               </button>
             </div>
           );

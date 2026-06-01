@@ -216,8 +216,31 @@ export default function CareerPlannerView({
 
     initSessionAndFetch();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
       setSession(currentSession);
+      if (event === 'SIGNED_OUT') {
+        setActivePath(null);
+        setMilestones([]);
+        setSkills([]);
+        setPlanData({
+          roadmap: [],
+          certifications: [],
+          experience_requirements: "",
+          books_and_resources: [],
+          projects_to_complete: [],
+          monthly_learning_targets: [],
+          gap_analysis: {
+            current_state: "",
+            desired_state: "",
+            missing_experience: "",
+            suggested_actions: []
+          }
+        });
+        localStorage.removeItem("wrindha_active_career_path");
+        localStorage.removeItem("wrindha_career_milestones");
+        localStorage.removeItem("wrindha_career_skills");
+        localStorage.removeItem("wrindha_career_plan_data_manual");
+      }
     });
 
     return () => {
