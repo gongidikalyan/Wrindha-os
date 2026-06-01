@@ -5260,43 +5260,6 @@ function AboutView() {
 }
 
 function ContactView() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-
-  const handleSubmit = async (e: any) => {
-    e.preventDefault();
-    if (!name.trim() || !email.trim() || !message.trim()) {
-      setErrorMsg("Please fill out all fields before submitting.");
-      return;
-    }
-    setSending(true);
-    setErrorMsg("");
-    try {
-      const res = await fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, message })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setSubmitted(true);
-        setName("");
-        setEmail("");
-        setMessage("");
-      } else {
-        setErrorMsg(data.message || "Failed to deliver message via server.");
-      }
-    } catch (err) {
-      setErrorMsg("An unexpected connection error occurred. Please try again.");
-    } finally {
-      setSending(false);
-    }
-  };
-
   return (
     <div className="max-w-4xl mx-auto py-12 px-4">
       <motion.div
@@ -5304,108 +5267,116 @@ function ContactView() {
         animate={{ opacity: 1, y: 0 }}
         className="space-y-12"
       >
+        {/* Hero Header */}
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-950/40 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-emerald-100 dark:border-emerald-900/40 shadow-sm">
-            <MessageCircle className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+          <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/40 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-indigo-100 dark:border-indigo-900/40 shadow-sm">
+            <MessageCircle className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
           </div>
           <h1 className="text-4xl sm:text-5xl font-black dark:text-white tracking-tight">Contact Us</h1>
-          <p className="text-lg text-gray-500 dark:text-gray-400 font-medium max-w-2xl mx-auto">
-            We would love to hear from you. Reach out for any questions, feedback, or business inquiries.
+          <h2 className="text-xl sm:text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 tracking-tight">Get in Touch with WrindhaOS</h2>
+          <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 font-medium max-w-2xl mx-auto leading-relaxed">
+            We're here to help you achieve your goals and make the most of your WrindhaOS experience. Whether you have questions, feedback, feature suggestions, partnership inquiries, or need technical support, we'd love to hear from you.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="md:col-span-2 bg-white dark:bg-gray-900 p-8 sm:p-10 rounded-[2.5rem] border border-gray-150 dark:border-gray-800/80 shadow-sm space-y-8">
-            <h2 className="text-2xl font-bold dark:text-white">Send a Message</h2>
-            {submitted ? (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-250 dark:border-emerald-900/40 p-6 rounded-2xl text-center"
-              >
-                <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
-                <p className="text-sm font-bold text-emerald-800 dark:text-emerald-400">Message Transferred Securely!</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Thank you. An automated receipt confirmation copy has been sent to your email.</p>
-                <button 
-                  onClick={() => setSubmitted(false)}
-                  className="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all"
+        {/* Informational Cards Layout */}
+        <div className="space-y-8">
+          
+          {/* Main Contact Info Callout */}
+          <div className="bg-white dark:bg-gray-900 p-8 sm:p-10 rounded-[2.5rem] border border-gray-150 dark:border-gray-800/80 shadow-sm space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/40 rounded-xl text-indigo-600 dark:text-indigo-400">
+                <Mail className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-bold dark:text-white text-gray-800">Contact Information</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+              <div className="p-6 bg-gray-50 dark:bg-gray-850 rounded-2xl border border-gray-100 dark:border-gray-800/50 hover:border-indigo-500/30 transition-all">
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#6B7280] mb-2">Email Address</p>
+                <a 
+                  href="mailto:wrindhaos@gmail.com" 
+                  className="text-lg font-black text-indigo-600 dark:text-indigo-400 hover:underline font-mono"
                 >
-                  Send Another Message
-                </button>
-              </motion.div>
-            ) : (
-              <form className="space-y-6" onSubmit={handleSubmit}>
-                {errorMsg && (
-                  <div className="p-4 bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-900/30 text-rose-600 dark:text-rose-450 text-xs font-bold rounded-xl">
-                    {errorMsg}
-                  </div>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Full Name</label>
-                    <input 
-                      required 
-                      type="text" 
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full bg-gray-50 dark:bg-gray-850 text-gray-900 dark:text-white px-5 py-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 outline-none focus:border-emerald-500 transition-all text-xs font-bold" 
-                      placeholder="Your Name" 
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Email Address</label>
-                    <input 
-                      required 
-                      type="email" 
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-gray-50 dark:bg-gray-850 text-gray-900 dark:text-white px-5 py-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 outline-none focus:border-emerald-500 transition-all text-xs font-bold" 
-                      placeholder="your@email.com" 
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Message / Inquiry Details</label>
-                  <textarea 
-                    required 
-                    rows={4} 
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    className="w-full bg-gray-50 dark:bg-gray-850 text-gray-900 dark:text-white px-5 py-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 outline-none focus:border-emerald-500 transition-all text-sm font-medium resize-none" 
-                    placeholder="For support, feedback, business inquiries, or partnership opportunities, please contact us..."
-                  ></textarea>
-                </div>
-                <button 
-                  type="submit" 
-                  disabled={sending}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-md flex items-center justify-center gap-2"
-                >
-                  {sending ? "Transmitting..." : "Send Message"}
-                </button>
-              </form>
-            )}
+                  wrindhaos@gmail.com
+                </a>
+              </div>
+              <div className="p-6 bg-gray-50 dark:bg-gray-850 rounded-2xl border border-gray-100 dark:border-gray-800/50 hover:border-indigo-500/30 transition-all">
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#6B7280] mb-2">Founder</p>
+                <p className="text-lg font-black text-gray-800 dark:text-gray-100 tracking-tight">
+                  Kalyan Gongidi
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-150 dark:border-gray-800/80 shadow-sm flex flex-col items-center text-center">
-              <div className="p-4 bg-gray-50 dark:bg-gray-850 rounded-2xl mb-4 border border-gray-100 dark:border-gray-800">
-                <Mail className="w-6 h-6 text-gray-400" />
+          {/* Grid Section for Subtopics */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            
+            {/* Technical Support */}
+            <div className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] border border-gray-150 dark:border-gray-800/80 shadow-xs space-y-4">
+              <div className="flex items-center gap-2.5 text-rose-550 dark:text-rose-400">
+                <div className="p-2 bg-rose-50 dark:bg-rose-950/30 rounded-xl">
+                  <Flame className="w-5 h-5" />
+                </div>
+                <h4 className="font-extrabold text-base dark:text-white text-gray-800">Support</h4>
               </div>
-              <h3 className="font-bold text-sm mb-1 dark:text-white">Founder Contact</h3>
-              <p className="text-xs text-gray-400 mb-4">Kalyan Gongidi</p>
-              <a href="mailto:wrindhaos@gmail.com" className="font-bold text-sm text-indigo-600 dark:text-indigo-400 hover:underline font-mono">wrindhaos@gmail.com</a>
-            </div>
-
-            <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-150 dark:border-gray-800/80 shadow-sm flex flex-col items-center text-center">
-              <div className="p-4 bg-gray-50 dark:bg-gray-850 rounded-2xl mb-4 border border-gray-100 dark:border-gray-800">
-                <Clock className="w-6 h-6 text-gray-400" />
-              </div>
-              <h3 className="font-bold text-sm mb-1 dark:text-white">Response Time</h3>
-              <p className="text-xs text-gray-400 leading-relaxed px-4">
-                Within <span className="text-emerald-500 font-extrabold font-mono">24–48</span> business hours.
+              <p className="text-sm text-[#4B5563] dark:text-gray-400 leading-relaxed">
+                If you're experiencing any issues with your account, subscription, payments, or platform features, please contact our support team via email. We aim to respond to all inquiries as quickly as possible.
               </p>
             </div>
+
+            {/* Feedback & Suggestions */}
+            <div className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] border border-gray-150 dark:border-gray-800/80 shadow-xs space-y-4">
+              <div className="flex items-center gap-2.5 text-emerald-550 dark:text-emerald-400">
+                <div className="p-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <h4 className="font-extrabold text-base dark:text-white text-gray-800">Feedback & Suggestions</h4>
+              </div>
+              <p className="text-sm text-[#4B5563] dark:text-gray-400 leading-relaxed">
+                Your feedback helps us improve WrindhaOS. If you have ideas for new features, improvements, or would like to share your experience, feel free to reach out.
+              </p>
+            </div>
+
+            {/* Business Partnerships */}
+            <div className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] border border-gray-150 dark:border-gray-800/80 shadow-xs space-y-4">
+              <div className="flex items-center gap-2.5 text-cyan-550 dark:text-cyan-400">
+                <div className="p-2 bg-cyan-50 dark:bg-cyan-950/30 rounded-xl">
+                  <Award className="w-5 h-5" />
+                </div>
+                <h4 className="font-extrabold text-base dark:text-white text-gray-800">Business & Partnership Inquiries</h4>
+              </div>
+              <p className="text-sm text-[#4B5563] dark:text-gray-400 leading-relaxed">
+                For collaborations, partnerships, promotional opportunities, or business-related discussions, please contact us through our official email address.
+              </p>
+            </div>
+
+            {/* Response Time */}
+            <div className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] border border-gray-150 dark:border-gray-800/80 shadow-xs space-y-4">
+              <div className="flex items-center gap-2.5 text-amber-550 dark:text-amber-400">
+                <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-xl">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <h4 className="font-extrabold text-base dark:text-white text-gray-800">Response Time</h4>
+              </div>
+              <p className="text-sm text-[#4B5563] dark:text-gray-400 leading-relaxed">
+                We strive to respond to all emails within <span className="text-indigo-600 dark:text-indigo-400 font-extrabold font-mono">24–48</span> business hours.
+              </p>
+            </div>
+
           </div>
+
+          {/* Aesthetic Footer/Closing statement */}
+          <div className="p-8 sm:p-10 bg-gradient-to-tr from-indigo-50/50 to-emerald-50/25 dark:from-indigo-950/20 dark:to-emerald-950/10 rounded-[2.5rem] border border-indigo-100/50 dark:border-indigo-950/50 text-center space-y-3">
+            <p className="text-sm font-semibold text-gray-600 dark:text-gray-300 leading-relaxed max-w-2xl mx-auto">
+              Thank you for choosing WrindhaOS. We appreciate your trust and support as we continue building a platform that helps people manage goals, careers, productivity, and personal growth.
+            </p>
+            <p className="text-base font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+              WrindhaOS – Organize Your Goals. Shape Your Future.
+            </p>
+          </div>
+
         </div>
       </motion.div>
     </div>
