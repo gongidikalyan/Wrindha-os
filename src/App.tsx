@@ -5573,21 +5573,21 @@ function TermsView() {
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-gray-900 p-8 sm:p-12 rounded-[2.5rem] sm:rounded-[3.5rem] border border-gray-150 dark:border-gray-800/85 shadow-sm space-y-12"
+        className="bg-white dark:bg-gray-900 p-8 sm:p-12 rounded-[2.5rem] sm:rounded-[3.5rem] border border-gray-200/60 dark:border-gray-800 shadow-sm space-y-12"
       >
         <div className="text-center">
           <Scale className="w-12 h-12 text-indigo-600 dark:text-indigo-400 mx-auto mb-4" />
           <h1 className="text-3xl sm:text-4xl font-black dark:text-white tracking-tight">Terms of Use</h1>
-          <p className="text-gray-400 mt-2 font-medium uppercase tracking-widest text-[9px] font-mono">By accessing and using WrindhaOS, you agree to comply with these Terms of Use.</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium uppercase tracking-widest text-[9px] font-mono">By accessing and using WrindhaOS, you agree to comply with these Terms of Use.</p>
         </div>
 
         <div className="space-y-6">
           {/* Item 1 */}
-          <div className="p-6 bg-gray-50 dark:bg-gray-850/50 rounded-2xl border border-gray-100 dark:border-gray-800/30">
+          <div className="p-6 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800/50">
             <h3 className="font-extrabold text-base dark:text-white flex items-center gap-2 mb-2">
               <span className="text-indigo-600 dark:text-indigo-400">01.</span> Account Responsibilities
             </h3>
-            <p className="text-xs text-gray-550 dark:text-gray-450 leading-relaxed mb-3">Users must strictly fulfill these commitments:</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed mb-3">Users must strictly fulfill these commitments:</p>
             <ul className="space-y-2 pl-2">
               {[
                 "Provide accurate, integral information during registration.",
@@ -5603,11 +5603,11 @@ function TermsView() {
           </div>
 
           {/* Item 2 */}
-          <div className="p-6 bg-gray-50 dark:bg-gray-850/50 rounded-2xl border border-gray-100 dark:border-gray-800/30">
+          <div className="p-6 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800/50">
             <h3 className="font-extrabold text-base dark:text-white flex items-center gap-2 mb-2">
               <span className="text-indigo-600 dark:text-indigo-400">02.</span> Acceptable Use
             </h3>
-            <p className="text-xs text-gray-550 dark:text-gray-450 leading-relaxed mb-3">You explicitly agree not to perform any of the following restricted actions:</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed mb-3">You explicitly agree not to perform any of the following restricted actions:</p>
             <ul className="space-y-2 pl-2">
               {[
                 "Violate any applicable local, national, or international laws.",
@@ -5624,7 +5624,7 @@ function TermsView() {
           </div>
 
           {/* Item 3 */}
-          <div className="p-6 bg-gray-50 dark:bg-gray-850/50 rounded-2xl border border-gray-100 dark:border-gray-800/30">
+          <div className="p-6 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800/50">
             <h3 className="font-extrabold text-base dark:text-white flex items-center gap-2 mb-2">
               <span className="text-indigo-600 dark:text-indigo-400">03.</span> Intellectual Property
             </h3>
@@ -5634,7 +5634,7 @@ function TermsView() {
           </div>
 
           {/* Item 4 */}
-          <div className="p-6 bg-gray-50 dark:bg-gray-850/50 rounded-2xl border border-gray-100 dark:border-gray-800/30">
+          <div className="p-6 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800/50">
             <h3 className="font-extrabold text-base dark:text-white flex items-center gap-2 mb-2">
               <span className="text-indigo-600 dark:text-indigo-400">04.</span> Subscription Services
             </h3>
@@ -5644,7 +5644,7 @@ function TermsView() {
           </div>
 
           {/* Item 5 */}
-          <div className="p-6 bg-gray-50 dark:bg-gray-850/50 rounded-2xl border border-gray-100 dark:border-gray-800/30">
+          <div className="p-6 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800/50">
             <h3 className="font-extrabold text-base dark:text-white flex items-center gap-2 mb-2">
               <span className="text-indigo-600 dark:text-indigo-400">05.</span> Account Suspension
             </h3>
@@ -5654,7 +5654,7 @@ function TermsView() {
           </div>
 
           {/* Item 6 */}
-          <div className="p-6 bg-gray-50 dark:bg-gray-850/50 rounded-2xl border border-gray-100 dark:border-gray-800/30">
+          <div className="p-6 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800/50">
             <h3 className="font-extrabold text-base dark:text-white flex items-center gap-2 mb-2">
               <span className="text-indigo-600 dark:text-indigo-400">06.</span> Limitation of Liability
             </h3>
@@ -5667,10 +5667,10 @@ function TermsView() {
         {/* Founder credentials bottom signature */}
         <div className="pt-8 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-xs">
           <div>
-            <p className="font-bold dark:text-white">Founder: Kalyan Gongidi</p>
-            <p className="text-gray-400 mt-0.5">Email: wrindhaos@gmail.com</p>
+            <p className="font-bold dark:text-white">Founder: <span className="text-indigo-600 dark:text-indigo-400 font-extrabold">Kalyan Gongidi</span></p>
+            <p className="text-gray-500 dark:text-gray-400 mt-0.5">Email: <a href="mailto:wrindhaos@gmail.com" className="hover:underline text-indigo-600 dark:text-indigo-400 font-semibold font-mono">wrindhaos@gmail.com</a></p>
           </div>
-          <p className="text-gray-400 max-w-xs text-[10px] text-right italic">
+          <p className="text-gray-400 dark:text-gray-500 max-w-xs text-[10px] text-right italic font-sans">
             "By continuing to access and use the app, you unconditionally pledge compliance."
           </p>
         </div>
@@ -5685,7 +5685,7 @@ function RefundView() {
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-gray-900 p-8 sm:p-12 rounded-[2.5rem] sm:rounded-[3.5rem] border border-gray-150 dark:border-gray-800/85 shadow-sm space-y-10"
+        className="bg-white dark:bg-gray-900 p-8 sm:p-12 rounded-[2.5rem] sm:rounded-[3.5rem] border border-gray-200/60 dark:border-gray-800 shadow-sm space-y-10"
       >
         <div className="flex flex-col sm:flex-row sm:items-center gap-6 pb-8 border-b border-gray-100 dark:border-gray-800">
           <div className="w-16 h-16 bg-rose-50 dark:bg-rose-950/40 rounded-[1.5rem] flex items-center justify-center shrink-0 border border-rose-100/50 dark:border-rose-900/30">
@@ -5747,7 +5747,7 @@ function RefundView() {
 
         {/* Section 3: Timeline & Process */}
         <section className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
-          <div className="p-6 bg-gray-50 dark:bg-gray-850/50 rounded-2xl border border-gray-100 dark:border-gray-800">
+          <div className="p-6 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800/50">
             <h4 className="font-extrabold text-sm dark:text-white mb-2 flex items-center gap-2">
               <Clock className="w-4 h-4 text-gray-400" /> Refund Request Period
             </h4>
@@ -5755,7 +5755,7 @@ function RefundView() {
               All formal refund queries must be submitted within <span className="font-bold text-gray-900 dark:text-white">7 days</span> of the initial payment transaction date.
             </p>
           </div>
-          <div className="p-6 bg-gray-50 dark:bg-gray-850/50 rounded-2xl border border-gray-100 dark:border-gray-800">
+          <div className="p-6 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800/50">
             <h4 className="font-extrabold text-sm dark:text-white mb-2 flex items-center gap-2">
               <RefreshCcw className="w-4 h-4 text-gray-400 animate-spin-slow" /> Approved Processing
             </h4>
@@ -5786,7 +5786,7 @@ function CancellationView() {
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-gray-900 p-8 sm:p-12 rounded-[2.5rem] sm:rounded-[3.5rem] border border-gray-150 dark:border-gray-800/85 shadow-sm space-y-10"
+        className="bg-white dark:bg-gray-900 p-8 sm:p-12 rounded-[2.5rem] sm:rounded-[3.5rem] border border-gray-200/60 dark:border-gray-800 shadow-sm space-y-10"
       >
         <div className="flex flex-col sm:flex-row sm:items-center gap-6 pb-8 border-b border-gray-100 dark:border-gray-800">
           <div className="w-16 h-16 bg-red-50 dark:bg-red-950/40 rounded-[1.5rem] flex items-center justify-center shrink-0 border border-red-100/50 dark:border-red-900/30">
