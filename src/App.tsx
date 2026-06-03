@@ -92,7 +92,7 @@ const infoModules = [
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
-  const isFetchingRef = useRef(true);
+  const isFetchingRef = useRef(false);
   const [currency, setCurrency] = useState<'USD' | 'INR'>(() => (localStorage.getItem('wrindha_currency') as 'USD' | 'INR') || 'INR');
   const [userName, setUserName] = useState(() => localStorage.getItem('wrindha_user_name') || "Felix");
   const [userBudget, setUserBudget] = useState<number>(() => {
@@ -344,13 +344,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    isFetchingRef.current = true;
     setIsInitializing(true);
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        isFetchingRef.current = true;
-        setIsInitializing(true);
         setSession(session);
         if (session.user?.user_metadata?.full_name) {
           setUserName(session.user.user_metadata.full_name);
@@ -393,8 +390,6 @@ export default function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
-        isFetchingRef.current = true;
-        setIsInitializing(true);
         setSession(session);
         if (event === 'PASSWORD_RECOVERY') {
           setShowResetPasswordModal(true);
@@ -434,8 +429,6 @@ export default function App() {
           });
         }
       } else if (event === 'SIGNED_OUT') {
-        isFetchingRef.current = true;
-        setIsInitializing(true);
         setSession(null);
         
         // Logout occurred: Clear personal data arrays and settings/tiers
@@ -783,7 +776,56 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
       const userId = session.user.id;
 
       try {
-        const { data: profileData } = await supabase.from('profiles').select('*').eq('id', userId).single();
+        // Query everything in parallel to eliminate RTT latency and database fetch delay
+        const [
+          profileRes,
+          habitsRes,
+          tasksRes,
+          expensesRes,
+          goalsRes,
+          timetableRes,
+          studyRes,
+          blogsRes,
+          ordersRes
+        ] = await Promise.all([
+          supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+          supabase.from('habits').select('*').eq('user_id', userId),
+          supabase.from('tasks').select('*').eq('user_id', userId),
+          supabase.from('expenses').select('*').eq('user_id', userId),
+          supabase.from('goals').select('*').eq('user_id', userId),
+          supabase.from('timetable').select('*').eq('user_id', userId),
+          supabase.from('study_courses').select('*').eq('user_id', userId),
+          supabase.from('blogs').select('*').order('created_at', { ascending: false }),
+          supabase.from('orders').select('*').eq('user_id', userId).order('created_at', { ascending: false })
+        ]);
+
+        let profileData = profileRes.data;
+
+        if (!profileData) {
+          // If the profile row doesn't exist yet, seamlessly bootstrap it to prevent any platform race states
+          const defaultName = session.user.user_metadata?.full_name || localStorage.getItem('wrindha_user_name') || "Felix";
+          const secureNow = getCurrentSecureTime();
+          const startStr = new Date(secureNow).toISOString();
+          const endStr = new Date(secureNow + 5 * 24 * 60 * 60 * 1000).toISOString();
+          
+          const { data: newProfile } = await supabase.from('profiles').upsert({
+            id: userId,
+            email: session.user.email,
+            full_name: defaultName,
+            last_active: new Date().toISOString(),
+            budget: userBudget,
+            currency: currency,
+            is_trial_activated: true,
+            trial_start_date: startStr,
+            trial_end_date: endStr,
+            has_paid: false
+          }).select().maybeSingle();
+
+          if (newProfile) {
+            profileData = newProfile;
+          }
+        }
+
         if (profileData) {
           const userHasSetBudget = localStorage.getItem('wrindha_budget_updated') === 'true';
           const localBudgetStr = localStorage.getItem('wrindha_budget');
@@ -865,7 +907,7 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
           }
         ]);
 
-        if (session?.user?.email === 'gongidikalyan08@gmail.com') {
+        if (session?.user?.id && session?.user?.email === 'gongidikalyan08@gmail.com') {
           try {
             const { data: allProfiles } = await supabase.from('profiles').select('*');
             if (allProfiles) {
@@ -882,42 +924,36 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
           }
         }
 
-        const { data: habitsData } = await supabase.from('habits').select('*').eq('user_id', userId);
-        const mappedHabits = habitsData && habitsData.length > 0 ? habitsData.map(h => ({
+        const mappedHabits = habitsRes.data && habitsRes.data.length > 0 ? habitsRes.data.map((h: any) => ({
           ...h,
           completedAt: h.completed_at || h.completedAt || []
         })) : [];
         setHabits(mappedHabits);
 
-        const { data: tasksData } = await supabase.from('tasks').select('*').eq('user_id', userId);
-        const mappedTasks = tasksData && tasksData.length > 0 ? tasksData.map(t => ({
+        const mappedTasks = tasksRes.data && tasksRes.data.length > 0 ? tasksRes.data.map((t: any) => ({
           ...t,
           dueDate: t.due_date || t.dueDate
         })) : [];
         setTasks(mappedTasks);
 
-        const { data: expensesData } = await supabase.from('expenses').select('*').eq('user_id', userId);
-        const mappedExpenses = expensesData && expensesData.length > 0 ? expensesData : [];
+        const mappedExpenses = expensesRes.data && expensesRes.data.length > 0 ? expensesRes.data : [];
         setExpenses(mappedExpenses);
 
-        const { data: goalsData } = await supabase.from('goals').select('*').eq('user_id', userId);
-        const mappedGoals = goalsData && goalsData.length > 0 ? goalsData.map(g => ({
+        const mappedGoals = goalsRes.data && goalsRes.data.length > 0 ? goalsRes.data.map((g: any) => ({
           ...g,
           targetDate: g.target_date || g.targetDate
         })) : [];
         setGoals(mappedGoals);
 
-        const { data: timetableData } = await supabase.from('timetable').select('*').eq('user_id', userId);
-        const mappedTimetable = timetableData && timetableData.length > 0 ? timetableData : [];
+        const mappedTimetable = timetableRes.data && timetableRes.data.length > 0 ? timetableRes.data : [];
         setTimetable(mappedTimetable);
 
-        const { data: studyData } = await supabase.from('study_courses').select('*').eq('user_id', userId);
-        const mappedStudy = studyData && studyData.length > 0 ? studyData : [];
+        const mappedStudy = studyRes.data && studyRes.data.length > 0 ? studyRes.data : [];
         setStudyCourses(mappedStudy);
 
         // Globally load blogs (any user can view them)
         try {
-          const { data: blogsData } = await supabase.from('blogs').select('*').order('created_at', { ascending: false });
+          const blogsData = blogsRes.data;
           const defaultBlogsList: Blog[] = [
             {
               id: "f-habits",
@@ -1106,7 +1142,7 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
 
         // Load order records
         try {
-          const { data: ordersData } = await supabase.from('orders').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+          const ordersData = ordersRes.data;
           if (ordersData && ordersData.length > 0) {
             setOrders(ordersData);
             localStorage.setItem('wrindha_orders', JSON.stringify(ordersData));
@@ -1448,8 +1484,9 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
     return <AuthConfigErrorView error={configError} onBypass={() => setBypassConfig(true)} />;
   }
 
+  const hasLocalCache = localStorage.getItem('wrindha_trial_start_date') !== null;
   const isSyncingTime = serverTimeMs === null && (performance.now() - bootPerfTime < 2000);
-  if ((isInitializing || isSyncingTime) && (isSupabaseConfigured() && !bypassConfig)) {
+  if ((isInitializing || isSyncingTime) && (isSupabaseConfigured() && !bypassConfig) && !hasLocalCache) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-white font-sans">
         <div className="text-center space-y-6">
