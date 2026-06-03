@@ -146,6 +146,47 @@ export default function App() {
     return saved ? parseInt(saved) : 9999;
   });
 
+  const [serverTimeMs, setServerTimeMs] = useState<number | null>(null);
+  const [bootPerfTime] = useState<number>(() => performance.now());
+  const [secTicker, setSecTicker] = useState<number>(0);
+
+  useEffect(() => {
+    let active = true;
+    const fetchTime = async () => {
+      try {
+        const res = await fetch('/api/server-time');
+        const data = await res.json();
+        if (active && data.serverTime) {
+          setServerTimeMs(new Date(data.serverTime).getTime());
+        }
+      } catch (err) {
+        console.error("Failed to fetch server time:", err);
+      }
+    };
+    fetchTime();
+    const timer = setInterval(fetchTime, 30000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSecTicker(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const getCurrentSecureTime = () => {
+    if (serverTimeMs !== null) {
+      return serverTimeMs + (performance.now() - bootPerfTime);
+    }
+    return Date.now();
+  };
+
+  const nowSecure = getCurrentSecureTime();
+
   const [trialStartDateStr, setTrialStartDateStr] = useState<string>(() => {
     return localStorage.getItem('wrindha_trial_start_date') || new Date().toISOString();
   });
@@ -162,8 +203,9 @@ export default function App() {
   useEffect(() => {
     if (!isSupabaseConfigured() || bypassConfig) {
       if (!isTrialActivated) {
-        const start = new Date().toISOString();
-        const end = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+        const secureNow = getCurrentSecureTime();
+        const start = new Date(secureNow).toISOString();
+        const end = new Date(secureNow + 5 * 24 * 60 * 60 * 1000).toISOString();
         setTrialStartDateStr(start);
         setTrialEndDateStr(end);
         setIsTrialActivated(true);
@@ -176,9 +218,29 @@ export default function App() {
 
   const trialStartDate = new Date(trialStartDateStr);
   const trialEndDate = new Date(trialEndDateStr);
-  const msLeft = trialEndDate.getTime() - Date.now();
-  const trialDaysLeft = Math.max(0, Math.ceil(msLeft / (24 * 60 * 60 * 1000)));
+  const msLeft = Math.max(0, trialEndDate.getTime() - nowSecure);
+  
+  // Calculate trialDaysLeft based on exact elapsed hours from server-synced time:
+  const elapsedMs = Math.max(0, nowSecure - trialStartDate.getTime());
+  const daysElapsed = Math.floor(elapsedMs / (24 * 60 * 60 * 1000));
+  const trialDaysLeft = Math.max(0, 5 - daysElapsed);
   const isTrialActive = msLeft > 0;
+
+  const formatRemainingTimeText = (ms: number) => {
+    if (ms <= 0) return "0d 0h 0m";
+    const seconds = Math.floor(ms / 1000);
+    const m = Math.floor((seconds % 3600) / 60);
+    const h = Math.floor((seconds % (3600 * 24)) / 3600);
+    const d = Math.floor(seconds / (3600 * 24));
+    
+    const parts = [];
+    if (d > 0) parts.push(`${d}d`);
+    if (h > 0 || d > 0) parts.push(`${h}h`);
+    parts.push(`${m}m`);
+    return parts.join(" ");
+  };
+
+  const trialTimeLeftText = formatRemainingTimeText(msLeft);
 
   const cancellationInfo = (() => {
     if (!subscriptionTier || !subscriptionTier.includes('Cancelled:')) {
@@ -300,8 +362,9 @@ export default function App() {
                 last_active: new Date().toISOString() 
               }).eq('id', session.user.id).then();
             } else {
-              const startStr = new Date().toISOString();
-              const endStr = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+              const secureNow = getCurrentSecureTime();
+              const startStr = new Date(secureNow).toISOString();
+              const endStr = new Date(secureNow + 5 * 24 * 60 * 60 * 1000).toISOString();
               supabase.from('profiles').insert({ 
                 id: session.user.id, 
                 email: session.user.email,
@@ -347,8 +410,9 @@ export default function App() {
                 last_active: new Date().toISOString() 
               }).eq('id', session.user.id).then();
             } else {
-              const startStr = new Date().toISOString();
-              const endStr = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+              const secureNow = getCurrentSecureTime();
+              const startStr = new Date(secureNow).toISOString();
+              const endStr = new Date(secureNow + 5 * 24 * 60 * 60 * 1000).toISOString();
               supabase.from('profiles').insert({ 
                 id: session.user.id, 
                 email: session.user.email,
@@ -738,8 +802,9 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
           const dbHasPaid = !!profileData.has_paid;
 
           if (dbIsTrialActivated) {
-            const startStr = profileData.trial_start_date || new Date().toISOString();
-            const endStr = profileData.trial_end_date || new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+            const secureNow = getCurrentSecureTime();
+            const startStr = profileData.trial_start_date || new Date(secureNow).toISOString();
+            const endStr = profileData.trial_end_date || new Date(secureNow + 5 * 24 * 60 * 60 * 1000).toISOString();
             setTrialStartDateStr(startStr);
             setTrialEndDateStr(endStr);
             setIsTrialActivated(true);
@@ -751,8 +816,9 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
             localStorage.setItem('wrindha_has_paid', dbHasPaid ? 'true' : 'false');
           } else {
             // First time login activation flow (requirement 2 & 5)
-            const startStr = new Date().toISOString();
-            const endStr = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+            const secureNow = getCurrentSecureTime();
+            const startStr = new Date(secureNow).toISOString();
+            const endStr = new Date(secureNow + 5 * 24 * 60 * 60 * 1000).toISOString();
 
             await supabase.from('profiles').update({
               is_trial_activated: true,
@@ -1244,9 +1310,11 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
       setSubscriptionTier(cancelledTierVal);
       setMaxHabits(9999);
       setHasPaid(true);
+      setTrialEndDateStr('1970-01-01T00:00:00Z');
       localStorage.setItem('wrindha_subscription_tier', cancelledTierVal);
       localStorage.setItem('wrindha_max_habits', '9999');
       localStorage.setItem('wrindha_has_paid', 'true');
+      localStorage.setItem('wrindha_trial_end_date', '1970-01-01T00:00:00Z');
       return;
     }
     try {
@@ -1259,9 +1327,11 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
         setSubscriptionTier(cancelledTierVal);
         setMaxHabits(9999);
         setHasPaid(true);
+        setTrialEndDateStr('1970-01-01T00:00:00Z');
         localStorage.setItem('wrindha_subscription_tier', cancelledTierVal);
         localStorage.setItem('wrindha_max_habits', '9999');
         localStorage.setItem('wrindha_has_paid', 'true');
+        localStorage.setItem('wrindha_trial_end_date', '1970-01-01T00:00:00Z');
       }
       
       if (session?.user?.email === 'gongidikalyan08@gmail.com') {
@@ -1629,7 +1699,7 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
                 onClick={() => setActiveTab('pricing')}
                 className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20 px-3.5 py-1.5 rounded-full text-[11px] font-bold hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all shadow-sm hover:scale-105 active:scale-95"
               >
-                <span>⚡ 5-Day Free Trial: <strong className="font-extrabold text-indigo-700 dark:text-indigo-350">{trialDaysLeft} days remaining</strong></span>
+                <span>⚡ 5-Day Free Trial: <strong className="font-extrabold text-indigo-700 dark:text-indigo-350">{trialTimeLeftText} remaining</strong></span>
                 <span className="bg-indigo-600 text-white font-extrabold uppercase text-[8px] tracking-wider px-2 py-0.5 rounded-full shadow-sm">Upgrade</span>
               </button>
             )}
@@ -1769,7 +1839,7 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
                )}
                {activeTab === 'timetable' && <TimetableView entries={timetable} setEntries={setTimetable} onDelete={(id) => deleteFromSupabase('timetable', id)} theme={theme} />}
                {activeTab === 'blogs' && <BlogsView blogs={blogs} setBlogs={setBlogs} isAdmin={isAdmin} />}
-               {activeTab === 'pricing' && <PricingView plans={userPlans} subscriptionTier={subscriptionTier} onUpgrade={updateUserTier} onCancelSubscription={cancelUserSubscription} session={session} setActiveTab={setActiveTab} orders={orders} />}
+               {activeTab === 'pricing' && <PricingView plans={userPlans} subscriptionTier={subscriptionTier} onUpgrade={updateUserTier} onCancelSubscription={cancelUserSubscription} session={session} setActiveTab={setActiveTab} orders={orders} trialStartDateStr={trialStartDateStr} trialEndDateStr={trialEndDateStr} nowSecure={nowSecure} />}
                {activeTab === 'admin' && isAdmin && (
                  <AdminView 
                    plans={userPlans} 
@@ -6088,9 +6158,12 @@ interface PricingViewProps {
   session: any;
   setActiveTab: (tab: string) => void;
   orders?: any[];
+  trialStartDateStr: string;
+  trialEndDateStr: string;
+  nowSecure: number;
 }
 
-function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription, session, setActiveTab, orders = [] }: PricingViewProps) {
+function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription, session, setActiveTab, orders = [], trialStartDateStr, trialEndDateStr, nowSecure }: PricingViewProps) {
   const [upgradingTo, setUpgradingTo] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
@@ -6110,7 +6183,6 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
         await onCancelSubscription(userId);
       }
       setHasPaidLocal(false);
-      setTrialEnd('1970-01-01T00:00:00Z');
       setShowCancelModal(false);
       setSuccessMsg("Successfully cancelled your subscription! Your active membership has been ended, and your workspace limits have been updated.");
       setTimeout(() => setSuccessMsg(null), 6000);
@@ -6139,12 +6211,9 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
     return localStorage.getItem('wrindha_autorenew') !== 'false';
   });
 
-  const [trialStart, setTrialStart] = useState<string>(() => {
-    return localStorage.getItem('wrindha_trial_start_date') || new Date().toISOString();
-  });
-  const [trialEnd, setTrialEnd] = useState<string>(() => {
-    return localStorage.getItem('wrindha_trial_end_date') || new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
-  });
+  const trialStart = trialStartDateStr;
+  const trialEnd = trialEndDateStr;
+
   const [hasPaidLocal, setHasPaidLocal] = useState<boolean>(() => {
     return localStorage.getItem('wrindha_has_paid') === 'true';
   });
@@ -6210,9 +6279,25 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
 
   const trialStartDate = new Date(trialStart);
   const trialEndDate = new Date(trialEnd);
-  const msLeft = trialEndDate.getTime() - Date.now();
-  const trialDaysLeft = Math.max(0, Math.ceil(msLeft / (24 * 60 * 60 * 1000)));
+  const msLeft = Math.max(0, trialEndDate.getTime() - nowSecure);
+  const elapsedMs = Math.max(0, nowSecure - trialStartDate.getTime());
+  const daysElapsed = Math.floor(elapsedMs / (24 * 60 * 60 * 1000));
+  const trialDaysLeft = Math.max(0, 5 - daysElapsed);
   const isTrialActive = msLeft > 0;
+
+  const trialTimeLeftText = (() => {
+    if (msLeft <= 0) return "0d 0h 0m";
+    const seconds = Math.floor(msLeft / 1000);
+    const m = Math.floor((seconds % 3600) / 60);
+    const h = Math.floor((seconds % (3600 * 24)) / 3600);
+    const d = Math.floor(seconds / (3600 * 24));
+    
+    const parts = [];
+    if (d > 0) parts.push(`${d}d`);
+    if (h > 0 || d > 0) parts.push(`${h}h`);
+    parts.push(`${m}m`);
+    return parts.join(" ");
+  })();
 
   const cancellationInfo = (() => {
     if (!subscriptionTier || !subscriptionTier.includes('Cancelled:')) {
@@ -6515,7 +6600,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                   : isPremiumPaid 
                     ? "Premium OS Lifetime Access" 
                     : isTrialActive 
-                      ? `Active 5-Day Free Trial (${trialDaysLeft} days remaining)` 
+                      ? `Active 5-Day Free Trial (${trialTimeLeftText} remaining)` 
                       : "Subscription Expired"}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-semibold">

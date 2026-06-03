@@ -174,6 +174,12 @@ async function startServer() {
     });
   });
 
+  app.get("/api/server-time", (req, res) => {
+    res.json({
+      serverTime: new Date().toISOString()
+    });
+  });
+
   app.get("/api/config", (req, res) => {
     res.json({
       supabaseEnabled: !!process.env.VITE_SUPABASE_URL,
