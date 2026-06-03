@@ -861,22 +861,14 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
             let needDbUpdate = false;
 
             if (!startStr) {
-              const localStart = localStorage.getItem('wrindha_trial_start_date');
-              if (localStart) {
-                startStr = localStart;
-              } else {
-                startStr = new Date(secureNow).toISOString();
-              }
+              const signupTime = session.user.created_at ? new Date(session.user.created_at).getTime() : secureNow;
+              const startVal = (secureNow - signupTime > 5 * 24 * 60 * 60 * 1000) ? secureNow : signupTime;
+              startStr = new Date(startVal).toISOString();
               needDbUpdate = true;
             }
 
             if (!endStr) {
-              const localEnd = localStorage.getItem('wrindha_trial_end_date');
-              if (localEnd) {
-                endStr = localEnd;
-              } else {
-                endStr = new Date(new Date(startStr).getTime() + 5 * 24 * 60 * 60 * 1000).toISOString();
-              }
+              endStr = new Date(new Date(startStr).getTime() + 5 * 24 * 60 * 60 * 1000).toISOString();
               needDbUpdate = true;
             }
 
