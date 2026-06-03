@@ -366,8 +366,9 @@ export default function App() {
             } else {
               const secureNow = getCurrentSecureTime();
               const signupTime = session.user.created_at ? new Date(session.user.created_at).getTime() : secureNow;
-              const startStr = new Date(signupTime).toISOString();
-              const endStr = new Date(signupTime + 5 * 24 * 60 * 60 * 1000).toISOString();
+              const startVal = (secureNow - signupTime > 5 * 24 * 60 * 60 * 1000) ? secureNow : signupTime;
+              const startStr = new Date(startVal).toISOString();
+              const endStr = new Date(startVal + 5 * 24 * 60 * 60 * 1000).toISOString();
               supabase.from('profiles').insert({ 
                 id: session.user.id, 
                 email: session.user.email,
@@ -413,8 +414,9 @@ export default function App() {
             } else {
               const secureNow = getCurrentSecureTime();
               const signupTime = session.user.created_at ? new Date(session.user.created_at).getTime() : secureNow;
-              const startStr = new Date(signupTime).toISOString();
-              const endStr = new Date(signupTime + 5 * 24 * 60 * 60 * 1000).toISOString();
+              const startVal = (secureNow - signupTime > 5 * 24 * 60 * 60 * 1000) ? secureNow : signupTime;
+              const startStr = new Date(startVal).toISOString();
+              const endStr = new Date(startVal + 5 * 24 * 60 * 60 * 1000).toISOString();
               supabase.from('profiles').insert({ 
                 id: session.user.id, 
                 email: session.user.email,
@@ -808,8 +810,9 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
           const defaultName = session.user.user_metadata?.full_name || localStorage.getItem('wrindha_user_name') || "Felix";
           const secureNow = getCurrentSecureTime();
           const signupTime = session.user.created_at ? new Date(session.user.created_at).getTime() : secureNow;
-          const startStr = new Date(signupTime).toISOString();
-          const endStr = new Date(signupTime + 5 * 24 * 60 * 60 * 1000).toISOString();
+          const startVal = (secureNow - signupTime > 5 * 24 * 60 * 60 * 1000) ? secureNow : signupTime;
+          const startStr = new Date(startVal).toISOString();
+          const endStr = new Date(startVal + 5 * 24 * 60 * 60 * 1000).toISOString();
           
           const { data: newProfile } = await supabase.from('profiles').upsert({
             id: userId,
@@ -868,8 +871,9 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
             // First time login activation flow (requirement 2 & 5)
             const secureNow = getCurrentSecureTime();
             const signupTime = session.user.created_at ? new Date(session.user.created_at).getTime() : secureNow;
-            const startStr = new Date(signupTime).toISOString();
-            const endStr = new Date(signupTime + 5 * 24 * 60 * 60 * 1000).toISOString();
+            const startVal = (secureNow - signupTime > 5 * 24 * 60 * 60 * 1000) ? secureNow : signupTime;
+            const startStr = new Date(startVal).toISOString();
+            const endStr = new Date(startVal + 5 * 24 * 60 * 60 * 1000).toISOString();
 
             await supabase.from('profiles').update({
               is_trial_activated: true,
