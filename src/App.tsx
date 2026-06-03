@@ -1448,6 +1448,23 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
     return <AuthConfigErrorView error={configError} onBypass={() => setBypassConfig(true)} />;
   }
 
+  const isSyncingTime = serverTimeMs === null && (performance.now() - bootPerfTime < 2000);
+  if ((isInitializing || isSyncingTime) && (isSupabaseConfigured() && !bypassConfig)) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-white font-sans">
+        <div className="text-center space-y-6">
+          <div className="w-16 h-16 bg-indigo-500/10 text-indigo-400 rounded-3xl flex items-center justify-center mx-auto shadow-xl animate-pulse">
+            <BarChart3 className="w-8 h-8 animate-spin text-indigo-400" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-xl font-black leading-none uppercase tracking-wider text-white">Wrindha OS</h3>
+            <p className="text-xs text-slate-400 font-medium">Synchronizing workspace metadata across devices...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-[#F8F9FA] dark:bg-gray-950 text-[#1A1A1A] dark:text-gray-100 font-sans overflow-hidden transition-colors duration-300">
       {isSidebarOpen && (
