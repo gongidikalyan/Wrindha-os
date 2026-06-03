@@ -856,8 +856,37 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
 
           if (dbIsTrialActivated) {
             const secureNow = getCurrentSecureTime();
-            const startStr = profileData.trial_start_date || new Date(secureNow).toISOString();
-            const endStr = profileData.trial_end_date || new Date(secureNow + 5 * 24 * 60 * 60 * 1000).toISOString();
+            let startStr = profileData.trial_start_date;
+            let endStr = profileData.trial_end_date;
+            let needDbUpdate = false;
+
+            if (!startStr) {
+              const localStart = localStorage.getItem('wrindha_trial_start_date');
+              if (localStart) {
+                startStr = localStart;
+              } else {
+                startStr = new Date(secureNow).toISOString();
+              }
+              needDbUpdate = true;
+            }
+
+            if (!endStr) {
+              const localEnd = localStorage.getItem('wrindha_trial_end_date');
+              if (localEnd) {
+                endStr = localEnd;
+              } else {
+                endStr = new Date(new Date(startStr).getTime() + 5 * 24 * 60 * 60 * 1000).toISOString();
+              }
+              needDbUpdate = true;
+            }
+
+            if (needDbUpdate) {
+              await supabase.from('profiles').update({
+                trial_start_date: startStr,
+                trial_end_date: endStr
+              }).eq('id', userId);
+            }
+
             setTrialStartDateStr(startStr);
             setTrialEndDateStr(endStr);
             setIsTrialActivated(true);
