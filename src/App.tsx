@@ -152,19 +152,24 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
-    const fetchTime = async () => {
+    const fetchTime = async (retryCount = 0) => {
       try {
         const res = await fetch('/api/server-time');
+        if (!res.ok) throw new Error(`HTTP error ${res.status}`);
         const data = await res.json();
         if (active && data.serverTime) {
           setServerTimeMs(new Date(data.serverTime).getTime());
         }
       } catch (err) {
-        console.error("Failed to fetch server time:", err);
+        console.warn(`Failed to fetch server time (attempt ${retryCount + 1}):`, err);
+        if (active && retryCount < 5) {
+          const delay = Math.min(1000 * Math.pow(2, retryCount), 10000);
+          setTimeout(() => fetchTime(retryCount + 1), delay);
+        }
       }
     };
     fetchTime();
-    const timer = setInterval(fetchTime, 30000);
+    const timer = setInterval(() => fetchTime(0), 30000);
     return () => {
       active = false;
       clearInterval(timer);
