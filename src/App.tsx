@@ -89,6 +89,25 @@ const infoModules = [
   { id: 'disclaimer', name: 'Disclaimer', icon: AlertCircle },
 ];
 
+const calculateTrialDates = (signupTimeStr: string | undefined | null, currentSecureTime: number) => {
+  const JUNE_1_2026 = new Date("2026-06-01T00:00:00Z").getTime();
+  const signupTime = signupTimeStr ? new Date(signupTimeStr).getTime() : currentSecureTime;
+  
+  let trialStartVal: number;
+  if (signupTime < JUNE_1_2026) {
+    trialStartVal = currentSecureTime;
+  } else {
+    trialStartVal = signupTime;
+  }
+  
+  const trialEndVal = trialStartVal + 5 * 24 * 60 * 60 * 1000;
+  
+  return {
+    startStr: new Date(trialStartVal).toISOString(),
+    endStr: new Date(trialEndVal).toISOString()
+  };
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
@@ -365,10 +384,7 @@ export default function App() {
               }).eq('id', session.user.id).then();
             } else {
               const secureNow = getCurrentSecureTime();
-              const signupTime = session.user.created_at ? new Date(session.user.created_at).getTime() : secureNow;
-              const startVal = (secureNow - signupTime > 5 * 24 * 60 * 60 * 1000) ? secureNow : signupTime;
-              const startStr = new Date(startVal).toISOString();
-              const endStr = new Date(startVal + 5 * 24 * 60 * 60 * 1000).toISOString();
+              const dates = calculateTrialDates(session.user.created_at, secureNow);
               supabase.from('profiles').insert({ 
                 id: session.user.id, 
                 email: session.user.email,
@@ -377,8 +393,8 @@ export default function App() {
                 budget: userBudget,
                 currency: currency,
                 is_trial_activated: true,
-                trial_start_date: startStr,
-                trial_end_date: endStr,
+                trial_start_date: dates.startStr,
+                trial_end_date: dates.endStr,
                 has_paid: false
               }).then();
             }
@@ -413,10 +429,7 @@ export default function App() {
               }).eq('id', session.user.id).then();
             } else {
               const secureNow = getCurrentSecureTime();
-              const signupTime = session.user.created_at ? new Date(session.user.created_at).getTime() : secureNow;
-              const startVal = (secureNow - signupTime > 5 * 24 * 60 * 60 * 1000) ? secureNow : signupTime;
-              const startStr = new Date(startVal).toISOString();
-              const endStr = new Date(startVal + 5 * 24 * 60 * 60 * 1000).toISOString();
+              const dates = calculateTrialDates(session.user.created_at, secureNow);
               supabase.from('profiles').insert({ 
                 id: session.user.id, 
                 email: session.user.email,
@@ -425,8 +438,8 @@ export default function App() {
                 budget: userBudget,
                 currency: currency,
                 is_trial_activated: true,
-                trial_start_date: startStr,
-                trial_end_date: endStr,
+                trial_start_date: dates.startStr,
+                trial_end_date: dates.endStr,
                 has_paid: false
               }).then();
             }
@@ -809,10 +822,7 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
           // If the profile row doesn't exist yet, seamlessly bootstrap it to prevent any platform race states
           const defaultName = session.user.user_metadata?.full_name || localStorage.getItem('wrindha_user_name') || "Felix";
           const secureNow = getCurrentSecureTime();
-          const signupTime = session.user.created_at ? new Date(session.user.created_at).getTime() : secureNow;
-          const startVal = (secureNow - signupTime > 5 * 24 * 60 * 60 * 1000) ? secureNow : signupTime;
-          const startStr = new Date(startVal).toISOString();
-          const endStr = new Date(startVal + 5 * 24 * 60 * 60 * 1000).toISOString();
+          const dates = calculateTrialDates(session.user.created_at, secureNow);
           
           const { data: newProfile } = await supabase.from('profiles').upsert({
             id: userId,
@@ -822,8 +832,8 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
             budget: userBudget,
             currency: currency,
             is_trial_activated: true,
-            trial_start_date: startStr,
-            trial_end_date: endStr,
+            trial_start_date: dates.startStr,
+            trial_end_date: dates.endStr,
             has_paid: false
           }).select().maybeSingle();
 
@@ -861,9 +871,8 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
             let needDbUpdate = false;
 
             if (!startStr) {
-              const signupTime = session.user.created_at ? new Date(session.user.created_at).getTime() : secureNow;
-              const startVal = (secureNow - signupTime > 5 * 24 * 60 * 60 * 1000) ? secureNow : signupTime;
-              startStr = new Date(startVal).toISOString();
+              const dates = calculateTrialDates(session.user.created_at, secureNow);
+              startStr = dates.startStr;
               needDbUpdate = true;
             }
 
@@ -891,25 +900,22 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
           } else {
             // First time login activation flow (requirement 2 & 5)
             const secureNow = getCurrentSecureTime();
-            const signupTime = session.user.created_at ? new Date(session.user.created_at).getTime() : secureNow;
-            const startVal = (secureNow - signupTime > 5 * 24 * 60 * 60 * 1000) ? secureNow : signupTime;
-            const startStr = new Date(startVal).toISOString();
-            const endStr = new Date(startVal + 5 * 24 * 60 * 60 * 1000).toISOString();
+            const dates = calculateTrialDates(session.user.created_at, secureNow);
 
             await supabase.from('profiles').update({
               is_trial_activated: true,
-              trial_start_date: startStr,
-              trial_end_date: endStr,
+              trial_start_date: dates.startStr,
+              trial_end_date: dates.endStr,
               has_paid: false
             }).eq('id', userId);
 
-            setTrialStartDateStr(startStr);
-            setTrialEndDateStr(endStr);
+            setTrialStartDateStr(dates.startStr);
+            setTrialEndDateStr(dates.endStr);
             setIsTrialActivated(true);
             setHasPaid(false);
 
-            localStorage.setItem('wrindha_trial_start_date', startStr);
-            localStorage.setItem('wrindha_trial_end_date', endStr);
+            localStorage.setItem('wrindha_trial_start_date', dates.startStr);
+            localStorage.setItem('wrindha_trial_end_date', dates.endStr);
             localStorage.setItem('wrindha_is_trial_activated', 'true');
             localStorage.setItem('wrindha_has_paid', 'false');
           }
@@ -6374,8 +6380,9 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
   const isTrialActive = msLeft > 0;
 
   const trialTimeLeftText = (() => {
-    if (msLeft <= 0) return "0d 0h 0m";
+    if (msLeft <= 0) return "0d 0h 0m 0s";
     const seconds = Math.floor(msLeft / 1000);
+    const s = seconds % 60;
     const m = Math.floor((seconds % 3600) / 60);
     const h = Math.floor((seconds % (3600 * 24)) / 3600);
     const d = Math.floor(seconds / (3600 * 24));
@@ -6383,7 +6390,8 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
     const parts = [];
     if (d > 0) parts.push(`${d}d`);
     if (h > 0 || d > 0) parts.push(`${h}h`);
-    parts.push(`${m}m`);
+    if (m > 0 || h > 0 || d > 0) parts.push(`${m}m`);
+    parts.push(`${s}s`);
     return parts.join(" ");
   })();
 

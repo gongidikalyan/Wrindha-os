@@ -143,25 +143,54 @@ CREATE POLICY "Users can manage their own study courses" ON public.study_courses
 -- --- AUTOMATIC PROFILE CREATION ---
 CREATE OR REPLACE FUNCTION public.handle_new_user() 
 RETURNS TRIGGER AS $$
+DECLARE
+  signup_time TIMESTAMP WITH TIME ZONE := timezone('utc'::text, now());
+  june_1_2026 TIMESTAMP WITH TIME ZONE := '2026-06-01 00:00:00+00'::TIMESTAMPTZ;
 BEGIN
-  INSERT INTO public.profiles (
-    id, 
-    email, 
-    full_name, 
-    trial_start_date, 
-    trial_end_date, 
-    is_trial_activated, 
-    has_paid
-  )
-  VALUES (
-    new.id, 
-    new.email, 
-    COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'fullName'),
-    timezone('utc'::text, now()),
-    timezone('utc'::text, now() + INTERVAL '5 days'),
-    true,
-    false
-  );
+  IF signup_time < june_1_2026 THEN
+    -- Existing Users: account created before June 1, 2026.
+    -- One-time 5-day free trial on their first login after June 1, 2026.
+    -- So we do not activate the trial on raw creation.
+    INSERT INTO public.profiles (
+      id, 
+      email, 
+      full_name, 
+      trial_start_date, 
+      trial_end_date, 
+      is_trial_activated, 
+      has_paid
+    )
+    VALUES (
+      new.id, 
+      new.email, 
+      COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'fullName'),
+      NULL,
+      NULL,
+      false,
+      false
+    );
+  ELSE
+    -- New Users: account created on or after June 1, 2026.
+    -- Receive a one-time 5-day free trial starting from signup time itself.
+    INSERT INTO public.profiles (
+      id, 
+      email, 
+      full_name, 
+      trial_start_date, 
+      trial_end_date, 
+      is_trial_activated, 
+      has_paid
+    )
+    VALUES (
+      new.id, 
+      new.email, 
+      COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'fullName'),
+      signup_time,
+      signup_time + INTERVAL '5 days',
+      true,
+      false
+    );
+  END IF;
   RETURN NEW;
 EXCEPTION WHEN OTHERS THEN
   RETURN NEW; -- Ensure auth creation doesn't fail if profile creation fails
