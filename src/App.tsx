@@ -1848,8 +1848,8 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
                       <div className="space-y-3 pt-3 border-t border-gray-100 dark:border-gray-800 text-xs text-left">
                         <div className="flex justify-between items-center gap-2">
                           <span className="font-bold text-gray-400 uppercase text-[10px] shrink-0">Email</span>
-                          <span className="font-semibold dark:text-white text-gray-700 truncate max-w-[150px]" title={session?.user?.email || "sandbox@wrindha.com"}>
-                            {session?.user?.email || "sandbox@wrindha.com"}
+                          <span className="font-semibold dark:text-white text-gray-700 truncate max-w-[150px]" title={session?.user?.email || "user@wrindha.com"}>
+                            {session?.user?.email || "user@wrindha.com"}
                           </span>
                         </div>
                         <div className="flex justify-between items-center gap-2">
@@ -6555,7 +6555,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                   isSandbox: false,
                   couponCode: appliedCoupon ? appliedCoupon.couponCode : undefined,
                   userId: currentUserId,
-                  userEmail: session?.user?.email || "sandbox@wrindha.com",
+                  userEmail: session?.user?.email || "user@wrindha.com",
                   discountApplied: appliedCoupon ? appliedCoupon.discountAmount : 0,
                   paidAmount: finalPriceToOrder
                 })
@@ -6587,7 +6587,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
           },
           prefill: {
             name: session?.user?.user_metadata?.full_name || "Productive Student",
-            email: session?.user?.email || "sandbox@wrindha.com"
+            email: session?.user?.email || "user@wrindha.com"
           },
           theme: {
             color: "#3399cc"
@@ -6617,7 +6617,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                 isSandbox: true,
                 couponCode: appliedCoupon ? appliedCoupon.couponCode : undefined,
                 userId: currentUserId,
-                userEmail: session?.user?.email || "sandbox@wrindha.com",
+                userEmail: session?.user?.email || "user@wrindha.com",
                 discountApplied: appliedCoupon ? appliedCoupon.discountAmount : 0,
                 paidAmount: finalPriceToOrder
               })
@@ -6631,14 +6631,14 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
             // Persistence
             setUpgradingTo(checkoutPlan.id);
             const methodLabel = qrScanActive 
-              ? 'Razorpay Sandbox (UPI QR Scanner)' 
-              : `Razorpay Sandbox (UPI ID: ${selectedUpiApp.toUpperCase()}: ${upiId})`;
+              ? 'Razorpay Secure (UPI QR Scanner)' 
+              : `Razorpay Secure (UPI ID: ${selectedUpiApp.toUpperCase()}: ${upiId})`;
 
             await onUpgrade(currentUserId, checkoutPlan.name, 9999, `${finalPriceToOrder}`, checkoutPlan.id, methodLabel);
             setUpgradingTo(null);
 
             setCheckoutStep(3); // Perfect
-            setSuccessMsg(`Congratulations! Upgraded successfully to ${checkoutPlan.name} [Paid ${billingPeriod === 'yearly' ? 'Yearly' : 'Monthly'} via Razorpay Sandbox]! Premium capabilities activated. ✨`);
+            setSuccessMsg(`Congratulations! Upgraded successfully to ${checkoutPlan.name} [Paid ${billingPeriod === 'yearly' ? 'Yearly' : 'Monthly'} via Razorpay]! Premium capabilities activated. ✨`);
             setTimeout(() => setSuccessMsg(null), 6000);
           } catch (err: any) {
             setPaymentError(err.message || 'Error processing simulated billing upgrade.');
@@ -7156,30 +7156,30 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                   setCheckoutStep(0);
                   setPaymentError(null);
                 }}
-                className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2.5 rounded-full bg-gray-100/60 hover:bg-gray-200/80 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors text-gray-500 dark:text-gray-300 z-50 shadow-sm border border-gray-200/30 dark:border-gray-700/50"
+                className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors text-slate-500 dark:text-slate-300 z-50 shadow-sm border border-slate-200 dark:border-slate-750"
               >
                 <X className="w-4 h-4" />
               </button>
 
               {/* Left Column: Plan Summary and Virtual Credit Card Flip */}
-              <div className="flex-1 flex flex-col justify-between space-y-4 sm:space-y-6 bg-gray-50/50 dark:bg-gray-950/40 p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[2rem] border border-gray-100 dark:border-gray-800/60">
+              <div className="flex-1 flex flex-col justify-between space-y-4 sm:space-y-6 bg-slate-50/60 dark:bg-slate-900/40 p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-200/60 dark:border-slate-800/40">
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="w-5 h-5 text-indigo-500" />
                     <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Razorpay Secure Gateway Portal</span>
                   </div>
                   <div>
-                    <h3 className="text-2xl font-black dark:text-white">Upgrade to {checkoutPlan.name}</h3>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Unlock unconstrained productivity tracking, in-depth database analytics, and customized templates via Razorpay.</p>
+                    <h3 className="text-2xl font-black text-gray-900 dark:text-white">Upgrade to {checkoutPlan.name}</h3>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Unlock unconstrained productivity tracking, in-depth database analytics, and customized templates via Razorpay.</p>
                   </div>
 
                   {/* Pricing dynamic calculation billings list */}
                   <div className="space-y-2 pt-2">
-                    <div className="flex justify-between text-xs font-semibold text-gray-600 dark:text-gray-400">
+                    <div className="flex justify-between text-xs font-semibold text-gray-700 dark:text-gray-300">
                       <span>Pro Space Access Plan:</span>
                       <span>{checkoutPlan.price} / month</span>
                     </div>
-                    <div className="flex justify-between text-xs font-semibold text-gray-600 dark:text-gray-400">
+                    <div className="flex justify-between text-xs font-semibold text-gray-700 dark:text-gray-300">
                       <span>Billing Interval Cycle:</span>
                       <span className="capitalize">{billingPeriod}</span>
                     </div>
@@ -7189,13 +7189,13 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                         <span>-20% Applied</span>
                       </div>
                     )}
-                    <div className="h-[1px] bg-gray-200 dark:bg-gray-850/60 my-2"></div>
+                    <div className="h-[1px] bg-slate-200 dark:bg-slate-800 my-2"></div>
                     <div className="flex justify-between items-baseline pt-1">
-                      <span className="text-sm font-black dark:text-white">Authorized Total Paid:</span>
+                      <span className="text-sm font-black text-gray-900 dark:text-white">Authorized Total Paid:</span>
                       <div className="text-right">
                         {appliedCoupon ? (
                           <>
-                            <span className="text-xs line-through text-gray-400 mr-2 font-mono">
+                            <span className="text-xs line-through text-gray-400 dark:text-gray-550 mr-2 font-mono">
                               ₹{billingPeriod === 'yearly'
                                 ? Math.floor(parseFloat(checkoutPlan.price.replace(/[^\d.]/g, '')) * 12 * 0.8)
                                 : parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''))}
@@ -7203,7 +7203,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                             <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
                               ₹{appliedCoupon.payableAmount}
                             </span>
-                            <p className="text-[10px] text-emerald-500 font-extrabold mt-0.5">₹{appliedCoupon.discountAmount} Coupon Saved!</p>
+                            <p className="text-[10px] text-emerald-500 font-extrabold mt-0.5 font-sans">₹{appliedCoupon.discountAmount} Coupon Saved!</p>
                           </>
                         ) : (
                           <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400 font-mono">
@@ -7217,74 +7217,39 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                     </div>
                   </div>
                 </div>
-
-                {/* Virtual UPI Voucher Representation */}
-                <div className="hidden md:flex justify-center pt-4">
-                  <div className="w-80 h-44 bg-gradient-to-br from-teal-700 via-emerald-900 to-slate-950 rounded-3xl p-6 text-white shadow-xl flex flex-col justify-between relative overflow-hidden ring-1 ring-emerald-500/20">
-                    <div className="absolute inset-0 bg-white/[0.02] pointer-events-none"></div>
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-1">
-                        <span className="text-[8px] tracking-widest uppercase text-emerald-200 font-extrabold">BHIM UPI DIGITAL</span>
-                        <p className="text-[10px] font-bold text-emerald-400">NPCI Unified Network</p>
-                      </div>
-                      <span className="text-[9px] font-black uppercase tracking-widest bg-white/15 px-2.5 py-1 rounded text-emerald-100 flex items-center gap-1 align-middle">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                        SECURE
-                      </span>
-                    </div>
-                    
-                    <div className="py-2 text-center">
-                      <p className="text-[9px] text-emerald-200/65 uppercase tracking-widest">Active Virtual Address</p>
-                      <div className="font-mono text-xs tracking-wide font-black text-emerald-300 truncate px-2 mt-0.5 bg-black/20 py-2 rounded-xl border border-white/5">
-                        {upiId || 'premium@gpay'}
-                      </div>
-                    </div>
-
-                    <div className="flex justify-between text-[9px] uppercase font-bold text-emerald-200 pt-1">
-                      <div>
-                        <div className="text-[7px] text-emerald-450 uppercase tracking-wider">Gateway</div>
-                        <div>Razorpay Sandbox</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-[7px] text-emerald-450 uppercase tracking-wider">Settlement</div>
-                        <div>Instant Active</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
 
               {/* Right Column: Checkout input form and payment actions */}
-              <div className="flex-1 flex flex-col justify-center space-y-4 sm:space-y-6 py-2 border-t lg:border-t-0 lg:border-l border-gray-100 dark:border-gray-800/60 pt-6 lg:pt-0 lg:pl-8">
+              <div className="flex-1 flex flex-col justify-center space-y-4 sm:space-y-6 py-2 border-t lg:border-t-0 lg:border-l border-slate-150 dark:border-slate-800/60 pt-6 lg:pt-0 lg:pl-8">
                 {checkoutStep === 0 && (
                   <div className="space-y-4">
                     {/* Razorpay Brand Bar */}
-                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between pb-3 border-b border-gray-150 dark:border-gray-800/60">
+                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-800/60">
                       <div className="flex items-center gap-2">
                         <span className="bg-blue-600 text-white rounded px-2.5 py-1 text-[9px] font-black tracking-wider uppercase shadow-sm">
                           RAZORPAY
                         </span>
-                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">SECURE CHECKOUT</span>
+                        <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">SECURE CHECKOUT</span>
                       </div>
-                      <span className="text-[9px] text-emerald-500 font-extrabold flex items-center gap-1">
+                      <span className="text-[9px] text-emerald-550 font-extrabold flex items-center gap-1">
                         ● SECURED 256-BIT SSL
                       </span>
                     </div>
 
                     {paymentError && (
-                      <div className="p-3 bg-red-50 dark:bg-red-955/20 text-red-650 dark:text-red-400 border border-red-200 dark:border-red-900/30 rounded-xl text-xs font-bold animate-pulse">
+                      <div className="p-3 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-455 border border-red-200 dark:border-red-900/30 rounded-xl text-xs font-bold animate-pulse">
                         {paymentError}
                       </div>
                     )}
 
                     {/* Secure Coupon Code Input Section */}
-                    <div className="bg-gradient-to-r from-gray-50 to-indigo-50/20 dark:from-gray-950 dark:to-indigo-950/10 p-3.5 rounded-2xl border border-gray-150 dark:border-gray-800/80 space-y-2">
+                    <div className="bg-gradient-to-r from-gray-50 to-indigo-50/20 dark:from-slate-950 dark:to-indigo-950/10 p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1">
                           <Tag className="w-3 h-3 text-indigo-500" /> Apply Promo Code / Coupon
                         </span>
                         {appliedCoupon && (
-                          <span className="text-[9px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">
+                          <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
                             ACTIVE
                           </span>
                         )}
@@ -7318,7 +7283,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                               setTypedCoupon(e.target.value);
                               setCouponError(null);
                             }}
-                            className="flex-1 py-1.5 px-3 bg-white dark:bg-gray-90% border border-gray-200 dark:border-gray-850 rounded-xl outline-none text-xs font-mono font-bold dark:text-white uppercase placeholder-gray-400 focus:border-indigo-500"
+                            className="flex-1 py-1.5 px-3 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl outline-none text-xs font-mono font-bold text-gray-800 dark:text-white uppercase placeholder-gray-400 focus:border-indigo-500"
                           />
                           <button
                             type="button"
@@ -7338,13 +7303,13 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
 
                     <div className="space-y-4 animate-fadeIn">
                       {/* UPI Payment selector type tab */}
-                      <div className="flex bg-gray-50 dark:bg-gray-950 p-1 rounded-xl border border-gray-150 dark:border-gray-800/60 w-full sm:w-fit mx-auto">
+                      <div className="flex bg-gray-100 dark:bg-gray-950 p-1 rounded-xl border border-gray-200 dark:border-gray-800/80 w-full sm:w-fit mx-auto">
                         <button
                           type="button"
                           onClick={() => setQrScanActive(false)}
                           className={cn(
                             "flex-1 sm:flex-initial px-3 sm:px-4 py-2 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5",
-                            !qrScanActive ? "bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-gray-400 dark:text-gray-500 hover:text-gray-850"
+                            !qrScanActive ? "bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
                           )}
                         >
                           <Smartphone className="w-3.5 h-3.5" />
@@ -7358,7 +7323,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                           }}
                           className={cn(
                             "flex-1 sm:flex-initial px-3 sm:px-4 py-2 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5",
-                            qrScanActive ? "bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-gray-400 dark:text-gray-500 hover:text-gray-850"
+                            qrScanActive ? "bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
                           )}
                         >
                           <QrCode className="w-3.5 h-3.5" />
@@ -7368,12 +7333,12 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
 
                       {!qrScanActive ? (
                         <div className="space-y-4">
-                          <h4 className="text-xs font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">Razorpay UPI VPA Routing</h4>
+                          <h4 className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">Razorpay UPI VPA Routing</h4>
                           
                           <div className="space-y-4">
                             {/* Selection of UPI App preset */}
                             <div className="space-y-1.5">
-                              <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Select Preferring UPI App Preset</label>
+                              <label className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">Select Preferring UPI App Preset</label>
                               <div className="grid grid-cols-4 gap-2">
                                 {[
                                   { id: 'gpay', name: 'GPay', desc: '@okaxis' },
@@ -7393,47 +7358,44 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                                       "py-2 px-1 text-center rounded-xl border text-[10px] font-extrabold transition-all flex flex-col items-center justify-center gap-0.5",
                                       selectedUpiApp === app.id
                                         ? "border-amber-500 dark:border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/20"
-                                        : "border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-90% text-gray-500 hover:bg-gray-50 hover:text-gray-850 dark:hover:text-white"
+                                        : "border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-950 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900 hover:text-gray-900 dark:hover:text-white"
                                     )}
                                   >
                                     <span>{app.name}</span>
-                                    <span className="text-[8px] font-normal text-gray-400 uppercase tracking-tight">{app.desc}</span>
+                                    <span className="text-[8px] font-normal text-gray-400 dark:text-gray-500 uppercase tracking-tight">{app.desc}</span>
                                   </button>
                                 ))}
                               </div>
                             </div>
 
                             {/* UPI id field input */}
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Virtual Private Address (UPI ID)</label>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-455">Virtual Private Address (UPI ID)</label>
                               <input 
                                 type="text" 
                                 placeholder="username@okaxis"
                                 value={upiId}
                                 onChange={e => setUpiId(e.target.value)}
-                                className="w-full py-3 px-4 bg-gray-50 dark:bg-gray-850 border border-gray-150 dark:border-gray-800 rounded-xl outline-none text-sm font-mono focus:border-indigo-500 dark:text-white font-bold text-center"
+                                className="w-full py-3.5 px-4 bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-2xl outline-none text-sm font-mono focus:border-indigo-500 dark:text-white font-bold text-center focus:ring-2 focus:ring-indigo-500/20 transition-all text-gray-800"
                               />
                             </div>
                           </div>
 
-                          <div className="pt-4 space-y-3">
+                          <div className="pt-4">
                             <button 
                               onClick={processSecureCheckout}
                               className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-black uppercase tracking-widest text-xs rounded-2xl transition-all shadow-lg shadow-indigo-600/10 flex items-center justify-center gap-2"
                             >
                               <Zap className="w-4 h-4 text-amber-400 fill-amber-400" /> Pay via UPI ID Securely &rarr;
                             </button>
-                            <p className="text-[10px] text-center text-gray-400 leading-relaxed max-w-xs mx-auto">
-                              🔓 Interfacing with Sandbox UPI Router. Verification finishes instantly without real bank transactions.
-                            </p>
                           </div>
                         </div>
                       ) : (
                         <div className="space-y-4 text-center">
-                          <h4 className="text-xs font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">Dynamic Scan-to-Pay QR Code</h4>
+                          <h4 className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">Dynamic Scan-to-Pay QR Code</h4>
                           
                           {/* Visual QR Code Representational Box */}
-                          <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-inner w-52 h-52 mx-auto flex flex-col justify-between items-center relative overflow-hidden group">
+                          <div className="bg-white p-5 rounded-3xl border border-gray-200 shadow-inner w-52 h-52 mx-auto flex flex-col justify-between items-center relative overflow-hidden group">
                             {/* QR code matrix mockup strictly in custom design */}
                             <svg className="w-40 h-40 text-slate-900" viewBox="0 0 100 100" fill="currentColor">
                               {/* Corners */}
@@ -7463,13 +7425,13 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                             </div>
                           </div>
 
-                          <div className="text-center space-y-1">
-                            <p className="text-xs font-black dark:text-white">Amount to pay: ₹{
+                          <div className="text-center space-y-1.5">
+                            <p className="text-sm font-black text-gray-900 dark:text-white">Amount to pay: ₹{
                               billingPeriod === 'yearly'
                                 ? Math.floor(parseFloat(checkoutPlan.price.replace(/[^\d.]/g, '')) * 12 * 0.8)
                                 : parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''))
                             }.00</p>
-                            <p className="text-[10px] text-gray-400 font-semibold max-w-xs mx-auto">
+                            <p className="text-[11px] text-gray-600 dark:text-gray-400 font-medium max-w-xs mx-auto">
                               Scan using any compatible UPI app (Google Pay, PhonePe, Paytm, BHIM, Mobikwik, WhatsApp Pay) to verify instantly.
                             </p>
                           </div>
