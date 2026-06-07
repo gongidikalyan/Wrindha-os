@@ -171,7 +171,7 @@ BEGIN
     );
   ELSE
     -- New Users: account created on or after June 1, 2026.
-    -- Receive a one-time 5-day free trial starting from signup time itself.
+    -- Receive a one-time 7-day free trial starting from signup time itself.
     INSERT INTO public.profiles (
       id, 
       email, 
@@ -186,7 +186,7 @@ BEGIN
       new.email, 
       COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'fullName'),
       signup_time,
-      signup_time + INTERVAL '5 days',
+      signup_time + INTERVAL '7 days',
       true,
       false
     );
@@ -315,7 +315,7 @@ BEGIN
   -- Handle transition state for first-time login activation
   IF (OLD.is_trial_activated = false OR OLD.is_trial_activated IS NULL) AND NEW.is_trial_activated = true THEN
     NEW.trial_start_date := COALESCE(NEW.trial_start_date, timezone('utc'::text, now()));
-    NEW.trial_end_date := COALESCE(NEW.trial_end_date, NEW.trial_start_date + INTERVAL '5 days');
+    NEW.trial_end_date := COALESCE(NEW.trial_end_date, NEW.trial_start_date + INTERVAL '7 days');
   END IF;
 
   RETURN NEW;

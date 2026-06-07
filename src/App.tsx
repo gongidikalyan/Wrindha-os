@@ -57,7 +57,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn, formatCurrency, getStorage, setStorage } from "@/src/lib/utils";
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, LineChart, Line, CartesianGrid } from "recharts";
 import { Task, EisenhowerQuadrant, Habit, Expense, Goal, GoalType, TimetableEntry, TimetableType, StudyCourse, Blog, PricingPlan, UserSubscription } from "./types";
 import { supabase, isSupabaseConfigured, getSupabaseError, supabaseUrl } from "./lib/supabase";
 import AnalyticsView from "./components/AnalyticsView";
@@ -248,7 +248,7 @@ export default function App() {
   // Calculate trialDaysLeft based on exact elapsed hours from server-synced time:
   const elapsedMs = Math.max(0, nowSecure - trialStartDate.getTime());
   const daysElapsed = Math.floor(elapsedMs / (24 * 60 * 60 * 1000));
-  const trialDaysLeft = Math.max(0, 5 - daysElapsed);
+  const trialDaysLeft = Math.max(0, 7 - daysElapsed);
   const isTrialActive = msLeft > 0;
 
   const formatRemainingTimeText = (ms: number) => {
@@ -926,7 +926,7 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
             await supabase.from('profiles').update({ budget: localBudget }).eq('id', userId);
           } else {
             if (profileData.budget !== undefined && profileData.budget !== null) {
-              setUserBudget(profileData.budget);
+              setUserBudget(typeof profileData.budget === 'string' ? parseFloat(profileData.budget) : profileData.budget);
             }
           }
           if (profileData.currency) setCurrency(profileData.currency as 'USD' | 'INR');
@@ -1045,7 +1045,12 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
         })) : [];
         setTasks(mappedTasks);
 
-        const mappedExpenses = expensesRes.data && expensesRes.data.length > 0 ? expensesRes.data : [];
+        const mappedExpenses = expensesRes.data && expensesRes.data.length > 0 
+          ? expensesRes.data.map((e: any) => ({
+              ...e,
+              amount: typeof e.amount === 'string' ? parseFloat(e.amount) : e.amount
+            })) 
+          : [];
         setExpenses(mappedExpenses);
 
         const mappedGoals = goalsRes.data && goalsRes.data.length > 0 ? goalsRes.data.map((g: any) => ({
@@ -1992,16 +1997,16 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
              >
                {activeTab === 'dashboard' && <DashboardView habits={habits} tasks={tasks} expenses={expenses} currency={currency} userName={userName} setUserName={setUserName} theme={theme} setActiveTab={setActiveTab} budget={userBudget} />}
                 {activeTab === 'analytics' && <AnalyticsView expenses={expenses} habits={habits} tasks={tasks} goals={goals} courses={studyCourses} currency={currency} />}
-               {activeTab === 'habits' && <HabitsView habits={habits} setHabits={setHabits} onDelete={(id) => deleteFromSupabase('habits', id)} theme={theme} subscriptionTier="Premium" setActiveTab={setActiveTab} />}
-               {activeTab === 'tasks' && <TasksView tasks={tasks} setTasks={setTasks} onDelete={(id) => deleteFromSupabase('tasks', id)} subscriptionTier="Premium" setActiveTab={setActiveTab} />}
+               {activeTab === 'habits' && <HabitsView habits={habits} setHabits={setHabits} onDelete={(id) => deleteFromSupabase('habits', id)} theme={theme} subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} setActiveTab={setActiveTab} />}
+               {activeTab === 'tasks' && <TasksView tasks={tasks} setTasks={setTasks} onDelete={(id) => deleteFromSupabase('tasks', id)} subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} setActiveTab={setActiveTab} />}
                {activeTab === 'finance' && <FinanceView expenses={expenses} setExpenses={setExpenses} onDelete={(id) => deleteFromSupabase('expenses', id)} currency={currency} setCurrency={setCurrency} theme={theme} budget={userBudget} setBudget={setUserBudget} />}
-               {activeTab === 'study' && <StudyView courses={studyCourses} setCourses={setStudyCourses} onDeleteCourse={(id) => deleteFromSupabase('study_courses', id)} subscriptionTier="Premium" setActiveTab={setActiveTab} />}
+               {activeTab === 'study' && <StudyView courses={studyCourses} setCourses={setStudyCourses} onDeleteCourse={(id) => deleteFromSupabase('study_courses', id)} subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} setActiveTab={setActiveTab} />}
                {activeTab === 'goals' && (
                  <GoalsView 
                    goals={goals} 
                    setGoals={setGoals} 
                    onDelete={(id) => deleteFromSupabase('goals', id)} 
-                   subscriptionTier="Premium" 
+                   subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} 
                    setActiveTab={setActiveTab}
                    habits={habits}
                    setHabits={setHabits}
@@ -2017,7 +2022,7 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
                {activeTab === 'admin' && isAdmin && (
                  <AdminView 
                    plans={userPlans} 
-                   allUsers={allUserProfiles || []} 
+                   allUsers={allUserProfiles || []} theme={theme} 
                    onUpdateUser={updateUserTier} 
                    onUpdatePlan={updatePricingPlan} 
                    onDeletePlan={deletePricingPlan} 
@@ -2632,10 +2637,10 @@ interface AdminViewProps {
   allUsers: UserSubscription[];
   onUpdateUser: (userId: string, tier: string, habitsLimit: number) => Promise<void>;
   onUpdatePlan: (plan: PricingPlan) => Promise<void>;
-  onDeletePlan: (id: string) => Promise<void>;
+  onDeletePlan: (id: string) => Promise<void>; theme?: 'light' | 'dark';
 }
 
-function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan }: AdminViewProps) {
+function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan, theme = 'dark' }: AdminViewProps) {
   const SUGGESTED_FEATURES = [
     "Unlimited Habit tracking elements",
     "Daily streak analysis & calendar highlights",
@@ -2823,6 +2828,39 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan }
     fetchStats();
     fetchCouponsData();
   }, []);
+
+  const trendData = (() => {
+    const dataPoints = [];
+    const nowForTrend = new Date();
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(nowForTrend);
+      d.setDate(nowForTrend.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const displayDate = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      
+      let count = 0;
+      let discount = 0;
+      if (Array.isArray(usages)) {
+        usages.forEach(use => {
+          if (use.used_at) {
+            const usedDateStr = use.used_at.split('T')[0];
+            if (usedDateStr === dateStr) {
+              count += 1;
+              discount += parseFloat(use.discount_applied) || 0;
+            }
+          }
+        });
+      }
+      
+      dataPoints.push({
+        date: dateStr,
+        displayDate,
+        count,
+        discount: Math.round(discount * 100) / 100
+      });
+    }
+    return dataPoints;
+  })();
 
   return (
     <div className="space-y-8 pb-20">
@@ -3376,6 +3414,62 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan }
               </div>
             </div>
 
+            {/* Coupon Usage Trends Line Chart */}
+            <div className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-[2.5rem] p-8 shadow-sm space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-black dark:text-white flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    Coupon Usage Trends (Last 30 Days)
+                  </h3>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Real-time daily analysis of voucher redemption frequency and discount distribution.</p>
+                </div>
+                <div className="flex flex-wrap gap-4 text-xs font-semibold">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full bg-indigo-600 block"></span>
+                    <span className="text-gray-600 dark:text-gray-300">Daily Redemptions</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full bg-emerald-500 block"></span>
+                    <span className="text-gray-600 dark:text-gray-300">Total Discounts Given (₹)</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#374151' : '#F3F4F6'} />
+                    <XAxis dataKey="displayDate" stroke="#9CA3AF" fontSize={10} tickLine={false} />
+                    <YAxis stroke="#9CA3AF" fontSize={10} tickLine={false} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1F2937', borderRadius: '12px', border: 'none' }}
+                      labelStyle={{ color: '#F3F4F6', fontWeight: 'bold' }}
+                      itemStyle={{ color: '#F3F4F6' }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="count" 
+                      stroke="#6366F1" 
+                      strokeWidth={3} 
+                      dot={{ r: 3, stroke: "#6366F1", strokeWidth: 1.5, fill: "#fff" }} 
+                      activeDot={{ r: 5 }} 
+                      name="Redemptions"
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="discount" 
+                      stroke="#10B981" 
+                      strokeWidth={2} 
+                      dot={{ r: 2, stroke: "#10B981", strokeWidth: 1, fill: "#fff" }} 
+                      activeDot={{ r: 4 }} 
+                      name="Total Discounts"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
             {/* Campaign control bar */}
             <div className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-[2.5rem] p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div>
@@ -3904,7 +3998,7 @@ function HabitsView({ habits, setHabits, onDelete, theme, subscriptionTier = 'Fr
 
   const addHabit = () => {
     if (!newName.trim()) return;
-    if (subscriptionTier === 'Free' && habits.length >= 5) {
+    if (subscriptionTier === 'Expired') {
       setShowLimitModal(true);
       return;
     }
@@ -3992,7 +4086,7 @@ function HabitsView({ habits, setHabits, onDelete, theme, subscriptionTier = 'Fr
         </div>
         <button 
           onClick={() => {
-            if (subscriptionTier === 'Free' && habits.length >= 5) {
+            if (subscriptionTier === 'Expired') {
               setShowLimitModal(true);
             } else {
               setShowAdd(true);
@@ -4004,18 +4098,42 @@ function HabitsView({ habits, setHabits, onDelete, theme, subscriptionTier = 'Fr
         </button>
       </div>
 
-      {subscriptionTier === 'Free' && (
+      {subscriptionTier === 'Expired' && (
+        <div className="bg-gradient-to-r from-rose-500/10 to-transparent p-4 rounded-2xl border border-rose-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-rose-700 dark:text-rose-300 gap-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-rose-500 animate-pulse shrink-0" />
+            <span>⚠️ 7-Day Free Trial Completed: You are in <strong>Read-Only Mode</strong>. Please upgrade to Premium to track new habits and make updates.</span>
+          </div>
+          <button 
+            onClick={() => setActiveTab && setActiveTab('pricing')} 
+            className="underline font-black uppercase text-[10px] tracking-wider hover:text-rose-950 dark:hover:text-white shrink-0"
+          >
+            Upgrade &rarr;
+          </button>
+        </div>
+      )}
+
+      {subscriptionTier === 'Trial' && (
         <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
-            <span>You are currently managing <strong>{habits.length} of 5 daily habits</strong> under standard limit rules. Unlock infinite streaks by starting a premium space.</span>
+            <span>⚡ Standard 7-Day Free Trial Active: Build and track <strong>unlimited habit streaks</strong> with zero limits.</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
             className="underline font-black uppercase text-[10px] tracking-wider hover:text-indigo-900 dark:hover:text-white shrink-0"
           >
-            Upgrade App Now &rarr;
+            Secure Premium &rarr;
           </button>
+        </div>
+      )}
+
+      {subscriptionTier === 'Premium' && (
+        <div className="bg-gradient-to-r from-emerald-500/10 to-transparent p-4 rounded-2xl border border-emerald-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-emerald-700 dark:text-emerald-300 gap-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-emerald-500 animate-pulse shrink-0" />
+            <span>🌌 Premium Workspace Unlocked: Unlimited custom habits, permanent streak histories, and backend backups enabled.</span>
+          </div>
         </div>
       )}
 
@@ -4036,9 +4154,9 @@ function HabitsView({ habits, setHabits, onDelete, theme, subscriptionTier = 'Fr
               <Zap className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-pulse" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-xl font-black dark:text-white">Professional habit Limit Reached</h3>
+              <h3 className="text-xl font-black dark:text-white">7-Day Free Trial Completed</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                Your current <span className="font-extrabold text-indigo-600 dark:text-indigo-400">Free Tier</span> supports up to <span className="font-black text-gray-800 dark:text-gray-200">5 active habits</span>. Upgrade to unlock unlimited behaviors creation, in-depth predictive insights, and priority support.
+                Your 7-day free trial has completed. Please subscribe to Premium below to unlock unlimited habits, tasks, and budgeting tools. Your current data is safe and in read-only mode!
               </p>
             </div>
             <div className="pt-2 flex flex-col gap-2">
@@ -4049,7 +4167,7 @@ function HabitsView({ habits, setHabits, onDelete, theme, subscriptionTier = 'Fr
                 }}
                 className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-indigo-600/10 active:scale-95"
               >
-                Upgrade to Pro Space ⚡
+                Upgrade to Premium ⚡
               </button>
               <button 
                 onClick={() => setShowLimitModal(false)}
@@ -4188,7 +4306,7 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
 
   const addTask = (q: EisenhowerQuadrant) => {
     if (!newTaskTitle.trim()) return;
-    if (subscriptionTier === 'Free' && tasks.length >= 10) {
+    if (subscriptionTier === 'Expired') {
       setShowLimitModal(true);
       return;
     }
@@ -4226,18 +4344,38 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
         </div>
       </div>
 
-      {subscriptionTier === 'Free' && (
+      {subscriptionTier === 'Expired' ? (
+        <div className="bg-gradient-to-r from-rose-500/10 to-transparent p-4 rounded-2xl border border-rose-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-rose-700 dark:text-rose-300 gap-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-rose-500 animate-pulse shrink-0" />
+            <span>⚠️ 7-Day Free Trial Completed: You are in <strong>Read-Only Mode</strong>. Please upgrade to Premium to unlock unlimited tasks and other tools.</span>
+          </div>
+          <button 
+            onClick={() => setActiveTab && setActiveTab('pricing')} 
+            className="underline font-black uppercase text-[10px] tracking-wider hover:text-rose-950 dark:hover:text-white shrink-0"
+          >
+            Upgrade &rarr;
+          </button>
+        </div>
+      ) : subscriptionTier === 'Trial' ? (
         <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
-            <span>You are currently managing <strong>{tasks.length} of 10 tasks</strong> under standard limit rules. Upgrade now to log unlimited milestones and tasks.</span>
+            <span>⚡ Standard 7-Day Free Trial Active: You can manage <strong>unlimited priority tasks</strong> during your active trial period.</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
             className="underline font-black uppercase text-[10px] tracking-wider hover:text-indigo-900 dark:hover:text-white shrink-0"
           >
-            Upgrade App &rarr;
+            Secure Premium &rarr;
           </button>
+        </div>
+      ) : (
+        <div className="bg-gradient-to-r from-emerald-500/10 to-transparent p-4 rounded-2xl border border-emerald-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-emerald-700 dark:text-emerald-300 gap-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-emerald-500 animate-pulse shrink-0" />
+            <span>🌌 Premium Workspace Unlocked: Absolute access to <strong>unlimited tasks ({tasks.length} active)</strong> with database backup.</span>
+          </div>
         </div>
       )}
 
@@ -4258,9 +4396,9 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
               <Zap className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-pulse" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-xl font-black dark:text-white">Milestone Matrix Limit Reached</h3>
+              <h3 className="text-xl font-black dark:text-white">7-Day Free Trial Completed</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                Your current <span className="font-extrabold text-indigo-600 dark:text-indigo-400">Free Tier</span> supports up to <span className="font-black text-gray-800 dark:text-gray-200">10 tasks</span> in the Priority Matrix. Upgrade to a premium plan to unlock infinite task capacity, custom labels, and priority support.
+                Your 7-day free trial has completed. Please subscribe to Premium below to unlock unlimited tasks, habit trackers, and budgeting tools. Your current data is safe and in read-only mode!
               </p>
             </div>
             <div className="pt-2 flex flex-col gap-2">
@@ -4271,7 +4409,7 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
                 }}
                 className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-indigo-600/10 active:scale-95"
               >
-                Upgrade to Pro Space ⚡
+                Upgrade to Premium ⚡
               </button>
               <button 
                 onClick={() => setShowLimitModal(false)}
@@ -4684,7 +4822,7 @@ function StudyView({ courses, setCourses, onDeleteCourse, subscriptionTier = 'Fr
 
   const addCourse = () => {
     if (!newCourseName.trim()) return;
-    if (subscriptionTier === 'Free' && courses.length >= 2) {
+    if (subscriptionTier === 'Expired') {
       setShowLimitModal(true);
       return;
     }
@@ -4755,7 +4893,7 @@ function StudyView({ courses, setCourses, onDeleteCourse, subscriptionTier = 'Fr
         </div>
         <button 
           onClick={() => {
-            if (subscriptionTier === 'Free' && courses.length >= 2) {
+            if (subscriptionTier === 'Expired') {
               setShowLimitModal(true);
             } else {
               setShowAddCourse(true);
@@ -4767,18 +4905,42 @@ function StudyView({ courses, setCourses, onDeleteCourse, subscriptionTier = 'Fr
         </button>
       </div>
 
-      {subscriptionTier === 'Free' && (
+      {subscriptionTier === 'Expired' && (
+        <div className="bg-gradient-to-r from-rose-500/10 to-transparent p-4 rounded-2xl border border-rose-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-rose-700 dark:text-rose-300 gap-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-rose-500 animate-pulse shrink-0" />
+            <span>⚠️ 7-Day Free Trial Completed: You are in <strong>Read-Only Mode</strong>. Please upgrade to Premium to manage new courses, materials, and exams.</span>
+          </div>
+          <button 
+            onClick={() => setActiveTab && setActiveTab('pricing')} 
+            className="underline font-black uppercase text-[10px] tracking-wider hover:text-rose-950 dark:hover:text-white shrink-0"
+          >
+            Upgrade &rarr;
+          </button>
+        </div>
+      )}
+
+      {subscriptionTier === 'Trial' && (
         <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
-            <span>You are currently managing <strong>{courses.length} of 2 active courses</strong> under standard limit rules. Upgrade now to track infinite courses, logs, and materials.</span>
+            <span>⚡ Standard 7-Day Free Trial Active: Track <strong>unlimited study courses, exams, and materials</strong> during your active trial.</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
             className="underline font-black uppercase text-[10px] tracking-wider hover:text-indigo-900 dark:hover:text-white shrink-0"
           >
-            Upgrade App &rarr;
+            Secure Premium &rarr;
           </button>
+        </div>
+      )}
+
+      {subscriptionTier === 'Premium' && (
+        <div className="bg-gradient-to-r from-emerald-500/10 to-transparent p-4 rounded-2xl border border-emerald-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-emerald-700 dark:text-emerald-300 gap-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-emerald-500 animate-pulse shrink-0" />
+            <span>🌌 Premium Workspace Unlocked: Unlimited active courses, cloud sync, and material backup.</span>
+          </div>
         </div>
       )}
 
@@ -4799,9 +4961,9 @@ function StudyView({ courses, setCourses, onDeleteCourse, subscriptionTier = 'Fr
               <Zap className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-pulse" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-xl font-black dark:text-white">Academic Course Limit Reached</h3>
+              <h3 className="text-xl font-black dark:text-white">7-Day Free Trial Completed</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                Your current <span className="font-extrabold text-indigo-600 dark:text-indigo-400">Free Tier</span> supports up to <span className="font-black text-gray-800 dark:text-gray-200">2 active study courses</span>. Upgrade to modern premium plans to manage your entire education path, logs, and milestones.
+                Your 7-day free trial has completed. Please subscribe to Premium below to unlock unlimited courses, exams, and files. Your current data is safe and in read-only mode!
               </p>
             </div>
             <div className="pt-2 flex flex-col gap-2">
@@ -4812,7 +4974,7 @@ function StudyView({ courses, setCourses, onDeleteCourse, subscriptionTier = 'Fr
                 }}
                 className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-indigo-600/10 active:scale-95"
               >
-                Upgrade to Pro Space ⚡
+                Upgrade to Premium ⚡
               </button>
               <button 
                 onClick={() => setShowLimitModal(false)}
@@ -5064,7 +5226,7 @@ function GoalsView({
 
   const addGoal = () => {
     if (!newGoal.title || !newGoal.date) return;
-    if (subscriptionTier === 'Free' && goals.length >= 3) {
+    if (subscriptionTier === 'Expired') {
       setShowLimitModal(true);
       return;
     }
@@ -5132,7 +5294,7 @@ function GoalsView({
             </div>
             <button 
               onClick={() => {
-                if (subscriptionTier === 'Free' && goals.length >= 3) {
+                if (subscriptionTier === 'Expired') {
                   setShowLimitModal(true);
                 } else {
                   setShowAdd(true);
@@ -5144,18 +5306,42 @@ function GoalsView({
             </button>
           </div>
 
-      {subscriptionTier === 'Free' && (
+      {subscriptionTier === 'Expired' && (
+        <div className="bg-gradient-to-r from-rose-500/10 to-transparent p-4 rounded-2xl border border-rose-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-rose-700 dark:text-rose-300 gap-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-rose-500 animate-pulse shrink-0" />
+            <span>⚠️ 7-Day Free Trial Completed: You are in <strong>Read-Only Mode</strong>. Please upgrade to Premium to manage and track your long-term goals.</span>
+          </div>
+          <button 
+            onClick={() => setActiveTab && setActiveTab('pricing')} 
+            className="underline font-black uppercase text-[10px] tracking-wider hover:text-rose-950 dark:hover:text-white shrink-0"
+          >
+            Upgrade &rarr;
+          </button>
+        </div>
+      )}
+
+      {subscriptionTier === 'Trial' && (
         <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
-            <span>You are currently managing <strong>{goals.length} of 3 active goals</strong> under standard limit rules. Upgrade now to structure infinite goals, milestones, and roadmaps.</span>
+            <span>⚡ Standard 7-Day Free Trial Active: Track <strong>unlimited goals, vision boards, and progress milestones</strong> during your active trial.</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
             className="underline font-black uppercase text-[10px] tracking-wider hover:text-indigo-900 dark:hover:text-white shrink-0"
           >
-            Upgrade App &rarr;
+            Secure Premium &rarr;
           </button>
+        </div>
+      )}
+
+      {subscriptionTier === 'Premium' && (
+        <div className="bg-gradient-to-r from-emerald-500/10 to-transparent p-4 rounded-2xl border border-emerald-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-emerald-700 dark:text-emerald-300 gap-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-emerald-500 animate-pulse shrink-0" />
+            <span>🌌 Premium Workspace Unlocked: Unlimited custom goals, history archives, and secure cloud backups.</span>
+          </div>
         </div>
       )}
 
@@ -5176,9 +5362,9 @@ function GoalsView({
               <Zap className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-pulse" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-xl font-black dark:text-white">Vision Milestone Limit Reached</h3>
+              <h3 className="text-xl font-black dark:text-white">7-Day Free Trial Completed</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                Your current <span className="font-extrabold text-indigo-600 dark:text-indigo-400">Free Tier</span> supports up to <span className="font-black text-gray-800 dark:text-gray-200">3 active vision goals</span>. Upgrade to unlock unlimited goals, progress metrics, and timeline projection analytics.
+                Your 7-day free trial has completed. Please subscribe to Premium below to unlock unlimited goals, tasks, and budgeting tools. Your current data is safe and in read-only mode!
               </p>
             </div>
             <div className="pt-2 flex flex-col gap-2">
@@ -5189,7 +5375,7 @@ function GoalsView({
                 }}
                 className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-indigo-600/10 active:scale-95"
               >
-                Upgrade to Pro Space ⚡
+                Upgrade to Premium ⚡
               </button>
               <button 
                 onClick={() => setShowLimitModal(false)}
@@ -6457,7 +6643,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
   const msLeft = Math.max(0, trialEndDate.getTime() - nowSecure);
   const elapsedMs = Math.max(0, nowSecure - trialStartDate.getTime());
   const daysElapsed = Math.floor(elapsedMs / (24 * 60 * 60 * 1000));
-  const trialDaysLeft = Math.max(0, 5 - daysElapsed);
+  const trialDaysLeft = Math.max(0, 7 - daysElapsed);
   const isTrialActive = msLeft > 0;
 
   const trialTimeLeftText = (() => {
