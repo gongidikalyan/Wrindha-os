@@ -71,6 +71,8 @@ interface CareerPlannerViewProps {
   setGoals: React.Dispatch<React.SetStateAction<Goal[]>>;
   studyCourses: StudyCourse[];
   setStudyCourses: React.Dispatch<React.SetStateAction<StudyCourse[]>>;
+  hasActiveAccess?: boolean;
+  onRequestUpgrade?: () => void;
 }
 
 const CAREER_CATEGORIES = [
@@ -93,7 +95,9 @@ export default function CareerPlannerView({
   goals,
   setGoals,
   studyCourses,
-  setStudyCourses
+  setStudyCourses,
+  hasActiveAccess = true,
+  onRequestUpgrade
 }: CareerPlannerViewProps) {
   // Supabase Sync States
   const [session, setSession] = useState<any>(null);
@@ -112,22 +116,22 @@ export default function CareerPlannerView({
   }, [syncToast]);
 
   // Local active trajectory state
-  const [activePath, setActivePath] = useState<CareerPath | null>(() => {
+  const [activePath, _setActivePath] = useState<CareerPath | null>(() => {
     const saved = localStorage.getItem("wrindha_active_career_path");
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [milestones, setMilestones] = useState<Milestone[]>(() => {
+  const [milestones, _setMilestones] = useState<Milestone[]>(() => {
     const saved = localStorage.getItem("wrindha_career_milestones");
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [skills, setSkills] = useState<CareerSkill[]>(() => {
+  const [skills, _setSkills] = useState<CareerSkill[]>(() => {
     const saved = localStorage.getItem("wrindha_career_skills");
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [planData, setPlanData] = useState<PlanData>(() => {
+  const [planData, _setPlanData] = useState<PlanData>(() => {
     const saved = localStorage.getItem("wrindha_career_plan_data_manual");
     if (saved) return JSON.parse(saved);
     
@@ -146,6 +150,38 @@ export default function CareerPlannerView({
       }
     };
   });
+
+  const setActivePath = (val: React.SetStateAction<CareerPath | null>) => {
+    if (!hasActiveAccess && !supabaseLoading) {
+      if (onRequestUpgrade) onRequestUpgrade();
+      return;
+    }
+    _setActivePath(val);
+  };
+
+  const setMilestones = (val: React.SetStateAction<Milestone[]>) => {
+    if (!hasActiveAccess && !supabaseLoading) {
+      if (onRequestUpgrade) onRequestUpgrade();
+      return;
+    }
+    _setMilestones(val);
+  };
+
+  const setSkills = (val: React.SetStateAction<CareerSkill[]>) => {
+    if (!hasActiveAccess && !supabaseLoading) {
+      if (onRequestUpgrade) onRequestUpgrade();
+      return;
+    }
+    _setSkills(val);
+  };
+
+  const setPlanData = (val: React.SetStateAction<PlanData>) => {
+    if (!hasActiveAccess && !supabaseLoading) {
+      if (onRequestUpgrade) onRequestUpgrade();
+      return;
+    }
+    _setPlanData(val);
+  };
 
   // Creation form states
   const [currentPosition, setCurrentPosition] = useState("");

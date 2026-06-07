@@ -64,6 +64,7 @@ import AnalyticsView from "./components/AnalyticsView";
 import PomodoroTimer from "./components/PomodoroTimer";
 import TaskNotesEditor from "./components/TaskNotesEditor";
 import CareerPlannerView from "./components/CareerPlannerView";
+import HabitRewards from "./components/HabitRewards";
 
 // Modules
 const modules = [
@@ -100,7 +101,7 @@ const calculateTrialDates = (signupTimeStr: string | undefined | null, currentSe
     trialStartVal = signupTime;
   }
   
-  const trialEndVal = trialStartVal + 5 * 24 * 60 * 60 * 1000;
+  const trialEndVal = trialStartVal + 7 * 24 * 60 * 60 * 1000;
   
   return {
     startStr: new Date(trialStartVal).toISOString(),
@@ -112,9 +113,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
   const isFetchingRef = useRef(false);
-  const [currency, setCurrency] = useState<'USD' | 'INR'>(() => (localStorage.getItem('wrindha_currency') as 'USD' | 'INR') || 'INR');
-  const [userName, setUserName] = useState(() => localStorage.getItem('wrindha_user_name') || "Felix");
-  const [userBudget, setUserBudget] = useState<number>(() => {
+  const [currency, _setCurrency] = useState<'USD' | 'INR'>(() => (localStorage.getItem('wrindha_currency') as 'USD' | 'INR') || 'INR');
+  const [userName, _setUserName] = useState(() => localStorage.getItem('wrindha_user_name') || "Felix");
+  const [userBudget, _setUserBudget] = useState<number>(() => {
     const saved = localStorage.getItem('wrindha_budget');
     return saved ? parseFloat(saved) : 0;
   });
@@ -215,7 +216,7 @@ export default function App() {
     return localStorage.getItem('wrindha_trial_start_date') || new Date().toISOString();
   });
   const [trialEndDateStr, setTrialEndDateStr] = useState<string>(() => {
-    return localStorage.getItem('wrindha_trial_end_date') || new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+    return localStorage.getItem('wrindha_trial_end_date') || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   });
   const [isTrialActivated, setIsTrialActivated] = useState<boolean>(() => {
     return localStorage.getItem('wrindha_is_trial_activated') === 'true';
@@ -229,7 +230,7 @@ export default function App() {
       if (!isTrialActivated) {
         const secureNow = getCurrentSecureTime();
         const start = new Date(secureNow).toISOString();
-        const end = new Date(secureNow + 5 * 24 * 60 * 60 * 1000).toISOString();
+        const end = new Date(secureNow + 7 * 24 * 60 * 60 * 1000).toISOString();
         setTrialStartDateStr(start);
         setTrialEndDateStr(end);
         setIsTrialActivated(true);
@@ -311,7 +312,7 @@ export default function App() {
         price: "₹49",
         period: "month",
         features: [
-          "5-day free trial (no credit card upfront)",
+          "7-day free trial (no credit card upfront)",
           "No artificial limitations",
           "Unlimited habit trackers & custom daily streaks",
           "Unlimited Priority Eisenhower quadrant tasks",
@@ -509,32 +510,32 @@ export default function App() {
   }, [theme]);
 
   // States with Persistence
-  const [habits, setHabits] = useState<Habit[]>(() => {
+  const [habits, _setHabits] = useState<Habit[]>(() => {
     const saved = localStorage.getItem('wrindha_habits');
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [tasks, setTasks] = useState<Task[]>(() => {
+  const [tasks, _setTasks] = useState<Task[]>(() => {
     const saved = localStorage.getItem('wrindha_tasks');
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
+  const [expenses, _setExpenses] = useState<Expense[]>(() => {
     const saved = localStorage.getItem('wrindha_expenses');
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [goals, setGoals] = useState<Goal[]>(() => {
+  const [goals, _setGoals] = useState<Goal[]>(() => {
     const saved = localStorage.getItem('wrindha_goals');
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [timetable, setTimetable] = useState<TimetableEntry[]>(() => {
+  const [timetable, _setTimetable] = useState<TimetableEntry[]>(() => {
     const saved = localStorage.getItem('wrindha_timetable');
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [studyCourses, setStudyCourses] = useState<StudyCourse[]>(() => {
+  const [studyCourses, _setStudyCourses] = useState<StudyCourse[]>(() => {
     const saved = localStorage.getItem('wrindha_study');
     return saved ? JSON.parse(saved) : [];
   });
@@ -740,6 +741,79 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
   });
 
   const [isInitializing, setIsInitializing] = useState(true);
+  const [showReadOnlyModal, setShowReadOnlyModal] = useState(false);
+
+  const setHabits = (val: React.SetStateAction<Habit[]>) => {
+    if (!hasActiveAccess && !isInitializing) {
+      setShowReadOnlyModal(true);
+      return;
+    }
+    _setHabits(val);
+  };
+
+  const setTasks = (val: React.SetStateAction<Task[]>) => {
+    if (!hasActiveAccess && !isInitializing) {
+      setShowReadOnlyModal(true);
+      return;
+    }
+    _setTasks(val);
+  };
+
+  const setExpenses = (val: React.SetStateAction<Expense[]>) => {
+    if (!hasActiveAccess && !isInitializing) {
+      setShowReadOnlyModal(true);
+      return;
+    }
+    _setExpenses(val);
+  };
+
+  const setGoals = (val: React.SetStateAction<Goal[]>) => {
+    if (!hasActiveAccess && !isInitializing) {
+      setShowReadOnlyModal(true);
+      return;
+    }
+    _setGoals(val);
+  };
+
+  const setTimetable = (val: React.SetStateAction<TimetableEntry[]>) => {
+    if (!hasActiveAccess && !isInitializing) {
+      setShowReadOnlyModal(true);
+      return;
+    }
+    _setTimetable(val);
+  };
+
+  const setStudyCourses = (val: React.SetStateAction<StudyCourse[]>) => {
+    if (!hasActiveAccess && !isInitializing) {
+      setShowReadOnlyModal(true);
+      return;
+    }
+    _setStudyCourses(val);
+  };
+
+  const setCurrency = (val: React.SetStateAction<'USD' | 'INR'>) => {
+    if (!hasActiveAccess && !isInitializing) {
+      setShowReadOnlyModal(true);
+      return;
+    }
+    _setCurrency(val);
+  };
+
+  const setUserName = (val: React.SetStateAction<string>) => {
+    if (!hasActiveAccess && !isInitializing) {
+      setShowReadOnlyModal(true);
+      return;
+    }
+    _setUserName(val);
+  };
+
+  const setUserBudget = (val: React.SetStateAction<number>) => {
+    if (!hasActiveAccess && !isInitializing) {
+      setShowReadOnlyModal(true);
+      return;
+    }
+    _setUserBudget(val);
+  };
 
   // Persistence
   useEffect(() => {
@@ -929,7 +1003,7 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
             price: "₹49",
             period: "month",
             features: [
-              "5-day free trial (no credit card upfront)",
+              "7-day free trial (no credit card upfront)",
               "No artificial limitations",
               "Unlimited habit trackers & custom daily streaks",
               "Unlimited Priority Eisenhower quadrant tasks",
@@ -1236,6 +1310,10 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
   };
 
   const deleteFromSupabase = async (table: string, id: string) => {
+    if (!hasActiveAccess && !isInitializing) {
+      setShowReadOnlyModal(true);
+      return;
+    }
     if (!isSupabaseConfigured() || !session?.user?.id || bypassConfig) return;
     try {
       await supabase.from(table).delete().eq('id', id).eq('user_id', session.user.id);
@@ -1593,36 +1671,29 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
 
         <nav className="flex-1 px-4 space-y-1 mt-4">
           {modules.map((m) => {
-            const isLocked = !hasActiveAccess && m.id !== 'pricing' && m.id !== 'blogs';
+            const isLocked = false;
             return (
               <button
                 key={m.id}
                 onClick={() => {
-                  if (isLocked) {
-                    setActiveTab('pricing');
-                  } else {
-                    setActiveTab(m.id);
-                  }
+                  setActiveTab(m.id);
                 }}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group relative",
                   activeTab === m.id 
                     ? "bg-black dark:bg-indigo-600 text-white shadow-lg shadow-black/10" 
-                    : "text-[#6B7280] dark:text-gray-500 hover:bg-[#F3F4F6] dark:hover:bg-gray-800 hover:text-[#1A1A1A] dark:hover:text-white",
-                  isLocked && "opacity-60 cursor-not-allowed hover:bg-transparent"
+                    : "text-[#6B7280] dark:text-gray-500 hover:bg-[#F3F4F6] dark:hover:bg-gray-800 hover:text-[#1A1A1A] dark:hover:text-white"
                 )}
               >
                 <m.icon className={cn("w-5 h-5 shrink-0", activeTab !== m.id && m.color)} />
                 {isSidebarOpen && (
                   <span className="font-medium text-sm whitespace-nowrap flex items-center justify-between w-full">
                     <span>{m.name}</span>
-                    {isLocked && <Lock className="w-3.5 h-3.5 text-orange-500 animate-pulse" />}
                   </span>
                 )}
                 {!isSidebarOpen && (
                   <div className="absolute left-16 bg-black text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-[60] flex items-center gap-1.5">
                     {m.name}
-                    {isLocked && <Lock className="w-3 h-3 text-orange-400" />}
                   </div>
                 )}
               </button>
@@ -1793,8 +1864,17 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
                 onClick={() => setActiveTab('pricing')}
                 className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20 px-3.5 py-1.5 rounded-full text-[11px] font-bold hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all shadow-sm hover:scale-105 active:scale-95"
               >
-                <span>⚡ 5-Day Free Trial: <strong className="font-extrabold text-indigo-700 dark:text-indigo-350">{trialTimeLeftText} remaining</strong></span>
+                <span>⚡ 7-Day Free Trial: <strong className="font-extrabold text-indigo-700 dark:text-indigo-350">{trialTimeLeftText} remaining</strong></span>
                 <span className="bg-indigo-600 text-white font-extrabold uppercase text-[8px] tracking-wider px-2 py-0.5 rounded-full shadow-sm">Upgrade</span>
+              </button>
+            )}
+            {!hasActiveAccess && (
+              <button 
+                onClick={() => setActiveTab('pricing')}
+                className="flex items-center gap-2 bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/30 px-3.5 py-1.5 rounded-full text-[11px] font-bold hover:bg-rose-100 dark:hover:bg-rose-950/40 transition-all shadow-sm hover:scale-105 active:scale-95 animate-pulse"
+              >
+                <span>⚠️ Read-Only Mode: Trial / Subscription Completed</span>
+                <span className="bg-rose-600 text-white font-extrabold uppercase text-[8px] tracking-wider px-2 py-0.5 rounded-full shadow-sm animate-none">Activate Premium</span>
               </button>
             )}
           </div>
@@ -1967,29 +2047,23 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
           { id: 'blogs', name: 'Blogs', icon: FileText },
           { id: 'pricing', name: 'Pricing', icon: Award },
         ].map((m) => {
-          const isLocked = !hasActiveAccess && m.id !== 'pricing' && m.id !== 'blogs';
+          const isLocked = false;
           return (
             <button
               key={m.id}
               onClick={() => {
-                if (isLocked) {
-                  setActiveTab('pricing');
-                } else {
-                  setActiveTab(m.id);
-                }
+                setActiveTab(m.id);
               }}
               className={cn(
                 "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all",
                 activeTab === m.id 
                   ? "text-indigo-600 dark:text-indigo-400 scale-105 font-bold" 
-                  : "text-gray-400 hover:text-gray-600",
-                isLocked && "opacity-60"
+                  : "text-gray-400 hover:text-gray-600"
               )}
             >
               <m.icon className="w-5 h-5 shrink-0 mb-0.5" />
               <span className="text-[9px] tracking-tight flex items-center gap-0.5">
                 {m.name}
-                {isLocked && <Lock className="w-2.5 h-2.5 text-orange-500" />}
               </span>
             </button>
           );
@@ -2029,64 +2103,52 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
         </div>
       )}
 
-      {/* Global Trial Expired Paywall Overlay */}
-      {!hasActiveAccess && !isInitializing && activeTab !== 'pricing' && activeTab !== 'about' && activeTab !== 'contact' && activeTab !== 'privacy' && activeTab !== 'disclaimer' && activeTab !== 'terms' && (
-        <div className="fixed inset-0 z-[200] bg-slate-950/65 backdrop-blur-xl flex items-center justify-center p-4">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white dark:bg-gray-900 w-full max-w-lg rounded-[2.5rem] p-8 md:p-10 border border-indigo-200/50 dark:border-gray-800 shadow-2xl text-center relative overflow-hidden space-y-6"
-          >
-            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-red-500 via-indigo-600 to-purple-500"></div>
-            <div className="w-20 h-20 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto shadow-inner animate-pulse">
-              <Lock className="w-10 h-10" />
-            </div>
-            <div className="space-y-2">
-              <span className="text-[10px] bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400 font-extrabold uppercase tracking-widest px-3 py-1 rounded-full">
-                {subscriptionTier.toLowerCase() === 'free' || subscriptionTier.includes('Cancelled:') ? 'Membership Cancelled' : 'Trial Period Expired'}
-              </span>
-              <h2 className="text-3xl font-black dark:text-white">Workspace Locked</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-semibold">
-                {subscriptionTier.toLowerCase() === 'free' || subscriptionTier.includes('Cancelled:') 
-                  ? 'Your premium membership has been cancelled or has expired. To restore access and continue using Wrindha OS, please renew your subscription.' 
-                  : 'Your 5-day free trial has ended. Please subscribe to continue using Wrindha OS.'}
-              </p>
-              <div className="text-xs text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/35 py-3 px-4 rounded-xl mt-2">
-                🚀 Subscribe to Premium for only <strong className="text-lg">₹49/month</strong> to restore unlimited tracking of habits, study matrices, goals, and priority timetables!
+      {/* Read-Only Mode Notification Modal */}
+      <AnimatePresence>
+        {showReadOnlyModal && (
+          <div className="fixed inset-0 z-[250] bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white dark:bg-gray-900 w-full max-w-md rounded-3xl p-6 md:p-8 border border-red-200 dark:border-gray-800 shadow-2xl text-center relative overflow-hidden"
+              id="readonly-modal"
+            >
+              <div className="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
+              <div className="w-14 h-14 bg-red-50 dark:bg-red-950/30 text-red-500 rounded-full flex items-center justify-center mx-auto shadow-sm mb-4">
+                <Lock className="w-6 h-6 animate-pulse" />
               </div>
-            </div>
+              <h3 className="text-xl font-black text-gray-900 dark:text-white leading-tight">Read-Only Workspace</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 leading-relaxed">
+                Your free trial or premium subscription has ended. You can view all existing entries, but adding, editing, or deleting items is disabled.
+              </p>
+              <div className="bg-red-50/50 dark:bg-red-950/10 py-2 px-3 rounded-xl text-xs text-red-600 dark:text-red-400 font-bold mt-4">
+                Unlock full access to restore full write-capabilities!
+              </div>
 
-            <div className="pt-2 flex flex-col gap-2">
-              <button 
-                onClick={() => {
-                  setActiveTab('pricing');
-                }}
-                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-wider text-xs rounded-2xl transition-all shadow-lg shadow-indigo-600/20 active:scale-95"
-              >
-                Unlock Wrindha OS Premium ✨
-              </button>
-              
-              {session ? (
+              <div className="mt-6 flex flex-col gap-2">
                 <button 
-                  onClick={async () => {
-                    await supabase.auth.signOut();
+                  onClick={() => {
+                    setShowReadOnlyModal(false);
+                    setActiveTab('pricing');
                   }}
-                  className="w-full py-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 font-bold rounded-2xl text-xs uppercase"
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold uppercase tracking-wider text-xs rounded-xl transition-all shadow-md active:scale-95"
+                  id="readonly-upgrade-btn"
                 >
-                  Sign out of account
+                  Upgrade Now & Unlock ✨
                 </button>
-              ) : (
                 <button 
-                  onClick={() => setShowSettings(true)}
-                  className="w-full py-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-indigo-600 dark:text-indigo-400 font-bold rounded-2xl text-xs uppercase"
+                  onClick={() => setShowReadOnlyModal(false)}
+                  className="w-full py-2.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-750 text-gray-500 dark:text-gray-400 font-semibold rounded-xl text-xs"
+                  id="readonly-close-btn"
                 >
-                  Sign In to existing profile
+                  Dismiss
                 </button>
-              )}
-            </div>
-          </motion.div>
-        </div>
-      )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -3105,26 +3167,36 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan }
               {plans.map((plan) => (
                 <div key={plan.id} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2.5rem] p-8 shadow-sm space-y-6 flex flex-col justify-between">
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between border-b border-gray-50 dark:border-gray-800/40 pb-4">
-                      <div className="flex flex-col">
+                    <div className="flex items-start justify-between border-b border-gray-50 dark:border-gray-800/40 pb-4 gap-4">
+                      <div className="flex-1 flex flex-col">
                         <span className="text-[10px] font-black uppercase tracking-widest text-[#6B7280]">Plan Tier Name</span>
                         <input
                           type="text"
                           value={plan.name}
                           onChange={(e) => onUpdatePlan({ ...plan, name: e.target.value })}
-                          className="bg-transparent text-lg font-bold border-none p-0 focus:ring-0 dark:text-white w-full outline-none"
+                          className="bg-transparent text-base font-bold border-none p-0 focus:ring-0 dark:text-white w-full outline-none"
                         />
                       </div>
-                      <div className="flex flex-col items-end">
+                      <div className="flex flex-col items-end shrink-0">
                         <span className="text-[10px] font-black uppercase tracking-widest text-[#6B7280]">Price</span>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="text"
-                            value={plan.price}
-                            onChange={(e) => onUpdatePlan({ ...plan, price: e.target.value })}
-                            className="bg-transparent text-lg font-bold text-right border-none p-0 focus:ring-0 dark:text-white w-24 outline-none font-mono"
-                          />
-                        </div>
+                        <input
+                          type="text"
+                          value={plan.price}
+                          onChange={(e) => onUpdatePlan({ ...plan, price: e.target.value })}
+                          className="bg-transparent text-base font-bold text-right border-none p-0 focus:ring-0 dark:text-white w-24 outline-none font-mono"
+                        />
+                      </div>
+                      <div className="flex flex-col items-end shrink-0">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[#6B7280]">Period</span>
+                        <select
+                          value={plan.period}
+                          onChange={(e) => onUpdatePlan({ ...plan, period: e.target.value })}
+                          className="bg-transparent text-xs font-bold text-right text-indigo-600 dark:text-indigo-400 border-none p-0 focus:ring-0 outline-none w-24 cursor-pointer"
+                        >
+                          <option value="month" className="text-black dark:text-white">Monthly</option>
+                          <option value="3 months" className="text-black dark:text-white">3 Months</option>
+                          <option value="year" className="text-black dark:text-white">Yearly</option>
+                        </select>
                       </div>
                     </div>
 
@@ -4086,6 +4158,9 @@ function HabitsView({ habits, setHabits, onDelete, theme, subscriptionTier = 'Fr
         )}
       </div>
 
+      {/* Habit Achievements & Milestone Rewards */}
+      <HabitRewards habits={habits} theme={theme} />
+
       {/* Habit Analytics */}
       <div className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] border border-gray-100 dark:border-gray-800">
         <h3 className="text-xl font-bold mb-2 dark:text-white">Active Completion Rate</h3>
@@ -4964,7 +5039,9 @@ function GoalsView({
   tasks,
   setTasks,
   studyCourses,
-  setStudyCourses
+  setStudyCourses,
+  hasActiveAccess = true,
+  onRequestUpgrade
 }: { 
   goals: Goal[], 
   setGoals: (g: Goal[]) => void, 
@@ -4976,7 +5053,9 @@ function GoalsView({
   tasks: Task[],
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>,
   studyCourses: StudyCourse[],
-  setStudyCourses: React.Dispatch<React.SetStateAction<StudyCourse[]>>
+  setStudyCourses: React.Dispatch<React.SetStateAction<StudyCourse[]>>,
+  hasActiveAccess?: boolean,
+  onRequestUpgrade?: () => void
 }) {
   const [goalsTab, setGoalsTab] = useState<'board' | 'career'>('board');
   const [showAdd, setShowAdd] = useState(false);
@@ -5041,6 +5120,8 @@ function GoalsView({
           setGoals={setGoals}
           studyCourses={studyCourses}
           setStudyCourses={setStudyCourses}
+          hasActiveAccess={hasActiveAccess}
+          onRequestUpgrade={onRequestUpgrade}
         />
       ) : (
         <div className="space-y-8">
@@ -6696,7 +6777,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                   : isPremiumPaid 
                     ? "Premium OS Lifetime Access" 
                     : isTrialActive 
-                      ? `Active 5-Day Free Trial (${trialTimeLeftText} remaining)` 
+                      ? `Active 7-Day Free Trial (${trialTimeLeftText} remaining)` 
                       : "Subscription Expired"}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-semibold">
@@ -6707,7 +6788,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                   : isPremiumPaid 
                     ? "You have fully unlocked the unconstrained Wrindha Premium OS tracking. Absolute data backup, unlimited habits, tasks, studies and timetables active." 
                     : isTrialActive 
-                      ? "You are currently enjoying your 5-day active trial of full premium workspace. No artificial limits or constraints are imposed. Secure your premium billing early to keep uninterrupted access!"
+                      ? "You are currently enjoying your 7-day active trial of full premium workspace. No artificial limits or constraints are imposed. Secure your premium billing early to keep uninterrupted access!"
                       : "Your free trial has expired. Subscribe to Wrindha Premium below for unlimited habits, tasks, budget tracking, and timetables."}
             </p>
           </div>
@@ -6875,9 +6956,10 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
 
                 <div className="flex items-baseline gap-1 pt-2">
                   <span className={cn("text-5xl font-black font-mono", isCurrent ? "text-white" : "text-gray-900 dark:text-white")}>
-                    {p.price.startsWith('₹') ? '₹' : p.price.startsWith('$') ? '$' : '₹'}{calculatedDisplayPrice}
+                    {p.price.startsWith('₹') ? '₹' : p.price.startsWith('$') ? '$' : ''}
+                    {billingPeriod === 'yearly' && p.period === 'month' ? calculatedDisplayPrice : p.price.replace(/[^\d.]/g, '')}
                   </span>
-                  <span className="text-gray-400 text-sm font-semibold">/ {billingPeriod === 'yearly' ? 'year' : 'month'}</span>
+                  <span className="text-gray-400 text-sm font-semibold">/ {billingPeriod === 'yearly' && p.period === 'month' ? 'year' : p.period || 'month'}</span>
                 </div>
 
                 <div className="h-[2px] bg-gray-100 dark:bg-gray-800/60 w-full"></div>
