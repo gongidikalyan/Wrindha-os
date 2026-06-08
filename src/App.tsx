@@ -1,4 +1,3 @@
-const API_URL = "https://wrindha-os.onrender.com";
 import React, { useState, useEffect, useRef } from "react";
 import { 
   BarChart3, 
@@ -198,7 +197,7 @@ export default function App() {
     let active = true;
     const fetchTime = async (retryCount = 0) => {
       try {
-        const res = await fetch('/api/server-time');
+        const res = await fetch(`${API_URL}/api/server-time`);
         if (!res.ok) throw new Error(`HTTP error ${res.status}`);
         const data = await res.json();
         if (active && data.serverTime) {
@@ -2737,13 +2736,13 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan, 
   const fetchCouponsData = async () => {
     setLoadingCoupons(true);
     try {
-      const res = await fetch("/api/admin/coupons");
+      const res = await fetch(`${API_URL}/api/admin/coupons`);
       const data = await res.json();
       if (data.success) {
         setCoupons(data.coupons || []);
       }
       
-      const statsRes = await fetch("/api/admin/coupon-stats");
+      const statsRes = await fetch(`${API_URL}/api/admin/coupon-stats`);
       const statsData = await statsRes.json();
       if (statsData.success) {
         setUsages(statsData.usages || []);
@@ -2760,7 +2759,7 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan, 
     if (!newCode.trim()) return;
 
     try {
-      const res = await fetch("/api/admin/coupons", {
+      const res = await fetch(`${API_URL}/api/admin/coupons`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2797,7 +2796,7 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan, 
   const handleDeleteCoupon = async (id: string) => {
     if (!window.confirm("Are you absolutely sure you want to delete this coupon? This is permanent.")) return;
     try {
-      const res = await fetch(`/api/admin/coupons/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_URL}/api/admin/coupons/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (data.success) {
         fetchCouponsData();
@@ -2809,7 +2808,7 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan, 
 
   const handleToggleActive = async (coupon: any) => {
     try {
-      const res = await fetch(`/api/admin/coupons/${coupon.id}`, {
+      const res = await fetch(`${API_URL}/api/admin/coupons/${coupon.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ is_active: !coupon.is_active })
@@ -2825,7 +2824,7 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan, 
 
   const handleUpdateCoupon = async (id: string) => {
     try {
-      const res = await fetch(`/api/admin/coupons/${id}`, {
+      const res = await fetch(`${API_URL}/api/admin/coupons/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -4389,11 +4388,16 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [showTaskLimitModal, setShowTaskLimitModal] = useState(false);
+  const [showPremiumTaskLimitModal, setShowPremiumTaskLimitModal] = useState(false);
 
   const addTask = (q: EisenhowerQuadrant) => {
     if (!newTaskTitle.trim()) return;
     if (subscriptionTier !== 'Premium' && tasks.length >= 10) {
       setShowTaskLimitModal(true);
+      return;
+    }
+    if (subscriptionTier === 'Premium' && tasks.length >= 999) {
+      setShowPremiumTaskLimitModal(true);
       return;
     }
     const newTask: Task = {
@@ -4434,7 +4438,7 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
         <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
-            <span>⚡ Standard Free Tier Active: Manage up to <strong>10 priority tasks & 5 habits</strong>. Upgrade to Premium to unlock Study Courses, Finances, and database cloud backup.</span>
+            <span>⚡ Standard Free Tier Active: Manage up to <strong>10 priority tasks & 5 habits</strong>. Upgrade to Premium to unlock up to 999 priority tasks, Study Courses, Finances, and database cloud backup.</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
@@ -4447,7 +4451,7 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
         <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
-            <span>⚡ Standard 7-Day Free Trial: Manage up to <strong>10 priority tasks & 5 habits</strong>. Upgrade to Premium for absolute unlimited habits & tasks! 🌌</span>
+            <span>⚡ Standard 7-Day Free Trial: Manage up to <strong>10 priority tasks & 5 habits</strong>. Upgrade to Premium for up to 999 priority tasks & unlimited habits! 🌌</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
@@ -4460,7 +4464,7 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
         <div className="bg-gradient-to-r from-emerald-500/10 to-transparent p-4 rounded-2xl border border-emerald-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-emerald-700 dark:text-emerald-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-emerald-500 animate-pulse shrink-0" />
-            <span>🌌 Premium Workspace Unlocked: Absolute access to <strong>unlimited tasks ({tasks.length} active)</strong> with database backup.</span>
+            <span>🌌 Premium Workspace Unlocked: Absolute access to <strong>up to 999 priority tasks ({tasks.length}/999 active)</strong> with database backup.</span>
           </div>
         </div>
       )}
@@ -4484,7 +4488,7 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
             <div className="space-y-2">
               <h3 className="text-xl font-black dark:text-white">7-Day Free Trial Completed</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                Your 7-day free trial has completed. Please subscribe to Premium below to unlock unlimited tasks, habit trackers, and budgeting tools. Your current data is safe and in read-only mode!
+                Your 7-day free trial has completed. Please subscribe to Premium below to unlock up to 999 active tasks, habit trackers, and budgeting tools. Your current data is safe and in read-only mode!
               </p>
             </div>
             <div className="pt-2 flex flex-col gap-2">
@@ -4527,7 +4531,7 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
             <div className="space-y-2">
               <h3 className="text-xl font-black dark:text-white">Task Limit Reached ✨</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                You can create up to <strong className="text-[#4F46E5] dark:text-[#818CF8]">10 active tasks</strong> in the Free/Trial version. Upgrade to Premium for absolute unlimited tasks, habit tracking, smart widgets, and cloud backup protection.
+                You can create up to <strong className="text-[#4F46E5] dark:text-[#818CF8]">10 active tasks</strong> in the Free/Trial version. Upgrade to Premium for up to <strong className="text-amber-600 dark:text-amber-400">999 active priority tasks</strong>, habit tracking, smart widgets, and cloud backup protection.
               </p>
             </div>
             <div className="pt-2 flex flex-col gap-2">
@@ -4538,13 +4542,47 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
                 }}
                 className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-[#4F46E5]/10 active:scale-95"
               >
-                Unlock Unlimited Tasks ⚡
+                Unlock 999 Tasks ⚡
               </button>
               <button 
                 onClick={() => setShowTaskLimitModal(false)}
                 className="w-full py-3.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold rounded-2xl transition-all text-xs"
               >
                 Keep existing 10 tasks
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {showPremiumTaskLimitModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/45 backdrop-blur-md">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[2.5rem] p-8 border border-indigo-150 dark:border-gray-800 shadow-2xl space-y-6 text-center relative"
+          >
+            <button 
+              onClick={() => setShowPremiumTaskLimitModal(false)}
+              className="absolute top-6 right-6 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="w-16 h-16 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <Zap className="w-8 h-8 text-amber-600 dark:text-amber-400 animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black dark:text-white">Premium Limit Reached 🚀</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                You have reached the maximum upgrade limit of <strong className="text-amber-600 dark:text-amber-400">999 active tasks</strong>. To keep adding new tasks, please delete or complete some of your existing items.
+              </p>
+            </div>
+            <div className="pt-2">
+              <button 
+                onClick={() => setShowPremiumTaskLimitModal(false)}
+                className="w-full py-4 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl transition-all shadow-lg active:scale-95 text-xs font-bold"
+              >
+                Okay, Understood
               </button>
             </div>
           </motion.div>
@@ -6684,17 +6722,6 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
     }
   };
 
-  // Reactively mount Razorpay SDK script Client-Side
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    document.body.appendChild(script);
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
-
   // SaaS states
   const [checkoutPlan, setCheckoutPlan] = useState<PricingPlan | null>(null);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
@@ -6737,7 +6764,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
       : rawPrice;
 
     try {
-      const res = await fetch("/api/coupons/validate", {
+      const res = await fetch(`${API_URL}/api/coupons/validate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -6836,8 +6863,11 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvv, setCardCvv] = useState('');
-  const [checkoutStep, setCheckoutStep] = useState<number>(0); // 0: details, 1: connecting, 2: processing, 3-success
+  const [checkoutStep, setCheckoutStep] = useState<number>(0); // 0: details, 1: connecting, 2: processing, 3-success, 4-sandbox-confirm
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [sandboxOrderData, setSandboxOrderData] = useState<any | null>(null);
+  const [sandboxFellBack, setSandboxFellBack] = useState<boolean>(false);
+  const [sandboxFinalPrice, setSandboxFinalPrice] = useState<number>(0);
 
   // UPI Form States
   const [payMethod, setPayMethod] = useState<'card' | 'upi'>('upi');
@@ -6955,7 +6985,10 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
       }
 
       // 2. Determine authentic checkout vs high-fidelity design sandbox simulator
-      if (!orderData.isSandbox && (window as any).Razorpay) {
+      if (!orderData.isSandbox) {
+        if (!(window as any).Razorpay) {
+          throw new Error("Razorpay Checkout SDK was not found or was blocked by this browser's iframe rules. Please open the application in a new tab to pay with real Razorpay.");
+        }
         setCheckoutStep(2); // Initializing official overlay
         
         const rzpOptions = {
@@ -7026,67 +7059,11 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
         const razorInstance = new (window as any).Razorpay(rzpOptions);
         razorInstance.open();
       } else {
-        // Safe embedded beautiful simulator for local iframe testing & fallback sandbox execution
-        setCheckoutStep(2); // Remitting payment through simulated core
-        setTimeout(async () => {
-          try {
-            if (fellBackToLocal) {
-              // Bypass backend webhooks check since we are on static frontend (e.g. GitHub Pages) or backend is down
-              setUpgradingTo(checkoutPlan.id);
-              const methodLabel = qrScanActive 
-                ? 'Razorpay Secure (UPI QR Scanner - Static Sandbox)' 
-                : `Razorpay Secure (UPI ID Sandbox: ${selectedUpiApp.toUpperCase()}: ${upiId})`;
-
-              await onUpgrade(currentUserId, checkoutPlan.name, 9999, `${finalPriceToOrder}`, checkoutPlan.id, methodLabel);
-              setUpgradingTo(null);
-
-              setCheckoutStep(3); // Perfect
-              setSuccessMsg(`Congratulations! Upgraded successfully to ${checkoutPlan.name} [Simulated Gateway Mode via Standalone Frontend Integration]! Premium capabilities activated. ✨`);
-              setTimeout(() => setSuccessMsg(null), 6000);
-            } else {
-                const verifyResponse = await fetch(`${API_URL}/api/payments/razorpay/verify`, {
-                  method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  razorpay_payment_id: `pay_mock_${Math.random().toString(36).substring(2, 9)}`,
-                  razorpay_order_id: orderData.orderId,
-                  razorpay_signature: "mock_checksum",
-                  isSandbox: true,
-                  couponCode: appliedCoupon ? appliedCoupon.couponCode : undefined,
-                  userId: currentUserId,
-                  userEmail: session?.user?.email || "user@wrindha.com",
-                  discountApplied: appliedCoupon ? appliedCoupon.discountAmount : 0,
-                  paidAmount: finalPriceToOrder
-                })
-              });
-
-              if (!verifyResponse.ok) {
-                throw new Error("Local sandbox verification server returned connection error.");
-              }
-
-              const verifyData = await verifyResponse.json();
-              if (!verifyData.success) {
-                throw new Error("Local sandbox webhook authorization error.");
-              }
-
-              // Persistence
-              setUpgradingTo(checkoutPlan.id);
-              const methodLabel = qrScanActive 
-                ? 'Razorpay Secure (UPI QR Scanner)' 
-                : `Razorpay Secure (UPI ID: ${selectedUpiApp.toUpperCase()}: ${upiId})`;
-
-              await onUpgrade(currentUserId, checkoutPlan.name, 9999, `${finalPriceToOrder}`, checkoutPlan.id, methodLabel);
-              setUpgradingTo(null);
-
-              setCheckoutStep(3); // Perfect
-              setSuccessMsg(`Congratulations! Upgraded successfully to ${checkoutPlan.name} [Paid ${billingPeriod === 'yearly' ? 'Yearly' : 'Monthly'} via Razorpay]! Premium capabilities activated. ✨`);
-              setTimeout(() => setSuccessMsg(null), 6000);
-            }
-          } catch (err: any) {
-            setPaymentError(err.message || 'Error processing simulated billing upgrade.');
-            setCheckoutStep(0);
-          }
-        }, 1500);
+        // High fidelity sandbox simulator - save states and prompt user confirming to complete simulated payment (no auto-upgrade!)
+        setSandboxOrderData(orderData);
+        setSandboxFellBack(fellBackToLocal);
+        setSandboxFinalPrice(finalPriceToOrder);
+        setCheckoutStep(4); // Advance to interactive manual confirmation gateway
       }
     } catch (err: any) {
       setPaymentError(err.message || 'Unable to establish secure Razorpay handshake checkout.');
@@ -7679,6 +7656,17 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                       </span>
                     </div>
 
+                    {!razorpayServerEnabled && (
+                      <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-400 rounded-2xl text-[11px] leading-relaxed font-semibold flex flex-col gap-1">
+                        <span className="font-black flex items-center gap-1.5 uppercase text-[9px] tracking-wider text-amber-600 dark:text-amber-300">
+                          ⚠️ Sandbox Simulation Mode Active
+                        </span>
+                        <span>
+                          The host server is currently running without Razorpay API keys configured. Clicking below will trigger a mock sandbox upgrade to let you preview premium features safely.
+                        </span>
+                      </div>
+                    )}
+
                     {paymentError && (
                       <div className="p-3 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-455 border border-red-200 dark:border-red-900/30 rounded-xl text-xs font-bold animate-pulse">
                         {paymentError}
@@ -7901,25 +7889,31 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                       <h4 className="text-lg font-black dark:text-white">
                         {checkoutStep === 1 
                           ? 'Connecting to Razorpay UPI Handshake Gateway...' 
-                          : 'Verifying Razorpay UPI Remittance Receipt Ledger...'}
+                          : !razorpayServerEnabled
+                            ? 'Simulating Razorpay UPI Payment Verification...'
+                            : 'Verifying Razorpay UPI Remittance Receipt Ledger...'}
                       </h4>
                       <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed">
-                        Validating real-time VPA endpoint token authentication. Completing premium active directory update. Please wait.
+                        {!razorpayServerEnabled
+                          ? 'Bypassing real VPA endpoints since live API keys are absent. Running target database schema upgrade in simulation mode.'
+                          : 'Validating real-time VPA endpoint token authentication. Completing premium active directory update. Please wait.'}
                       </p>
                     </div>
                   </div>
                 )}
-
-                {/* Success Checkout Landing screen */}
                 {checkoutStep === 3 && (
                   <div className="text-center py-6 space-y-6">
                     <div className="w-20 h-20 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-500 rounded-full flex items-center justify-center mx-auto shadow-inner animate-bounce">
                       <CheckCircle2 className="w-10 h-10 text-emerald-500" />
                     </div>
                     <div className="space-y-2">
-                      <h4 className="text-2xl font-black dark:text-white">Transaction Verified!</h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto leading-relaxed">
-                        The checkout transaction was logged and Supabase profiles was auto-upgraded to <span className="font-bold text-indigo-500">{checkoutPlan.name}</span>. You can now use unlimited daily habit streaks, priorities matrices, and academic planners.
+                      <h4 className="text-2xl font-black dark:text-white">
+                        {!razorpayServerEnabled ? "Simulated Payment Verified!" : "Transaction Verified!"}
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto leading-relaxed font-semibold">
+                        {!razorpayServerEnabled 
+                          ? `The payment checkout was simulated successfully! Your profile was upgraded to the premium ${checkoutPlan?.name || "Premium OS"} plan for testing purposes. Real live gateway credentials are currently disabled on the server.`
+                          : `The checkout transaction was logged and Supabase profiles was auto-upgraded to ${checkoutPlan?.name || "Premium OS"}. You can now use unlimited daily habit streaks, priorities matrices, and academic planners.`}
                       </p>
                     </div>
                     
@@ -7932,6 +7926,114 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                         className="w-full py-3.5 bg-black dark:bg-indigo-600 font-bold text-white rounded-2xl text-xs uppercase tracking-widest active:scale-95 transition-all"
                       >
                         Open Workspace Dashboards &rarr;
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Interactive Simulated Payment gateway stage */}
+                {checkoutStep === 4 && (
+                  <div className="space-y-6 py-4 text-center animate-fade-in">
+                    <div className="mx-auto w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500">
+                      <CreditCard className="w-6 h-6 animate-pulse" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-base font-black dark:text-white uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                        Simulated Razorpay Gateway
+                      </h4>
+                      <p className="text-xs text-gray-400 max-w-sm mx-auto leading-relaxed">
+                        Since live Razorpay keys are omitted, a high-fidelity payment simulation sandbox is running. You must manually select to pay or cancel this authorization.
+                      </p>
+                    </div>
+
+                    <div className="bg-slate-55 dark:bg-slate-900/40 p-4 border border-slate-150 dark:border-slate-800/80 rounded-2xl text-left space-y-2 font-sans">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400 font-bold">Subtotal Amount:</span>
+                        <span className="font-mono font-black text-gray-900 dark:text-white">₹{sandboxFinalPrice}.00 INR</span>
+                      </div>
+                      <div className="flex justify-between text-xs border-t border-slate-100 dark:border-slate-800/60 pt-2">
+                        <span className="text-gray-400 font-bold">Billing Gateway:</span>
+                        <span className="font-black text-indigo-500">Razorpay (Test Sandbox)</span>
+                      </div>
+                      <div className="flex justify-between text-xs border-t border-slate-100 dark:border-slate-800/60 pt-2">
+                        <span className="text-gray-400 font-bold">UPI/Remittance ID:</span>
+                        <span className="font-mono text-gray-700 dark:text-gray-300">{qrScanActive ? 'QR-SCAN-01' : (upiId || "anonymous@upi")}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2.5">
+                      <button
+                        onClick={async () => {
+                          setCheckoutStep(2); // Verify loader
+                          setTimeout(async () => {
+                            try {
+                              const currentUserId = session?.user?.id || "local-user";
+                              if (sandboxFellBack) {
+                                setUpgradingTo(checkoutPlan?.id || null);
+                                const methodLabel = qrScanActive 
+                                  ? 'Razorpay Secure (UPI QR Scanner - Static Sandbox)' 
+                                  : `Razorpay Secure (UPI ID Sandbox: ${selectedUpiApp.toUpperCase()}: ${upiId})`;
+
+                                await onUpgrade(currentUserId, checkoutPlan!.name, 9999, `${sandboxFinalPrice}`, checkoutPlan!.id, methodLabel);
+                                setUpgradingTo(null);
+                                setCheckoutStep(3); // Upgraded successfully
+                                setSuccessMsg(`Congratulations! Upgraded successfully to ${checkoutPlan?.name} [Simulated Gateway Mode]! Premium functions active. ✨`);
+                                setTimeout(() => setSuccessMsg(null), 6000);
+                              } else {
+                                const verifyResponse = await fetch(`${API_URL}/api/payments/razorpay/verify`, {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({
+                                    razorpay_payment_id: `pay_mock_${Math.random().toString(36).substring(2, 9)}`,
+                                    razorpay_order_id: sandboxOrderData?.orderId || "order_mock",
+                                    razorpay_signature: "mock_checksum",
+                                    isSandbox: true,
+                                    couponCode: appliedCoupon ? appliedCoupon.couponCode : undefined,
+                                    userId: currentUserId,
+                                    userEmail: session?.user?.email || "user@wrindha.com",
+                                    discountApplied: appliedCoupon ? appliedCoupon.discountAmount : 0,
+                                    paidAmount: sandboxFinalPrice
+                                  })
+                                });
+
+                                if (!verifyResponse.ok) {
+                                  throw new Error("Local sandbox verification server returned connection error.");
+                                }
+
+                                const verifyData = await verifyResponse.json();
+                                if (!verifyData.success) {
+                                  throw new Error("Local sandbox webhook authorization error.");
+                                }
+
+                                setUpgradingTo(checkoutPlan?.id || null);
+                                const methodLabel = qrScanActive 
+                                  ? 'Razorpay Secure (UPI QR Scanner)' 
+                                  : `Razorpay Secure (UPI ID: ${selectedUpiApp.toUpperCase()}: ${upiId})`;
+
+                                await onUpgrade(currentUserId, checkoutPlan!.name, 9999, `${sandboxFinalPrice}`, checkoutPlan!.id, methodLabel);
+                                setUpgradingTo(null);
+                                setCheckoutStep(3); // Perfect
+                                setSuccessMsg(`Congratulations! Upgraded successfully to ${checkoutPlan?.name} [Paid via Razorpay Simulation]! Premium capabilities activated. ✨`);
+                                setTimeout(() => setSuccessMsg(null), 6000);
+                              }
+                            } catch (err: any) {
+                              setPaymentError(err.message || 'Error processing simulated billing upgrade.');
+                              setCheckoutStep(0);
+                            }
+                          }, 1500);
+                        }}
+                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black uppercase tracking-widest text-xs rounded-2xl transition-all shadow-lg shadow-emerald-600/10 flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        ✅ Authorize and Pay ₹{sandboxFinalPrice}.00
+                      </button>
+                      <button
+                        onClick={() => {
+                          setCheckoutStep(0);
+                          setPaymentError("Simulated sandbox payment transaction cancelled by the user.");
+                        }}
+                        className="w-full py-4 bg-slate-100 hover:bg-slate-200 active:scale-98 text-slate-600 dark:bg-slate-800 dark:text-gray-300 dark:hover:bg-slate-700 font-black uppercase tracking-widest text-[10px] rounded-2xl transition-all cursor-pointer"
+                      >
+                        ❌ Cancel Simulated Transaction
                       </button>
                     </div>
                   </div>
