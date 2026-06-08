@@ -1,3 +1,4 @@
+const API_URL = "https://wrindha-os.onrender.com";
 import React, { useState, useEffect, useRef } from "react";
 import { 
   BarChart3, 
