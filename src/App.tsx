@@ -2018,7 +2018,7 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
                exit={{ opacity: 0, y: -10 }}
                transition={{ duration: 0.2 }}
              >
-               {activeTab === 'dashboard' && <DashboardView habits={habits} tasks={tasks} expenses={expenses} currency={currency} userName={userName} setUserName={setUserName} theme={theme} setActiveTab={setActiveTab} budget={userBudget} />}
+               {activeTab === 'dashboard' && <DashboardView habits={habits} tasks={tasks} expenses={expenses} currency={currency} userName={userName} setUserName={setUserName} theme={theme} setActiveTab={setActiveTab} budget={userBudget} subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} />}
                 {activeTab === 'analytics' && <AnalyticsView expenses={expenses} habits={habits} tasks={tasks} goals={goals} courses={studyCourses} currency={currency} />}
                {activeTab === 'habits' && <HabitsView habits={habits} setHabits={setHabits} onDelete={(id) => deleteFromSupabase('habits', id)} theme={theme} subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} setActiveTab={setActiveTab} />}
                {activeTab === 'tasks' && <TasksView tasks={tasks} setTasks={setTasks} onDelete={(id) => deleteFromSupabase('tasks', id)} subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} setActiveTab={setActiveTab} />}
@@ -3810,7 +3810,7 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan, 
 
 // --- Views ---
 
-function DashboardView({ habits, tasks, expenses, currency, userName, setUserName, theme, setActiveTab, budget }: { 
+function DashboardView({ habits, tasks, expenses, currency, userName, setUserName, theme, setActiveTab, budget, subscriptionTier = 'Free' }: { 
   habits: Habit[], 
   tasks: Task[], 
   expenses: Expense[], 
@@ -3819,7 +3819,8 @@ function DashboardView({ habits, tasks, expenses, currency, userName, setUserNam
   setUserName: (name: string) => void,
   theme: 'light' | 'dark',
   setActiveTab: (tab: string) => void,
-  budget: number
+  budget: number,
+  subscriptionTier?: string
 }) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState(userName);
@@ -3827,6 +3828,9 @@ function DashboardView({ habits, tasks, expenses, currency, userName, setUserNam
   const totalSpent = expenses.reduce((acc, curr) => acc + curr.amount, 0);
   const remaining = budget - totalSpent;
   const progressPercent = Math.max(0, Math.min(100, (remaining / budget) * 100));
+
+  const isPremium = subscriptionTier?.toLowerCase() === 'premium' || subscriptionTier === 'Premium';
+  const activeTasksCount = tasks.filter(t => !t.completed).length;
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -3853,9 +3857,9 @@ function DashboardView({ habits, tasks, expenses, currency, userName, setUserNam
 
   return (
     <div className="space-y-8">
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-150 dark:border-gray-800 pb-5">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {isEditingName ? (
               <div className="flex items-center gap-2">
                 <input 
@@ -3869,15 +3873,47 @@ function DashboardView({ habits, tasks, expenses, currency, userName, setUserNam
               </div>
             ) : (
               <h1 
-                className="text-3xl font-bold tracking-tight cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-white rounded-xl px-2 -ml-2 transition-colors flex items-center gap-2 group"
+                className="text-3xl font-bold tracking-tight cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-white rounded-xl px-2 -ml-2 transition-colors flex items-center gap-2 group md:max-w-max"
                 onClick={() => setIsEditingName(true)}
               >
                 {getGreeting()}, {userName}
                 <Settings className="w-5 h-5 text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" />
               </h1>
             )}
+            {!isPremium ? (
+              <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 text-xs font-black rounded-full border border-indigo-150 dark:border-indigo-900 animate-pulse shrink-0 capitalize">
+                trial
+              </span>
+            ) : (
+              <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 text-xs font-black rounded-full border border-emerald-150 dark:border-emerald-900 shrink-0 capitalize">
+                premium
+              </span>
+            )}
           </div>
-          <p className="text-[#6B7280] dark:text-gray-500 mt-1">You have {habits.length} active habits and {tasks.filter(t => !t.completed).length} pending tasks.</p>
+          <p className="text-[#6B7280] dark:text-gray-500 mt-1">You have {habits.length} active habits and {activeTasksCount} pending tasks.</p>
+        </div>
+
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-2xl flex flex-col items-center">
+            <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">Active task Usage</span>
+            <span className="text-sm font-black dark:text-white font-mono mt-0.5">
+              {isPremium ? (
+                <span className="text-emerald-500 font-extrabold uppercase text-xs">Unlimited Tasks</span>
+              ) : (
+                <span className="text-indigo-600 dark:text-indigo-400">{activeTasksCount}/10 Tasks Used</span>
+              )}
+            </span>
+          </div>
+
+          {!isPremium && (
+            <button
+              onClick={() => setActiveTab('pricing')}
+              className="px-5 py-3 bg-indigo-650 hover:bg-indigo-700 bg-indigo-600 text-white font-black uppercase tracking-wider text-xs rounded-2xl hover:shadow-lg active:scale-97 transition-all cursor-pointer flex items-center gap-2 shadow-lg shadow-indigo-600/10"
+            >
+              <Zap className="w-4 h-4 animate-bounce shrink-0" />
+              Subscribe Now
+            </button>
+          )}
         </div>
       </div>
 
@@ -4381,16 +4417,14 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [showTaskLimitModal, setShowTaskLimitModal] = useState(false);
-  const [showPremiumTaskLimitModal, setShowPremiumTaskLimitModal] = useState(false);
+
+  const isPremium = subscriptionTier?.toLowerCase() === 'premium' || subscriptionTier === 'Premium';
+  const activeTasksCount = tasks.filter(t => !t.completed).length;
 
   const addTask = (q: EisenhowerQuadrant) => {
     if (!newTaskTitle.trim()) return;
-    if (subscriptionTier !== 'Premium' && tasks.length >= 10) {
+    if (!isPremium && activeTasksCount >= 10) {
       setShowTaskLimitModal(true);
-      return;
-    }
-    if (subscriptionTier === 'Premium' && tasks.length >= 999) {
-      setShowPremiumTaskLimitModal(true);
       return;
     }
     const newTask: Task = {
@@ -4418,20 +4452,52 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-150 dark:border-gray-800 pb-5">
         <div>
-          <h2 className="text-3xl font-black tracking-tight dark:text-white">Task Priority Matrix</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-3xl font-black tracking-tight dark:text-white">Task Priority Matrix</h2>
+            {!isPremium ? (
+              <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 text-xs font-bold rounded-full border border-indigo-150 dark:border-indigo-900">
+                Trial Active
+              </span>
+            ) : (
+              <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-full border border-emerald-150 dark:border-emerald-900">
+                Premium Status
+              </span>
+            )}
+          </div>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
             Prioritize your tasks across Eisenhower's 4 quadrants and focus with Pomodoro cycles.
           </p>
         </div>
+        
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-2xl flex flex-col items-center">
+            <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-505 font-bold">Usage Status</span>
+            <span className="text-sm font-black dark:text-white font-mono mt-0.5">
+              {isPremium ? (
+                <span className="text-emerald-500">Unlimited Tasks</span>
+              ) : (
+                <span>{activeTasksCount}/10 Tasks Used</span>
+              )}
+            </span>
+          </div>
+          {!isPremium && (
+            <button
+              onClick={() => setActiveTab && setActiveTab('pricing')}
+              className="px-5 py-2.5 bg-indigo-650 hover:bg-indigo-700 bg-indigo-600 text-white font-black uppercase tracking-wider text-[11px] rounded-2xl hover:shadow-lg active:scale-97 transition-all cursor-pointer"
+            >
+              Subscribe Now ⚡
+            </button>
+          )}
+        </div>
       </div>
 
-      {subscriptionTier === 'Expired' ? (
+      {subscriptionTier === 'Expired' && !isPremium ? (
         <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
-            <span>⚡ Standard Free Tier Active: Manage up to <strong>10 priority tasks & 5 habits</strong>. Upgrade to Premium to unlock up to 999 priority tasks, Study Courses, Finances, and database cloud backup.</span>
+            <span>⚡ Standard Free Tier Active: Manage up to <strong>10 active tasks & 5 habits</strong>. Upgrade to Premium to unlock Unlimited Tasks, Study Courses, Finances, and database cloud backup.</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
@@ -4440,11 +4506,11 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
             Upgrade &rarr;
           </button>
         </div>
-      ) : subscriptionTier === 'Trial' ? (
+      ) : (!isPremium && subscriptionTier === 'Trial') ? (
         <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
-            <span>⚡ Standard 7-Day Free Trial: Manage up to <strong>10 priority tasks & 5 habits</strong>. Upgrade to Premium for up to 999 priority tasks & unlimited habits! 🌌</span>
+            <span>⚡ Standard 7-Day Free Trial: Manage up to <strong>10 active tasks</strong>. Upgrade to Premium for unlimited habits & tasks! 🌌</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
@@ -4474,7 +4540,7 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
             <div className="space-y-2">
               <h3 className="text-xl font-black dark:text-white">7-Day Free Trial Completed</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                Your 7-day free trial has completed. Please subscribe to Premium below to unlock up to 999 active tasks, habit trackers, and budgeting tools. Your current data is safe and in read-only mode!
+                Your 7-day free trial has completed. Please subscribe to Premium below to unlock unlimited tasks, habit trackers, and budgeting tools. Your current data is safe and in read-only mode!
               </p>
             </div>
             <div className="pt-2 flex flex-col gap-2">
@@ -4514,10 +4580,10 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
             <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto shadow-inner">
               <Zap className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-pulse" />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-4">
               <h3 className="text-xl font-black dark:text-white">Task Limit Reached ✨</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                You can create up to <strong className="text-[#4F46E5] dark:text-[#818CF8]">10 active tasks</strong> in the Free/Trial version. Upgrade to Premium for up to <strong className="text-amber-600 dark:text-amber-400">999 active priority tasks</strong>, habit tracking, smart widgets, and cloud backup protection.
+                You have reached the task limit available during your free trial. Subscribe to WrindhaOS Premium to unlock unlimited tasks and all premium features.
               </p>
             </div>
             <div className="pt-2 flex flex-col gap-2">
@@ -4528,47 +4594,13 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
                 }}
                 className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-[#4F46E5]/10 active:scale-95"
               >
-                Unlock 999 Tasks ⚡
+                Subscribe Now ⚡
               </button>
               <button 
                 onClick={() => setShowTaskLimitModal(false)}
                 className="w-full py-3.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold rounded-2xl transition-all text-xs"
               >
-                Keep existing 10 tasks
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
-
-      {showPremiumTaskLimitModal && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/45 backdrop-blur-md">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[2.5rem] p-8 border border-indigo-150 dark:border-gray-800 shadow-2xl space-y-6 text-center relative"
-          >
-            <button 
-              onClick={() => setShowPremiumTaskLimitModal(false)}
-              className="absolute top-6 right-6 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400"
-            >
-              <X className="w-4 h-4" />
-            </button>
-            <div className="w-16 h-16 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-full flex items-center justify-center mx-auto shadow-inner">
-              <Zap className="w-8 h-8 text-amber-600 dark:text-amber-400 animate-pulse" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-black dark:text-white">Premium Limit Reached 🚀</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                You have reached the maximum upgrade limit of <strong className="text-amber-600 dark:text-amber-400">999 active tasks</strong>. To keep adding new tasks, please delete or complete some of your existing items.
-              </p>
-            </div>
-            <div className="pt-2">
-              <button 
-                onClick={() => setShowPremiumTaskLimitModal(false)}
-                className="w-full py-4 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl transition-all shadow-lg active:scale-95 text-xs font-bold"
-              >
-                Okay, Understood
+                Keep existing tasks
               </button>
             </div>
           </motion.div>

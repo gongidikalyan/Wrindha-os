@@ -389,6 +389,40 @@ CREATE POLICY "Users can manage their own career plans" ON public.career_plans
     FOR ALL USING (auth.uid() = user_id);
 
 
+-- 17. Backend Rule: Enforce Triggers for Task Limit based on user account status ('trial' vs 'premium')
+CREATE OR REPLACE FUNCTION public.check_task_limit()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_status TEXT;
+  v_active_count INTEGER;
+BEGIN
+  -- Get user subscription tier status (e.g. 'trial', 'premium', 'Free')
+  SELECT COALESCE(subscription_tier, 'trial') INTO v_status
+  FROM public.profiles
+  WHERE id = NEW.user_id;
+
+  -- Count existing active (incomplete) tasks
+  SELECT COUNT(*) INTO v_active_count
+  FROM public.tasks
+  WHERE user_id = NEW.user_id AND completed = false;
+
+  -- Enforce 10 tasks limit if status equates to trial/Free/null
+  IF (LOWER(v_status) = 'trial' OR v_status = 'Free' OR v_status IS NULL) AND v_active_count >= 10 THEN
+    RAISE EXCEPTION 'You have reached the task limit available during your free trial. Subscribe to WrindhaOS Premium to unlock unlimited tasks and all premium features.';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_check_task_limit ON public.tasks;
+
+CREATE TRIGGER trg_check_task_limit
+  BEFORE INSERT ON public.tasks
+  FOR EACH ROW EXECUTE PROCEDURE public.check_task_limit();
+
+
+
 
 
 
