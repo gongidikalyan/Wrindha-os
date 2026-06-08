@@ -4169,14 +4169,7 @@ function HabitsView({ habits, setHabits, onDelete, theme, subscriptionTier = 'Fr
         </div>
       )}
 
-      {subscriptionTier === 'Premium' && (
-        <div className="bg-gradient-to-r from-emerald-500/10 to-transparent p-4 rounded-2xl border border-emerald-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-emerald-700 dark:text-emerald-300 gap-3">
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-emerald-500 animate-pulse shrink-0" />
-            <span>🌌 Premium Workspace Unlocked: Unlimited custom habits, permanent streak histories, and backend backups enabled.</span>
-          </div>
-        </div>
-      )}
+
 
       {showLimitModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/45 backdrop-blur-md">
@@ -4460,14 +4453,7 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
             Secure Premium &rarr;
           </button>
         </div>
-      ) : (
-        <div className="bg-gradient-to-r from-emerald-500/10 to-transparent p-4 rounded-2xl border border-emerald-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-emerald-700 dark:text-emerald-300 gap-3">
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-emerald-500 animate-pulse shrink-0" />
-            <span>🌌 Premium Workspace Unlocked: Absolute access to <strong>up to 999 priority tasks ({tasks.length}/999 active)</strong> with database backup.</span>
-          </div>
-        </div>
-      )}
+      ) : null}
 
       {showLimitModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/45 backdrop-blur-md">
@@ -5102,14 +5088,7 @@ function StudyView({ courses, setCourses, onDeleteCourse, subscriptionTier = 'Fr
         </div>
       )}
 
-      {subscriptionTier === 'Premium' && (
-        <div className="bg-gradient-to-r from-emerald-500/10 to-transparent p-4 rounded-2xl border border-emerald-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-emerald-700 dark:text-emerald-300 gap-3">
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-emerald-500 animate-pulse shrink-0" />
-            <span>🌌 Premium Workspace Unlocked: Unlimited active courses, cloud sync, and material backup.</span>
-          </div>
-        </div>
-      )}
+
 
       {showLimitModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/45 backdrop-blur-md">
@@ -5503,14 +5482,7 @@ function GoalsView({
         </div>
       )}
 
-      {subscriptionTier === 'Premium' && (
-        <div className="bg-gradient-to-r from-emerald-500/10 to-transparent p-4 rounded-2xl border border-emerald-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-emerald-700 dark:text-emerald-300 gap-3">
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-emerald-500 animate-pulse shrink-0" />
-            <span>🌌 Premium Workspace Unlocked: Unlimited custom goals, history archives, and secure cloud backups.</span>
-          </div>
-        </div>
-      )}
+
 
       {showLimitModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/45 backdrop-blur-md">
