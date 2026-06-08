@@ -2512,7 +2512,16 @@ function AuthView({ onBypass }: { onBypass: () => void }) {
               </div>
             )}
 
-            {error && <p className="text-red-500 text-xs font-bold px-2">{error}</p>}
+            {error && (
+              <div className="space-y-2">
+                <p className="text-red-500 text-xs font-bold px-2">{error}</p>
+                {error.includes("Invalid login credentials") && (
+                  <p className="text-amber-500 dark:text-amber-400 text-[11px] font-medium px-2 leading-relaxed">
+                    💡 <strong>Tip:</strong> If you don't have an account registered yet, switch to <strong>"Generate Account"</strong> to create one instantly or click <strong>"Continue in Sandbox/Demo Mode"</strong> below.
+                  </p>
+                )}
+              </div>
+            )}
             {successMsg && <p className="text-emerald-500 text-xs font-bold px-2 leading-relaxed">{successMsg}</p>}
 
             <button 
@@ -2529,6 +2538,20 @@ function AuthView({ onBypass }: { onBypass: () => void }) {
                     : "Generate Account"}
             </button>
           </form>
+
+          <div className="relative flex py-4 items-center">
+            <div className="flex-grow border-t border-gray-100 dark:border-gray-800"></div>
+            <span className="flex-shrink mx-4 text-[10px] font-black uppercase tracking-widest text-gray-400">or</span>
+            <div className="flex-grow border-t border-gray-100 dark:border-gray-800"></div>
+          </div>
+
+          <button 
+            type="button"
+            onClick={onBypass}
+            className="w-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800/80 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            🚀 Continue in Sandbox/Demo Mode
+          </button>
 
           <div className="mt-8 flex flex-col gap-3 text-center">
             {showForgotPassword ? (
@@ -3998,10 +4021,6 @@ function HabitsView({ habits, setHabits, onDelete, theme, subscriptionTier = 'Fr
 
   const addHabit = () => {
     if (!newName.trim()) return;
-    if (subscriptionTier === 'Expired') {
-      setShowLimitModal(true);
-      return;
-    }
     const newHabit: Habit = {
       id: Math.random().toString(36).substr(2, 9),
       name: newName,
@@ -4085,13 +4104,7 @@ function HabitsView({ habits, setHabits, onDelete, theme, subscriptionTier = 'Fr
           <p className="text-gray-500 dark:text-gray-400">Habit completions update your graphs and streaks dynamically.</p>
         </div>
         <button 
-          onClick={() => {
-            if (subscriptionTier === 'Expired') {
-              setShowLimitModal(true);
-            } else {
-              setShowAdd(true);
-            }
-          }}
+          onClick={() => setShowAdd(true)}
           className="bg-black dark:bg-indigo-600 hover:opacity-95 text-white p-3 rounded-2xl hover:scale-105 transition-transform"
         >
           <Plus className="w-5 h-5" />
@@ -4099,14 +4112,14 @@ function HabitsView({ habits, setHabits, onDelete, theme, subscriptionTier = 'Fr
       </div>
 
       {subscriptionTier === 'Expired' && (
-        <div className="bg-gradient-to-r from-rose-500/10 to-transparent p-4 rounded-2xl border border-rose-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-rose-700 dark:text-rose-300 gap-3">
+        <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-rose-500 animate-pulse shrink-0" />
-            <span>⚠️ 7-Day Free Trial Completed: You are in <strong>Read-Only Mode</strong>. Please upgrade to Premium to track new habits and make updates.</span>
+            <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
+            <span>⚡ Standard Free Tier Active: Enjoy <strong>unlimited habits & daily streaks</strong>. Upgrade to Premium to unlock Study Courses, Finances, and database cloud backup.</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
-            className="underline font-black uppercase text-[10px] tracking-wider hover:text-rose-950 dark:hover:text-white shrink-0"
+            className="underline font-black uppercase text-[10px] tracking-wider hover:text-indigo-950 dark:hover:white shrink-0"
           >
             Upgrade &rarr;
           </button>
@@ -4306,10 +4319,6 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
 
   const addTask = (q: EisenhowerQuadrant) => {
     if (!newTaskTitle.trim()) return;
-    if (subscriptionTier === 'Expired') {
-      setShowLimitModal(true);
-      return;
-    }
     const newTask: Task = {
       id: Math.random().toString(36).substr(2, 9),
       title: newTaskTitle,
@@ -4345,14 +4354,14 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
       </div>
 
       {subscriptionTier === 'Expired' ? (
-        <div className="bg-gradient-to-r from-rose-500/10 to-transparent p-4 rounded-2xl border border-rose-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-rose-700 dark:text-rose-300 gap-3">
+        <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-rose-500 animate-pulse shrink-0" />
-            <span>⚠️ 7-Day Free Trial Completed: You are in <strong>Read-Only Mode</strong>. Please upgrade to Premium to unlock unlimited tasks and other tools.</span>
+            <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
+            <span>⚡ Standard Free Tier Active: Create and manage <strong>unlimited Eisenhower quadrant tasks</strong> for free. Upgrade to Premium to unlock Study Courses, Finances, and database cloud backup.</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
-            className="underline font-black uppercase text-[10px] tracking-wider hover:text-rose-950 dark:hover:text-white shrink-0"
+            className="underline font-black uppercase text-[10px] tracking-wider hover:text-indigo-950 dark:hover:text-white shrink-0"
           >
             Upgrade &rarr;
           </button>

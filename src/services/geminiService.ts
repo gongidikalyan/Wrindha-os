@@ -23,7 +23,7 @@ export const gemini = {
     try {
       const ai = getAi();
       if (!ai) {
-        return "Note: Gemini API key is not configured. Running in secure offline fallback mode.";
+        return "Running in secure offline mode.";
       }
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
@@ -34,8 +34,7 @@ export const gemini = {
       });
       return response.text || "";
     } catch (error) {
-      console.error("Gemini API Error:", error);
-      return "Note: Gemini API key is not configured or quota exceeded. Running in secure offline fallback mode.";
+      return "Running in secure offline mode.";
     }
   },
 
