@@ -396,6 +396,11 @@ DECLARE
   v_status TEXT;
   v_active_count INTEGER;
 BEGIN
+  -- If this is an update or an upsert on an already existing task, bypass the insertion limit check
+  IF EXISTS (SELECT 1 FROM public.tasks WHERE id = NEW.id) THEN
+    RETURN NEW;
+  END IF;
+
   -- Get user subscription tier status (e.g. 'trial', 'premium', 'Free')
   SELECT COALESCE(subscription_tier, 'trial') INTO v_status
   FROM public.profiles
