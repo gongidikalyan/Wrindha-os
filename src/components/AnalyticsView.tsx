@@ -333,9 +333,9 @@ export default function AnalyticsView({
       </div>
 
       {/* OVERALL METRICS GRID */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
         {/* Expenses Metric */}
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800/80 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800/80 shadow-sm flex flex-col justify-between" id="analytics-spent-card">
           <div className="flex justify-between items-start">
             <div className="p-2.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl">
               <Wallet className="w-5 h-5 text-emerald-500" />
@@ -349,7 +349,7 @@ export default function AnalyticsView({
         </div>
 
         {/* Habits Completion Metric */}
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800/80 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800/80 shadow-sm flex flex-col justify-between" id="analytics-habits-card">
           <div className="flex justify-between items-start">
             <div className="p-2.5 bg-orange-50 dark:bg-orange-500/10 rounded-2xl">
               <Flame className="w-5 h-5 text-orange-500" />
@@ -364,22 +364,8 @@ export default function AnalyticsView({
           </div>
         </div>
 
-        {/* Tasks Metric */}
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800/80 shadow-sm flex flex-col justify-between">
-          <div className="flex justify-between items-start">
-            <div className="p-2.5 bg-green-50 dark:bg-green-500/10 rounded-2xl">
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
-            </div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-green-500 bg-green-50 dark:bg-green-500/10 px-2 py-1 rounded-md">Tasks</span>
-          </div>
-          <div className="mt-4">
-            <p className="text-2xl font-black font-mono tracking-tight dark:text-white">{taskCompletionRate}%</p>
-            <p className="text-xs text-gray-400 mt-1">{completedTasksCount} of {totalTasksCount} done</p>
-          </div>
-        </div>
-
         {/* Goals Metric */}
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800/80 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800/80 shadow-sm flex flex-col justify-between" id="analytics-goals-card">
           <div className="flex justify-between items-start">
             <div className="p-2.5 bg-purple-50 dark:bg-purple-500/10 rounded-2xl">
               <Target className="w-5 h-5 text-purple-500" />
@@ -556,89 +542,7 @@ export default function AnalyticsView({
           </div>
         </div>
 
-        {/* ================= 3. EISENHOWER TASK PRIORITY & MATRIX DISTRIBUTION ================= */}
-        <div className="bg-white dark:bg-gray-900 p-6 md:p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800/80 shadow-sm flex flex-col justify-between min-h-[420px]">
-          <div>
-            <h3 className="text-lg font-bold mb-6 dark:text-white flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-500" />
-              Task Execution Rate
-            </h3>
-            <div className="flex flex-col items-center justify-center p-4">
-              <div className="relative w-40 h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={[
-                        { name: 'Completed', value: completedTasksCount },
-                        { name: 'Pending', value: Math.max(0, totalTasksCount - completedTasksCount) }
-                      ]}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={3}
-                      dataKey="value"
-                    >
-                      <Cell fill="#10B981" />
-                      <Cell fill="#E5E7EB" className="dark:fill-gray-800" />
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-                  <span className="text-2xl font-black font-mono dark:text-white">{taskCompletionRate}%</span>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">Finished</p>
-                </div>
-              </div>
-              <div className="flex gap-8 mt-6">
-                <div className="text-center">
-                  <span className="text-xs text-gray-400 block">Total Configured</span>
-                  <span className="text-lg font-black dark:text-white">{totalTasksCount}</span>
-                </div>
-                <div className="border-r border-gray-100 dark:border-gray-800 h-8 self-center"></div>
-                <div className="text-center">
-                  <span className="text-xs text-gray-400 block">Completed</span>
-                  <span className="text-lg font-black text-green-500">{completedTasksCount}</span>
-                </div>
-                <div className="border-r border-gray-100 dark:border-gray-800 h-8 self-center"></div>
-                <div className="text-center">
-                  <span className="text-xs text-gray-400 block">Pending</span>
-                  <span className="text-lg font-black text-rose-500">{totalTasksCount - completedTasksCount}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quadrant dispersion */}
-        <div className="bg-white dark:bg-gray-900 p-6 md:p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800/80 shadow-sm flex flex-col justify-between min-h-[420px]">
-          <div>
-            <h3 className="text-lg font-bold mb-6 dark:text-white flex items-center gap-2">
-              <FileCheck className="w-5 h-5 text-indigo-500" />
-              Tasks Priority Dispersion (Eisenhower)
-            </h3>
-            {totalTasksCount === 0 ? (
-              <div className="h-64 flex flex-col items-center justify-center text-gray-300 dark:text-gray-600">
-                <p className="text-sm italic">Add tasks in Eisenhower quadrant to analyze priorities.</p>
-              </div>
-            ) : (
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={quadrantDistribution} layout="vertical">
-                    <XAxis type="number" stroke="#9CA3AF" fontSize={11} tickLine={false} allowDecimals={false} />
-                    <YAxis dataKey="name" type="category" stroke="#9CA3AF" fontSize={10} width={130} tickLine={false} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#1F2937', borderRadius: '12px', border: 'none' }}
-                      itemStyle={{ color: '#6366F1' }}
-                    />
-                    <Bar dataKey="value" fill="#6366F1" radius={[0, 8, 8, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ================= 4. STUDY PLANNER MASTERIES ================= */}
+        {/* ================= 3. STUDY PLANNER MASTERIES ================= */}
         <div className="bg-white dark:bg-gray-900 p-6 md:p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800/80 shadow-sm flex flex-col justify-between min-h-[420px]">
           <div>
             <h3 className="text-lg font-bold mb-6 dark:text-white flex items-center gap-2">

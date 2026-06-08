@@ -65,14 +65,14 @@ import PomodoroTimer from "./components/PomodoroTimer";
 import TaskNotesEditor from "./components/TaskNotesEditor";
 import CareerPlannerView from "./components/CareerPlannerView";
 import HabitRewards from "./components/HabitRewards";
+import LifeOSView from "./components/LifeOSView";
 
 // Modules
 const modules = [
   { id: 'dashboard', name: 'Overview', icon: LayoutDashboard, color: 'text-blue-500' },
   { id: 'analytics', name: 'Analytics', icon: BarChart3, color: 'text-pink-500' },
   { id: 'habits', name: 'Habit Tracker', icon: Flame, color: 'text-orange-500' },
-  { id: 'tasks', name: 'Tasks & Matrix', icon: CheckCircle2, color: 'text-green-500' },
-  { id: 'goals', name: 'Goal System', icon: Target, color: 'text-purple-500' },
+  { id: 'goals', name: 'Life OS', icon: Target, color: 'text-purple-500' },
   { id: 'study', name: 'Study Planner', icon: GraduationCap, color: 'text-indigo-500' },
   { id: 'finance', name: 'Expenses', icon: Wallet, color: 'text-emerald-500' },
   { id: 'timetable', name: 'Timetable', icon: Calendar, color: 'text-cyan-500' },
@@ -233,6 +233,55 @@ export default function App() {
     return Date.now();
   };
 
+  const handleLogout = async () => {
+    try {
+      if (isSupabaseConfigured() && !bypassConfig) {
+        await supabase.auth.signOut();
+      }
+    } catch (clearErr) {
+      console.warn("Supabase signout erred:", clearErr);
+    }
+    
+    // Clear all client state
+    setSession(null);
+    setSubscriptionTier("Free");
+    setMaxHabits(5);
+    setHasFetchedFromDB(false);
+    setUserName("Felix");
+    setUserBudget(5000);
+    setHabits([]);
+    setTasks([]);
+    setExpenses([]);
+    setGoals([]);
+    setTimetable([]);
+    setStudyCourses([]);
+    setOrders([]);
+    
+    // Clear all localStorage keys
+    const keysToRemove = [
+      'wrindha_trial_start_date',
+      'wrindha_trial_end_date',
+      'wrindha_is_trial_activated',
+      'wrindha_has_paid',
+      'wrindha_subscription_tier',
+      'wrindha_max_habits',
+      'wrindha_orders',
+      'wrindha_habits',
+      'wrindha_tasks',
+      'wrindha_expenses',
+      'wrindha_goals',
+      'wrindha_timetable',
+      'wrindha_study',
+      'wrindha_budget',
+      'wrindha_budget_updated',
+      'wrindha_user_name'
+    ];
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    
+    setShowSettings(false);
+    setActiveTab('dashboard');
+  };
+
   const nowSecure = getCurrentSecureTime();
 
   const [trialStartDateStr, setTrialStartDateStr] = useState<string>(() => {
@@ -272,7 +321,7 @@ export default function App() {
   const elapsedMs = Math.max(0, nowSecure - trialStartDate.getTime());
   const daysElapsed = Math.floor(elapsedMs / (24 * 60 * 60 * 1000));
   const trialDaysLeft = Math.max(0, 7 - daysElapsed);
-  const isTrialActive = msLeft > 0;
+  const isTrialActive = !isAdmin && msLeft > 0;
 
   const formatRemainingTimeText = (ms: number) => {
     if (ms <= 0) return "0d 0h 0m";
@@ -419,6 +468,7 @@ export default function App() {
                 is_trial_activated: true,
                 trial_start_date: dates.startStr,
                 trial_end_date: dates.endStr,
+                subscription_tier: "TrialPremium",
                 has_paid: false
               }).then();
             }
@@ -464,6 +514,7 @@ export default function App() {
                 is_trial_activated: true,
                 trial_start_date: dates.startStr,
                 trial_end_date: dates.endStr,
+                subscription_tier: "TrialPremium",
                 has_paid: false
               }).then();
             }
@@ -486,6 +537,7 @@ export default function App() {
         setCurrency("INR");
         setSubscriptionTier("Free");
         setMaxHabits(5);
+        setHasFetchedFromDB(false);
         
         // Reset local trial values
         setTrialStartDateStr(new Date().toISOString());
@@ -567,6 +619,56 @@ export default function App() {
     const saved = localStorage.getItem('wrindha_blogs');
     const defaultBlogs: Blog[] = [
       {
+        id: "f-lifeos",
+        title: "Mastering Life OS Studio: How to Architect Your Focus with the 4-Level Pyramid",
+        content: `Welcome to Life OS Studio—a unified productivity cockpit designed to translate your highest vision into daily, manageable actions. Most productivity tools fail because they separate planning from execution. Life OS solves this by mathematically connecting your long-term dreams to the very next chore on your list.
+
+🌟 THE 4-LEVEL PYRAMID ARCHITECTURE
+At the heart of Life OS is the Priority Pyramid. This structure ensures that everything you do daily moves the needle on what matters most in the long run.
+
+Level 1: Strategic Goals (The Tip)
+These are your high-altitude guiding coordinates, divided into categories like Life, Career, Business, or Academic. Each Goal represents an overarching aspirational milestone (e.g., "Establish a Tech Startup" or "Graduate with Honors").
+
+Level 2: Major Projects (The Bridge)
+Strategic goals can feel overwhelming. Level 2 breaks them down into definitive, time-bound Projects. Projects are linked directly to your Level 1 Goals (e.g., "Develop MVP Architecture" or "Compile Thesis Draft").
+
+Level 3: Important Tasks (The Core)
+Tasks are the functional milestones that power your active projects. Every task lives within a project board and is tracked on your interactive Kanban board (e.g., "Design Database Schema" or "Proofread Chapter 1").
+
+Level 4: Daily Actions (The Base)
+This is where the rubber meets the road. Daily Actions are bite-sized, scheduled execution blocks (e.g., "Write SQL Script" or "Draft Abstract Paragraph") that you block on your calendar and tackle daily.
+
+🚀 STEP-BY-STEP WORKFLOW TO DOMINATE YOUR DAY:
+
+Step 1: Set Up Your Pyramid
+Navigate to the "Life OS" -> "Priority Pyramid" tab. 
+1. Use the simple panels to add a Strategic Goal (Level 1).
+2. Create a Major Project (Level 2) and select your Level 1 goal as the parent to link them.
+3. Establish your core Level 3 Tasks, linking them to your Level 2 Projects.
+4. Define your tactical Level 4 Daily Actions.
+
+Step 2: Organize Your Kanban Board
+Under the "Kanban Board" sub-tab, select your active Level 2 Project. You will see a dedicated board listing your Level 3 and Level 4 nodes. Drag-and-drop tasks across Backlog, To Do, In Progress, Review, and Completed columns to streamline your development pipeline.
+
+Step 3: Block Your Time & Execute
+Open the "Time Blocks" sub-tab. Select any Level 3 or 4 task, schedule a calendar date and specific time slot, and set the duration. 
+Today's active blocks automatically populate the "Overview" page. Turn on the "Deep Work" attribute for tasks requiring high mental reserve, and launch the integrated Pomodoro Focus Timer directly to log distraction-free sprints!
+
+🤖 DYNAMIC PROGRESS AUTOMATION
+You don't need to manually calculate progress. When you check off a Level 4 Daily Action:
+- The system automatically propagates completion progress upwards to the Parent Level 3 Task.
+- Completed Level 3 tasks automatically recalculate the Level 2 Project's completion rate.
+- Project completions aggregate to drive your Level 1 Strategic Goal's progress bar.
+- The entire ecosystem feeds into your global "Productivity Index" score on your central cockpit!
+
+💡 PRO TIP: CONSULT THE AI ADVISOR
+Every morning, click "Analyze priority recommendations" on your Dashboard. Our AI guidance engine analyzes your strategic pyramid, projects, and active tasks, serving up personalized advice to help you spot bottlenecks, schedule high-leverage deep work blocks, and maintain massive momentum!`,
+        author: "Admin",
+        category: "Productivity",
+        createdAt: "2026-06-08T00:00:00Z",
+        imageUrl: "https://images.unsplash.com/photo-1512486130939-2c4f79935e4f?q=80&w=600&auto=format&fit=crop"
+      },
+      {
         id: "f-habits",
         title: "The Wrindha OS Habit Tracker: How to Build Unshakeable Daily Rituals",
         content: `Developing healthy habits is the foundation of long-term personal success. Think of habits as compound interest for your self-improvement—small investments daily that yield massive returns over time.
@@ -595,39 +697,6 @@ Anchor your new habit to a current automated one. For instance, "Right after I g
         category: "Habits",
         createdAt: "2026-05-31T00:00:00Z",
         imageUrl: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=600&auto=format&fit=crop"
-      },
-      {
-        id: "f-tasks",
-        title: "The Eisenhower Matrix: Prioritizing Your Daily Tasks for High Impact",
-        content: `Are you busy, or are you productive? There is a profound difference. Often, we exhaust our days answering urgent but ultimately unimportant emails, completely ignoring the major goals that actually advance our lives.
-
-🌟 WHAT IS ITS USE?
-The Wrindha OS Task System uses the legendary Eisenhower Matrix (engineered by US President Dwight D. Eisenhower). It organizes tasks along two axes: Urgency and Importance.
-
-This divides your focus into 4 clear, actionable quadrants:
-1. Do First (Urgent & Important) — High-impact crises and deadlines. Action: Do immediately.
-2. Schedule (Important but Not Urgent) — Growth, studying, habits, relationship-building. Action: Schedule a specific time slot.
-3. Delegate (Urgent but Not Important) — Interruptions, scheduling, minor requests. Action: Delegate or automate.
-4. Eliminate (Neither Urgent nor Important) — Time sinks, distractions, endless feeds. Action: Eliminate ruthlessly.
-
-🚀 HOW TO USE IT:
-Step 1: Open the Task & Matrix Tab
-Navigate to the "Tasks & Matrix" section. You will see a quadrant board dividing your tasks visually.
-
-Step 2: Create and Categorize your Tasks
-Click "Add Task". Input your task name, set a description, and select the Quadrant. Wrindha OS will automatically distribute it into the correct grid space.
-
-Step 3: Execute in Order of Priority
-1. Deal with Quadrant 1 (Do First) immediately.
-2. Spend the majority of your deliberate planning time on Quadrant 2 (Schedule) to prevent future crises.
-3. Delegate or automate Quadrant 3.
-4. Eliminate Quadrant 4 tasks.
-
-Check off completed tasks to archive them and move your overall daily productivity score higher!`,
-        author: "Admin",
-        category: "Productivity",
-        createdAt: "2026-05-31T01:00:00Z",
-        imageUrl: "https://images.unsplash.com/photo-1540350394557-8d14678e7f91?q=80&w=600&auto=format&fit=crop"
       },
       {
         id: "f-finance",
@@ -764,77 +833,42 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
   });
 
   const [isInitializing, setIsInitializing] = useState(true);
+  const [hasFetchedFromDB, setHasFetchedFromDB] = useState(false);
   const [showReadOnlyModal, setShowReadOnlyModal] = useState(false);
 
   const setHabits = (val: React.SetStateAction<Habit[]>) => {
-    if (!hasActiveAccess && !isInitializing) {
-      setShowReadOnlyModal(true);
-      return;
-    }
     _setHabits(val);
   };
 
   const setTasks = (val: React.SetStateAction<Task[]>) => {
-    if (!hasActiveAccess && !isInitializing) {
-      setShowReadOnlyModal(true);
-      return;
-    }
     _setTasks(val);
   };
 
   const setExpenses = (val: React.SetStateAction<Expense[]>) => {
-    if (!hasActiveAccess && !isInitializing) {
-      setShowReadOnlyModal(true);
-      return;
-    }
     _setExpenses(val);
   };
 
   const setGoals = (val: React.SetStateAction<Goal[]>) => {
-    if (!hasActiveAccess && !isInitializing) {
-      setShowReadOnlyModal(true);
-      return;
-    }
     _setGoals(val);
   };
 
   const setTimetable = (val: React.SetStateAction<TimetableEntry[]>) => {
-    if (!hasActiveAccess && !isInitializing) {
-      setShowReadOnlyModal(true);
-      return;
-    }
     _setTimetable(val);
   };
 
   const setStudyCourses = (val: React.SetStateAction<StudyCourse[]>) => {
-    if (!hasActiveAccess && !isInitializing) {
-      setShowReadOnlyModal(true);
-      return;
-    }
     _setStudyCourses(val);
   };
 
   const setCurrency = (val: React.SetStateAction<'USD' | 'INR'>) => {
-    if (!hasActiveAccess && !isInitializing) {
-      setShowReadOnlyModal(true);
-      return;
-    }
     _setCurrency(val);
   };
 
   const setUserName = (val: React.SetStateAction<string>) => {
-    if (!hasActiveAccess && !isInitializing) {
-      setShowReadOnlyModal(true);
-      return;
-    }
     _setUserName(val);
   };
 
   const setUserBudget = (val: React.SetStateAction<number>) => {
-    if (!hasActiveAccess && !isInitializing) {
-      setShowReadOnlyModal(true);
-      return;
-    }
     _setUserBudget(val);
   };
 
@@ -915,6 +949,8 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
 
         let profileData = profileRes.data;
 
+        const isAdminUser = session.user.email === 'gongidikalyan08@gmail.com';
+
         if (!profileData) {
           // If the profile row doesn't exist yet, seamlessly bootstrap it to prevent any platform race states
           const defaultName = session.user.user_metadata?.full_name || localStorage.getItem('wrindha_user_name') || "Felix";
@@ -928,10 +964,11 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
             last_active: new Date().toISOString(),
             budget: userBudget,
             currency: currency,
-            is_trial_activated: true,
-            trial_start_date: dates.startStr,
-            trial_end_date: dates.endStr,
-            has_paid: false
+            is_trial_activated: isAdminUser ? false : true,
+            trial_start_date: isAdminUser ? null : dates.startStr,
+            trial_end_date: isAdminUser ? null : dates.endStr,
+            subscription_tier: isAdminUser ? "Premium" : "TrialPremium",
+            has_paid: isAdminUser ? true : false
           }).select().maybeSingle();
 
           if (newProfile) {
@@ -954,14 +991,44 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
           }
           if (profileData.currency) setCurrency(profileData.currency as 'USD' | 'INR');
           if (profileData.full_name) setUserName(profileData.full_name);
-          if (profileData.subscription_tier) setSubscriptionTier(profileData.subscription_tier);
-          if (profileData.max_habits) setMaxHabits(profileData.max_habits);
 
           // Support robust trial system synced live from DB
-          const dbIsTrialActivated = !!profileData.is_trial_activated;
-          const dbHasPaid = !!profileData.has_paid;
+          const dbIsTrialActivated = isAdminUser ? false : !!profileData.is_trial_activated;
+          const dbHasPaid = isAdminUser ? true : !!profileData.has_paid;
 
-          if (dbIsTrialActivated) {
+          let initialTier = isAdminUser ? "Premium" : (profileData.subscription_tier || "Free");
+          if (!isAdminUser && dbIsTrialActivated && !dbHasPaid && (initialTier === "Free" || initialTier === "")) {
+            initialTier = "TrialPremium";
+            supabase.from('profiles').update({ subscription_tier: "TrialPremium" }).eq('id', userId).then();
+          }
+          setSubscriptionTier(initialTier);
+          if (profileData.max_habits) setMaxHabits(isAdminUser ? 9999 : profileData.max_habits);
+
+          if (isAdminUser) {
+            setTrialStartDateStr("");
+            setTrialEndDateStr("");
+            setIsTrialActivated(false);
+            setHasPaid(true);
+            localStorage.setItem('wrindha_trial_start_date', "");
+            localStorage.setItem('wrindha_trial_end_date', "");
+            localStorage.setItem('wrindha_is_trial_activated', 'false');
+            localStorage.setItem('wrindha_has_paid', 'true');
+            localStorage.setItem('wrindha_subscription_tier', 'Premium');
+            
+            // Explicitly sync this state live with Supabase to make sure DB trigger bypass succeeds
+            if (profileData.subscription_tier !== "Premium" || !profileData.has_paid || profileData.is_trial_activated) {
+              supabase.from('profiles').update({
+                subscription_tier: "Premium",
+                has_paid: true,
+                is_trial_activated: false,
+                trial_start_date: null,
+                trial_end_date: null,
+                max_habits: 9999
+              }).eq('id', userId).then(({ error }) => {
+                if (error) console.error("Could not update admin profile row to Premium in Supabase:", error);
+              });
+            }
+          } else if (dbIsTrialActivated) {
             const secureNow = getCurrentSecureTime();
             let startStr = profileData.trial_start_date;
             let endStr = profileData.trial_end_date;
@@ -1056,37 +1123,61 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
           }
         }
 
-        const mappedHabits = habitsRes.data && habitsRes.data.length > 0 ? habitsRes.data.map((h: any) => ({
-          ...h,
-          completedAt: h.completed_at || h.completedAt || []
-        })) : [];
-        setHabits(mappedHabits);
+        if (!habitsRes?.error) {
+          const mappedHabits = habitsRes.data && habitsRes.data.length > 0 ? habitsRes.data.map((h: any) => ({
+            ...h,
+            completedAt: h.completed_at || h.completedAt || []
+          })) : [];
+          setHabits(mappedHabits);
+        } else {
+          console.warn("Could not fetch habits from Supabase, preserving local state:", habitsRes.error);
+        }
 
-        const mappedTasks = tasksRes.data && tasksRes.data.length > 0 ? tasksRes.data.map((t: any) => ({
-          ...t,
-          dueDate: t.due_date || t.dueDate
-        })) : [];
-        setTasks(mappedTasks);
+        if (!tasksRes?.error) {
+          const mappedTasks = tasksRes.data && tasksRes.data.length > 0 ? tasksRes.data.map((t: any) => ({
+            ...t,
+            dueDate: t.due_date || t.dueDate
+          })) : [];
+          setTasks(mappedTasks);
+        } else {
+          console.warn("Could not fetch tasks from Supabase, preserving local state:", tasksRes.error);
+        }
 
-        const mappedExpenses = expensesRes.data && expensesRes.data.length > 0 
-          ? expensesRes.data.map((e: any) => ({
-              ...e,
-              amount: typeof e.amount === 'string' ? parseFloat(e.amount) : e.amount
-            })) 
-          : [];
-        setExpenses(mappedExpenses);
+        if (!expensesRes?.error) {
+          const mappedExpenses = expensesRes.data && expensesRes.data.length > 0 
+            ? expensesRes.data.map((e: any) => ({
+                ...e,
+                amount: typeof e.amount === 'string' ? parseFloat(e.amount) : e.amount
+              })) 
+            : [];
+          setExpenses(mappedExpenses);
+        } else {
+          console.warn("Could not fetch expenses from Supabase, preserving local state:", expensesRes.error);
+        }
 
-        const mappedGoals = goalsRes.data && goalsRes.data.length > 0 ? goalsRes.data.map((g: any) => ({
-          ...g,
-          targetDate: g.target_date || g.targetDate
-        })) : [];
-        setGoals(mappedGoals);
+        if (!goalsRes?.error) {
+          const mappedGoals = goalsRes.data && goalsRes.data.length > 0 ? goalsRes.data.map((g: any) => ({
+            ...g,
+            targetDate: g.target_date || g.targetDate
+          })) : [];
+          setGoals(mappedGoals);
+        } else {
+          console.warn("Could not fetch goals from Supabase, preserving local state:", goalsRes.error);
+        }
 
-        const mappedTimetable = timetableRes.data && timetableRes.data.length > 0 ? timetableRes.data : [];
-        setTimetable(mappedTimetable);
+        if (!timetableRes?.error) {
+          const mappedTimetable = timetableRes.data && timetableRes.data.length > 0 ? timetableRes.data : [];
+          setTimetable(mappedTimetable);
+        } else {
+          console.warn("Could not fetch timetable from Supabase, preserving local state:", timetableRes.error);
+        }
 
-        const mappedStudy = studyRes.data && studyRes.data.length > 0 ? studyRes.data : [];
-        setStudyCourses(mappedStudy);
+        if (!studyRes?.error) {
+          const mappedStudy = studyRes.data && studyRes.data.length > 0 ? studyRes.data : [];
+          setStudyCourses(mappedStudy);
+        } else {
+          console.warn("Could not fetch study courses from Supabase, preserving local state:", studyRes.error);
+        }
 
         // Globally load blogs (any user can view them)
         try {
@@ -1121,39 +1212,6 @@ Anchor your new habit to a current automated one. For instance, "Right after I g
               category: "Habits",
               createdAt: "2026-05-31T00:00:00Z",
               imageUrl: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=600&auto=format&fit=crop"
-            },
-            {
-              id: "f-tasks",
-              title: "The Eisenhower Matrix: Prioritizing Your Daily Tasks for High Impact",
-              content: `Are you busy, or are you productive? There is a profound difference. Often, we exhaust our days answering urgent but ultimately unimportant emails, completely ignoring the major goals that actually advance our lives.
-
-🌟 WHAT IS ITS USE?
-The Wrindha OS Task System uses the legendary Eisenhower Matrix (engineered by US President Dwight D. Eisenhower). It organizes tasks along two axes: Urgency and Importance.
-
-This divides your focus into 4 clear, actionable quadrants:
-1. Do First (Urgent & Important) — High-impact crises and deadlines. Action: Do immediately.
-2. Schedule (Important but Not Urgent) — Growth, studying, habits, relationship-building. Action: Schedule a specific time slot.
-3. Delegate (Urgent but Not Important) — Interruptions, scheduling, minor requests. Action: Delegate or automate.
-4. Eliminate (Neither Urgent nor Important) — Time sinks, distractions, endless feeds. Action: Eliminate ruthlessly.
-
-🚀 HOW TO USE IT:
-Step 1: Open the Task & Matrix Tab
-Navigate to the "Tasks & Matrix" section. You will see a quadrant board dividing your tasks visually.
-
-Step 2: Create and Categorize your Tasks
-Click "Add Task". Input your task name, set a description, and select the Quadrant. Wrindha OS will automatically distribute it into the correct grid space.
-
-Step 3: Execute in Order of Priority
-1. Deal with Quadrant 1 (Do First) immediately.
-2. Spend the majority of your deliberate planning time on Quadrant 2 (Schedule) to prevent future crises.
-3. Delegate or automate Quadrant 3.
-4. Eliminate Quadrant 4 tasks.
-
-Check off completed tasks to archive them and move your overall daily productivity score higher!`,
-              author: "Admin",
-              category: "Productivity",
-              createdAt: "2026-05-31T01:00:00Z",
-              imageUrl: "https://images.unsplash.com/photo-1540350394557-8d14678e7f91?q=80&w=600&auto=format&fit=crop"
             },
             {
               id: "f-finance",
@@ -1287,6 +1345,8 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
         } catch (ordersError) {
           console.warn("Table 'orders' might not exist or be accessible yet in Supabase.", ordersError);
         }
+
+        setHasFetchedFromDB(true);
       } catch (error) {
         console.error('Error fetching from Supabase:', error);
       } finally {
@@ -1315,7 +1375,7 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
   // Sync to Supabase helper
   const syncToSupabase = async (table: string, data: any) => {
     if (!isSupabaseConfigured() || !session?.user?.id || bypassConfig) return;
-    if (isInitializing || isFetchingRef.current) return;
+    if (isInitializing || !hasFetchedFromDB || isFetchingRef.current) return;
     try {
       // Add user_id to each item before upserting and map camelCase to snake_case if needed
       const mapItem = (item: any) => {
@@ -1331,17 +1391,16 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
         ? data.map(mapItem)
         : mapItem(data);
         
-      await supabase.from(table).upsert(dataWithUser);
-    } catch (error) {
-      console.error(`Error syncing ${table} to Supabase:`, error);
+      const { error } = await supabase.from(table).upsert(dataWithUser);
+      if (error) {
+        console.error(`Error syncing ${table} to Supabase:`, error);
+      }
+    } catch (err: any) {
+      console.error(`Error syncing ${table} to Supabase:`, err);
     }
   };
 
   const deleteFromSupabase = async (table: string, id: string) => {
-    if (!hasActiveAccess && !isInitializing) {
-      setShowReadOnlyModal(true);
-      return;
-    }
     if (!isSupabaseConfigured() || !session?.user?.id || bypassConfig) return;
     try {
       await supabase.from(table).delete().eq('id', id).eq('user_id', session.user.id);
@@ -1759,10 +1818,7 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
           </button>
           {session && (
             <button 
-              onClick={async () => {
-                await supabase.auth.signOut();
-                setActiveTab('dashboard');
-              }}
+              onClick={handleLogout}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all"
             >
               <LogOut className="w-5 h-5 shrink-0" />
@@ -1847,12 +1903,8 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
                         <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
                           <span className="text-sm font-medium dark:text-gray-300">Account</span>
                           <button 
-                            onClick={async () => {
-                              await supabase.auth.signOut();
-                              setShowSettings(false);
-                              setActiveTab('dashboard');
-                            }}
-                            className="text-xs font-bold uppercase text-red-500 hover:text-white px-3 py-1.5 bg-red-50 dark:bg-red-900/10 hover:bg-red-500 dark:hover:bg-red-600 rounded-lg transition-all flex items-center gap-2"
+                            onClick={handleLogout}
+                            className="text-xs font-bold uppercase text-red-500 hover:text-white px-3 py-1.5 bg-red-50 dark:bg-red-900/10 hover:bg-red-500 dark:hover:bg-red-600 rounded-lg transition-colors flex items-center gap-2"
                           >
                             <LogOut className="w-3 h-3" /> Logout
                           </button>
@@ -1901,7 +1953,7 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
                 onClick={() => setActiveTab('pricing')}
                 className="flex items-center gap-2 bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/30 px-3.5 py-1.5 rounded-full text-[11px] font-bold hover:bg-rose-100 dark:hover:bg-rose-950/40 transition-all shadow-sm hover:scale-105 active:scale-95 animate-pulse"
               >
-                <span>⚠️ Read-Only Mode: Trial / Subscription Completed</span>
+                <span>⚠️ Standard Free Mode Active: Upgrade to Premium</span>
                 <span className="bg-rose-600 text-white font-extrabold uppercase text-[8px] tracking-wider px-2 py-0.5 rounded-full shadow-sm animate-none">Activate Premium</span>
               </button>
             )}
@@ -1960,12 +2012,14 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
                             {session?.user?.email || "user@wrindha.com"}
                           </span>
                         </div>
-                        <div className="flex justify-between items-center gap-2">
-                          <span className="font-bold text-gray-400 uppercase text-[10px] shrink-0">Current Plan</span>
-                          <span className="inline-block text-[10px] bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 font-extrabold uppercase px-2.5 py-0.5 rounded-full border border-indigo-150/30">
-                            {subscriptionTier.includes('Cancelled:') ? 'Premium (Cancelled)' : subscriptionTier}
-                          </span>
-                        </div>
+                        {subscriptionTier !== 'Premium' && subscriptionTier !== 'Pro Space' && (
+                          <div className="flex justify-between items-center gap-2">
+                            <span className="font-bold text-gray-400 uppercase text-[10px] shrink-0">Current Plan</span>
+                            <span className="inline-block text-[10px] bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 font-extrabold uppercase px-2.5 py-0.5 rounded-full border border-indigo-150/30">
+                              {subscriptionTier.includes('Cancelled:') ? 'Premium (Cancelled)' : subscriptionTier}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex flex-col gap-2">
@@ -1981,9 +2035,8 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
                         {session ? (
                           <button
                             onClick={async () => {
-                              await supabase.auth.signOut();
                               setShowProfileMenu(false);
-                              setActiveTab('dashboard');
+                              await handleLogout();
                             }}
                             className="w-full py-2.5 bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 text-xs font-bold rounded-xl transition-all text-center flex items-center justify-center gap-2"
                           >
@@ -2018,10 +2071,9 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
                exit={{ opacity: 0, y: -10 }}
                transition={{ duration: 0.2 }}
              >
-               {activeTab === 'dashboard' && <DashboardView habits={habits} tasks={tasks} expenses={expenses} currency={currency} userName={userName} setUserName={setUserName} theme={theme} setActiveTab={setActiveTab} budget={userBudget} subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} />}
+               {activeTab === 'dashboard' && <DashboardView habits={habits} tasks={tasks} setTasks={setTasks} expenses={expenses} currency={currency} userName={userName} setUserName={setUserName} theme={theme} setActiveTab={setActiveTab} budget={userBudget} subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} />}
                 {activeTab === 'analytics' && <AnalyticsView expenses={expenses} habits={habits} tasks={tasks} goals={goals} courses={studyCourses} currency={currency} />}
                {activeTab === 'habits' && <HabitsView habits={habits} setHabits={setHabits} onDelete={(id) => deleteFromSupabase('habits', id)} theme={theme} subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} setActiveTab={setActiveTab} />}
-               {activeTab === 'tasks' && <TasksView tasks={tasks} setTasks={setTasks} onDelete={(id) => deleteFromSupabase('tasks', id)} subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} setActiveTab={setActiveTab} />}
                {activeTab === 'finance' && <FinanceView expenses={expenses} setExpenses={setExpenses} onDelete={(id) => deleteFromSupabase('expenses', id)} currency={currency} setCurrency={setCurrency} theme={theme} budget={userBudget} setBudget={setUserBudget} />}
                {activeTab === 'study' && <StudyView courses={studyCourses} setCourses={setStudyCourses} onDeleteCourse={(id) => deleteFromSupabase('study_courses', id)} subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} setActiveTab={setActiveTab} />}
                {activeTab === 'goals' && (
@@ -2071,7 +2123,6 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
           { id: 'dashboard', name: 'Overview', icon: LayoutDashboard },
           { id: 'analytics', name: 'Analytics', icon: BarChart3 },
           { id: 'habits', name: 'Habits', icon: Flame },
-          { id: 'tasks', name: 'Tasks', icon: ListTodo },
           { id: 'blogs', name: 'Blogs', icon: FileText },
           { id: 'pricing', name: 'Pricing', icon: Award },
         ].map((m) => {
@@ -2540,7 +2591,7 @@ function AuthView({ onBypass }: { onBypass: () => void }) {
                 <p className="text-red-500 text-xs font-bold px-2">{error}</p>
                 {error.includes("Invalid login credentials") && (
                   <p className="text-amber-500 dark:text-amber-400 text-[11px] font-medium px-2 leading-relaxed">
-                    💡 <strong>Tip:</strong> If you don't have an account registered yet, switch to <strong>"Generate Account"</strong> to create one instantly or click <strong>"Continue in Sandbox/Demo Mode"</strong> below.
+                    💡 <strong>Tip:</strong> If you don't have an account registered yet, switch to <strong>"Generate Account"</strong> to create one instantly.
                   </p>
                 )}
               </div>
@@ -2561,20 +2612,6 @@ function AuthView({ onBypass }: { onBypass: () => void }) {
                     : "Generate Account"}
             </button>
           </form>
-
-          <div className="relative flex py-4 items-center">
-            <div className="flex-grow border-t border-gray-100 dark:border-gray-800"></div>
-            <span className="flex-shrink mx-4 text-[10px] font-black uppercase tracking-widest text-gray-400">or</span>
-            <div className="flex-grow border-t border-gray-100 dark:border-gray-800"></div>
-          </div>
-
-          <button 
-            type="button"
-            onClick={onBypass}
-            className="w-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800/80 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]"
-          >
-            🚀 Continue in Sandbox/Demo Mode
-          </button>
 
           <div className="mt-8 flex flex-col gap-3 text-center">
             {showForgotPassword ? (
@@ -3810,9 +3847,10 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan, 
 
 // --- Views ---
 
-function DashboardView({ habits, tasks, expenses, currency, userName, setUserName, theme, setActiveTab, budget, subscriptionTier = 'Free' }: { 
+function DashboardView({ habits, tasks, setTasks, expenses, currency, userName, setUserName, theme, setActiveTab, budget, subscriptionTier = 'Free' }: { 
   habits: Habit[], 
   tasks: Task[], 
+  setTasks: (t: Task[]) => void,
   expenses: Expense[], 
   currency: 'USD' | 'INR', 
   userName: string,
@@ -3825,12 +3863,28 @@ function DashboardView({ habits, tasks, expenses, currency, userName, setUserNam
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState(userName);
   
+  const [quickTaskTitle, setQuickTaskTitle] = useState("");
+  const [quickQuadrant, setQuickQuadrant] = useState<EisenhowerQuadrant>(EisenhowerQuadrant.URGENT_IMPORTANT);
+  const [quickAddError, setQuickAddError] = useState<string | null>(null);
+  
   const totalSpent = expenses.reduce((acc, curr) => acc + curr.amount, 0);
   const remaining = budget - totalSpent;
   const progressPercent = Math.max(0, Math.min(100, (remaining / budget) * 100));
 
-  const isPremium = subscriptionTier?.toLowerCase() === 'premium' || subscriptionTier === 'Premium';
+  const isPremium = !!(subscriptionTier?.toLowerCase().includes('premium') || subscriptionTier?.toLowerCase().includes('trial') || subscriptionTier?.toLowerCase().includes('pro') || subscriptionTier?.toLowerCase().includes('active'));
+  const isUnlimitedTasks = !!(
+    subscriptionTier?.toLowerCase() === 'premium' || 
+    subscriptionTier?.toLowerCase() === 'pro space' || 
+    subscriptionTier?.toLowerCase() === 'ultimate matrix' || 
+    subscriptionTier?.toLowerCase() === 'active' ||
+    subscriptionTier?.toLowerCase().includes('premium') ||
+    subscriptionTier?.toLowerCase().includes('pro')
+  );
+  const isPremiumBadgeVisible = !isUnlimitedTasks;
+  const isTrial = subscriptionTier === 'Trial' || subscriptionTier?.toLowerCase() === 'trialpremium';
+  const maxTasksAllowed = isUnlimitedTasks ? Infinity : (isTrial ? 10 : 3);
   const activeTasksCount = tasks.filter(t => !t.completed).length;
+  const activeTasks = tasks.filter(t => !t.completed);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -3851,6 +3905,25 @@ function DashboardView({ habits, tasks, expenses, currency, userName, setUserNam
       style: 'currency',
       currency: currency === 'USD' ? 'USD' : 'INR',
     }).format(val);
+  };
+
+  const handleQuickAdd = () => {
+    if (!quickTaskTitle.trim()) return;
+    if (activeTasksCount >= maxTasksAllowed) {
+      setQuickAddError(`Task limit reached (${maxTasksAllowed} active tasks on ${isTrial ? 'Free Trial' : 'Free Version'}). Please upgrade!`);
+      setTimeout(() => setQuickAddError(null), 5005);
+      return;
+    }
+    const newTask: Task = {
+      id: Math.random().toString(36).substr(2, 9),
+      title: quickTaskTitle,
+      quadrant: quickQuadrant,
+      completed: false,
+      tags: []
+    };
+    setTasks([...tasks, newTask]);
+    setQuickTaskTitle("");
+    setQuickAddError(null);
   };
 
   const priorityTasks = tasks.filter(t => t.quadrant === EisenhowerQuadrant.URGENT_IMPORTANT && !t.completed);
@@ -3880,32 +3953,17 @@ function DashboardView({ habits, tasks, expenses, currency, userName, setUserNam
                 <Settings className="w-5 h-5 text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" />
               </h1>
             )}
-            {!isPremium ? (
-              <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 text-xs font-black rounded-full border border-indigo-150 dark:border-indigo-900 animate-pulse shrink-0 capitalize">
-                trial
-              </span>
-            ) : (
-              <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 text-xs font-black rounded-full border border-emerald-150 dark:border-emerald-900 shrink-0 capitalize">
-                premium
+            {isPremiumBadgeVisible && (
+              <span className="px-3 py-1 bg-indigo-100 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 text-xs font-black rounded-full border border-indigo-200 dark:border-indigo-900/50 shrink-0 capitalize">
+                {subscriptionTier === 'Trial' ? 'Free Trial' : 'Free Version'}
               </span>
             )}
           </div>
-          <p className="text-[#6B7280] dark:text-gray-500 mt-1">You have {habits.length} active habits and {activeTasksCount} pending tasks.</p>
+          <p className="text-[#6B7280] dark:text-gray-500 mt-1">You have {habits.length} active habits.</p>
         </div>
 
         <div className="flex items-center gap-4 flex-wrap">
-          <div className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-2xl flex flex-col items-center">
-            <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">Active task Usage</span>
-            <span className="text-sm font-black dark:text-white font-mono mt-0.5">
-              {isPremium ? (
-                <span className="text-emerald-500 font-extrabold uppercase text-xs">Unlimited Tasks</span>
-              ) : (
-                <span className="text-indigo-600 dark:text-indigo-400">{activeTasksCount}/10 Tasks Used</span>
-              )}
-            </span>
-          </div>
-
-          {!isPremium && (
+          {!isUnlimitedTasks && (
             <button
               onClick={() => setActiveTab('pricing')}
               className="px-5 py-3 bg-indigo-650 hover:bg-indigo-700 bg-indigo-600 text-white font-black uppercase tracking-wider text-xs rounded-2xl hover:shadow-lg active:scale-97 transition-all cursor-pointer flex items-center gap-2 shadow-lg shadow-indigo-600/10"
@@ -3917,9 +3975,9 @@ function DashboardView({ habits, tasks, expenses, currency, userName, setUserNam
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Habit Card */}
-        <div className="md:col-span-2 lg:col-span-2 bg-white dark:bg-gray-900 p-6 rounded-3xl border border-[#E5E7EB] dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow group">
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-[#E5E7EB] dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow group">
           <div className="flex justify-between items-start mb-4">
             <div className="p-2 bg-orange-50 dark:bg-orange-500/10 rounded-xl group-hover:bg-orange-100 dark:group-hover:bg-orange-500/20 transition-colors">
               <Flame className="w-6 h-6 text-orange-500" />
@@ -3963,26 +4021,6 @@ function DashboardView({ habits, tasks, expenses, currency, userName, setUserNam
             })()}
           </div>
           <p className="text-sm text-[#6B7280] dark:text-gray-400">Streak: {habits[0]?.streak || 0} days. Keep pushing!</p>
-        </div>
-
-        {/* Eisenhower Card */}
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-[#E5E7EB] dark:border-gray-800 shadow-sm flex flex-col justify-between">
-          <div>
-            <div className="p-2 bg-green-50 dark:bg-green-500/10 rounded-xl w-fit mb-4">
-               <CheckCircle2 className="w-6 h-6 text-green-500" />
-            </div>
-            <h3 className="text-lg font-bold leading-tight dark:text-white">Priority Matrix</h3>
-             <div className="mt-4 space-y-3">
-               {priorityTasks.slice(0, 3).map(task => (
-                 <div key={task.id} className="flex items-center gap-3 min-w-0">
-                   <div className="w-2 h-2 rounded-full bg-red-500 shrink-0"></div>
-                   <span className="text-sm font-medium truncate dark:text-gray-300 flex-1">{task.title}</span>
-                 </div>
-               ))}
-               {priorityTasks.length === 0 && <p className="text-gray-400 dark:text-gray-600 text-sm">No critical tasks!</p>}
-            </div>
-          </div>
-          <button onClick={() => setActiveTab('tasks')} className="text-xs font-bold text-[#6B7280] dark:text-gray-500 uppercase tracking-widest mt-6 hover:text-black dark:hover:text-white transition-colors w-full text-left">View Matrix →</button>
         </div>
 
         {/* Expenses Card */}
@@ -4081,7 +4119,8 @@ function HabitsView({ habits, setHabits, onDelete, theme, subscriptionTier = 'Fr
 
   const addHabit = () => {
     if (!newName.trim()) return;
-    if (subscriptionTier !== 'Premium' && habits.length >= 5) {
+    const isUnlimitedHabits = subscriptionTier === 'Premium' || subscriptionTier === 'Pro Space';
+    if (!isUnlimitedHabits && habits.length >= 5) {
       setShowHabitLimitModal(true);
       return;
     }
@@ -4418,12 +4457,21 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [showTaskLimitModal, setShowTaskLimitModal] = useState(false);
 
-  const isPremium = subscriptionTier?.toLowerCase() === 'premium' || subscriptionTier === 'Premium';
+  const isUnlimitedTasks = !!(
+    subscriptionTier?.toLowerCase() === 'premium' || 
+    subscriptionTier?.toLowerCase() === 'pro space' || 
+    subscriptionTier?.toLowerCase() === 'ultimate matrix' || 
+    subscriptionTier?.toLowerCase() === 'active' ||
+    subscriptionTier?.toLowerCase().includes('premium') ||
+    subscriptionTier?.toLowerCase().includes('pro')
+  );
+  const isTrial = subscriptionTier === 'Trial' || subscriptionTier?.toLowerCase() === 'trialpremium';
+  const maxTasksAllowed = isUnlimitedTasks ? Infinity : (isTrial ? 10 : 3);
   const activeTasksCount = tasks.filter(t => !t.completed).length;
 
   const addTask = (q: EisenhowerQuadrant) => {
     if (!newTaskTitle.trim()) return;
-    if (!isPremium && activeTasksCount >= 10) {
+    if (activeTasksCount >= maxTasksAllowed) {
       setShowTaskLimitModal(true);
       return;
     }
@@ -4456,13 +4504,9 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
         <div>
           <div className="flex items-center gap-3">
             <h2 className="text-3xl font-black tracking-tight dark:text-white">Task Priority Matrix</h2>
-            {!isPremium ? (
-              <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 text-xs font-bold rounded-full border border-indigo-150 dark:border-indigo-900">
-                Trial Active
-              </span>
-            ) : (
-              <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-full border border-emerald-150 dark:border-emerald-900">
-                Premium Status
+            {subscriptionTier !== 'Premium' && subscriptionTier !== 'Pro Space' && (
+              <span className="px-3 py-1 bg-indigo-100 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 text-xs font-bold rounded-full border border-indigo-200 dark:border-indigo-900/50">
+                {subscriptionTier === 'Trial' ? 'Free Trial' : 'Free Version'}
               </span>
             )}
           </div>
@@ -4473,16 +4517,16 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
         
         <div className="flex items-center gap-4 flex-wrap">
           <div className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-150 dark:border-gray-800 rounded-2xl flex flex-col items-center">
-            <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-505 font-bold">Usage Status</span>
+            <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-400 font-bold">Usage Status</span>
             <span className="text-sm font-black dark:text-white font-mono mt-0.5">
-              {isPremium ? (
-                <span className="text-emerald-500">Unlimited Tasks</span>
+              {isUnlimitedTasks ? (
+                <span className="text-emerald-500 font-extrabold text-xs uppercase tracking-wide">Unlimited Tasks</span>
               ) : (
-                <span>{activeTasksCount}/10 Tasks Used</span>
+                <span>{activeTasksCount}/{isTrial ? '10' : '3'} Tasks Used</span>
               )}
             </span>
           </div>
-          {!isPremium && (
+          {!isUnlimitedTasks && (
             <button
               onClick={() => setActiveTab && setActiveTab('pricing')}
               className="px-5 py-2.5 bg-indigo-650 hover:bg-indigo-700 bg-indigo-600 text-white font-black uppercase tracking-wider text-[11px] rounded-2xl hover:shadow-lg active:scale-97 transition-all cursor-pointer"
@@ -4493,11 +4537,11 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
         </div>
       </div>
 
-      {subscriptionTier === 'Expired' && !isPremium ? (
+      {!isUnlimitedTasks && !isTrial ? (
         <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
-            <span>⚡ Standard Free Tier Active: Manage up to <strong>10 active tasks & 5 habits</strong>. Upgrade to Premium to unlock Unlimited Tasks, Study Courses, Finances, and database cloud backup.</span>
+            <span>⚡ Standard Free Tier Active: Manage up to <strong>3 active tasks & 5 habits</strong>. Upgrade to Premium to unlock Unlimited Tasks, Study Courses, Finances, and database cloud backup.</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
@@ -4506,7 +4550,7 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
             Upgrade &rarr;
           </button>
         </div>
-      ) : (!isPremium && subscriptionTier === 'Trial') ? (
+      ) : (!isUnlimitedTasks && isTrial) ? (
         <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
@@ -4581,9 +4625,9 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
               <Zap className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-pulse" />
             </div>
             <div className="space-y-4">
-              <h3 className="text-xl font-black dark:text-white">Task Limit Reached ✨</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                You have reached the task limit available during your free trial. Subscribe to WrindhaOS Premium to unlock unlimited tasks and all premium features.
+              <h3 className="text-xl font-black dark:text-white font-sans">Task Limit Reached ✨</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-sans">
+                You have reached the task limit available ({isTrial ? '10 tasks during your Free Trial' : '3 tasks on Free Version'}). Subscribe to WrindhaOS Premium to unlock unlimited tasks and all premium features.
               </p>
             </div>
             <div className="pt-2 flex flex-col gap-2">
@@ -5094,7 +5138,7 @@ function StudyView({ courses, setCourses, onDeleteCourse, subscriptionTier = 'Fr
         <div className="bg-gradient-to-r from-rose-500/10 to-transparent p-4 rounded-2xl border border-rose-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-rose-700 dark:text-rose-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-rose-500 animate-pulse shrink-0" />
-            <span>⚠️ 7-Day Free Trial Completed: You are in <strong>Read-Only Mode</strong>. Please upgrade to Premium to manage new courses, materials, and exams.</span>
+            <span>⚠️ Standard Free Mode: Please upgrade to Premium to unlock academic schedules, new courses, materials, and exams.</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
@@ -5397,6 +5441,22 @@ function GoalsView({
   hasActiveAccess?: boolean,
   onRequestUpgrade?: () => void
 }) {
+  return (
+    <LifeOSView 
+      goals={goals} 
+      setGoals={setGoals} 
+      onDelete={onDelete} 
+      subscriptionTier={subscriptionTier} 
+      setActiveTab={setActiveTab || (() => {})}
+      habits={habits}
+      setHabits={setHabits}
+      tasks={tasks}
+      setTasks={setTasks}
+      studyCourses={studyCourses}
+      setStudyCourses={setStudyCourses}
+    />
+  );
+
   const [goalsTab, setGoalsTab] = useState<'board' | 'career'>('board');
   const [showAdd, setShowAdd] = useState(false);
   const [newGoal, setNewGoal] = useState({ title: '', type: GoalType.SHORT, date: '' });
@@ -5488,7 +5548,7 @@ function GoalsView({
         <div className="bg-gradient-to-r from-rose-500/10 to-transparent p-4 rounded-2xl border border-rose-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-rose-700 dark:text-rose-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-rose-500 animate-pulse shrink-0" />
-            <span>⚠️ 7-Day Free Trial Completed: You are in <strong>Read-Only Mode</strong>. Please upgrade to Premium to manage and track your long-term goals.</span>
+            <span>⚠️ Standard Free Mode: Please upgrade to Premium to unlock long-term goal tracking metrics.</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
@@ -6805,7 +6865,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
   const elapsedMs = Math.max(0, nowSecure - trialStartDate.getTime());
   const daysElapsed = Math.floor(elapsedMs / (24 * 60 * 60 * 1000));
   const trialDaysLeft = Math.max(0, 7 - daysElapsed);
-  const isTrialActive = msLeft > 0;
+  const isTrialActive = session?.user?.email !== 'gongidikalyan08@gmail.com' && msLeft > 0;
 
   const trialTimeLeftText = (() => {
     if (msLeft <= 0) return "0d 0h 0m 0s";
@@ -6919,12 +6979,12 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
   };
 
   // Real-time Razorpay Payment Flow Gateway Linker
-  const processSecureCheckout = async () => {
-    if (!checkoutPlan) return;
+  const processSecureCheckout = async (directPlan?: PricingPlan) => {
+    const plan = directPlan || checkoutPlan;
+    if (!plan) return;
 
-    if (!qrScanActive && (!upiId.trim() || !upiId.includes('@'))) {
-      setPaymentError('Please enter a valid UPI ID (e.g., yourname@okaxis, name@paytm, or username@ybl) to authorize payment.');
-      return;
+    if (directPlan) {
+      setCheckoutPlan(directPlan);
     }
 
     setPaymentError(null);
@@ -6932,12 +6992,40 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
 
     try {
       // Calculate precise plan pricing
-      const rawPrice = parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''));
+      const rawPrice = parseFloat(plan.price.replace(/[^\d.]/g, ''));
       const calculatedPrice = billingPeriod === 'yearly' 
         ? Math.floor(rawPrice * 12 * 0.8) 
         : rawPrice;
 
       const finalPriceToOrder = appliedCoupon ? appliedCoupon.payableAmount : calculatedPrice;
+
+      if (!razorpayServerEnabled) {
+        // Direct, instant, seamless free upgrade when Razorpay keys are not configured on host server
+        setCheckoutStep(2); // Activating Premium Workspace loader step
+        const currentUserId = session?.user?.id || "local-user";
+        
+        setTimeout(async () => {
+          try {
+            setUpgradingTo(plan.id);
+            await onUpgrade(
+              currentUserId, 
+              plan.name, 
+              9999, 
+              `${finalPriceToOrder}`, 
+              plan.id, 
+              `Direct Promoted Upgrade`
+            );
+            setUpgradingTo(null);
+            setCheckoutStep(3); // Upgraded successfully -> transition to checkmark Success view
+            setSuccessMsg(`Congratulations! Upgraded successfully to ${plan.name}! All premium capabilities are now active. ✨`);
+            setTimeout(() => setSuccessMsg(null), 6000);
+          } catch (upgradeErr: any) {
+            setPaymentError(upgradeErr.message || "Error processing workspace billing upgrade.");
+            setCheckoutStep(1);
+          }
+        }, 1200);
+        return;
+      }
 
       let orderData;
       let fellBackToLocal = false;
@@ -6948,7 +7036,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            planName: checkoutPlan.name,
+            planName: plan.name,
             amount: calculatedPrice,
             currency: "INR",
             couponCode: appliedCoupon ? appliedCoupon.couponCode : undefined
@@ -7000,7 +7088,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
           amount: orderData.amount,
           currency: orderData.currency,
           name: "Wrindha OS",
-          description: `Upgrading to ${checkoutPlan.name} Subscription`,
+          description: `Upgrading to ${plan.name} Subscription`,
           order_id: orderData.orderId,
           handler: async function (razorpayResponse: any) {
             setCheckoutStep(2); // Performing security webhook/signature verify
@@ -7024,25 +7112,25 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
               const verifyData = await verifyResponse.json();
               if (verifyData.success) {
                 // Perform state persistence upgrades
-                setUpgradingTo(checkoutPlan.id);
+                setUpgradingTo(plan.id);
                 await onUpgrade(
                   currentUserId, 
-                  checkoutPlan.name, 
+                  plan.name, 
                   9999, 
                   `${finalPriceToOrder}`, 
-                  checkoutPlan.id, 
+                  plan.id, 
                   `Razorpay Gateway (${razorpayResponse.razorpay_payment_id})`
                 );
                 setUpgradingTo(null);
                 setCheckoutStep(3); // Upgraded successfully
-                setSuccessMsg(`Congratulations! Upgraded successfully to ${checkoutPlan.name} [Paid via Razorpay Live Gateway]! Premium functions active. ✨`);
+                setSuccessMsg(`Congratulations! Upgraded successfully to ${plan.name} [Paid via Razorpay Live Gateway]! Premium functions active. ✨`);
                 setTimeout(() => setSuccessMsg(null), 6000);
               } else {
                 throw new Error(verifyData.message || "Security authorization signature is invalid.");
               }
             } catch (err: any) {
               setPaymentError(err.message || "Razorpay Payment verification failure. Ledger transaction rejected.");
-              setCheckoutStep(0);
+              setCheckoutStep(1);
             }
           },
           prefill: {
@@ -7050,12 +7138,12 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
             email: session?.user?.email || "user@wrindha.com"
           },
           theme: {
-            color: "#3399cc"
+            color: "#6366f1"
           },
           modal: {
             ondismiss: function () {
-              setCheckoutStep(0);
-              setPaymentError("Razorpay transaction session cancelled by host.");
+              setCheckoutStep(1);
+              setPaymentError("Razorpay transaction session cancelled by user.");
             }
           }
         };
@@ -7063,15 +7151,37 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
         const razorInstance = new (window as any).Razorpay(rzpOptions);
         razorInstance.open();
       } else {
-        // High fidelity sandbox simulator - save states and prompt user confirming to complete simulated payment (no auto-upgrade!)
+        // High fidelity sandbox simulation mode with instant automatic upgrade
+        // No checkout manual forms or simulators. Fully automated upgrade on local/sandbox environment.
         setSandboxOrderData(orderData);
         setSandboxFellBack(fellBackToLocal);
         setSandboxFinalPrice(finalPriceToOrder);
-        setCheckoutStep(4); // Advance to interactive manual confirmation gateway
+        setCheckoutStep(2); // Progress to verifying loading segment
+
+        setTimeout(async () => {
+          try {
+            setUpgradingTo(plan.id);
+            await onUpgrade(
+              currentUserId, 
+              plan.name, 
+              9999, 
+              `${finalPriceToOrder}`, 
+              plan.id, 
+              `Simulated Razorpay (Instant Interactive-Free Trial Upgrade Session V1)`
+            );
+            setUpgradingTo(null);
+            setCheckoutStep(3); // Success Screen Active!
+            setSuccessMsg(`Congratulations! Upgraded successfully to ${plan.name} [Simulated Gateway Verified]! All premium functions active. ✨`);
+            setTimeout(() => setSuccessMsg(null), 6000);
+          } catch (upgradeErr: any) {
+            setPaymentError(upgradeErr.message || "Error processing simulated sandbox billing upgrade.");
+            setCheckoutStep(1);
+          }
+        }, 1200);
       }
     } catch (err: any) {
       setPaymentError(err.message || 'Unable to establish secure Razorpay handshake checkout.');
-      setCheckoutStep(0);
+      setCheckoutStep(1);
     }
   };
 
@@ -7322,7 +7432,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
               </div>
 
               <button
-                onClick={() => setCheckoutPlan(p)}
+                onClick={() => processSecureCheckout(p)}
                 disabled={upgradingTo !== null || isCurrent || isAdmin}
                 className={cn(
                   "w-full py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2",
@@ -7577,7 +7687,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
               <button 
                 onClick={() => {
                   setCheckoutPlan(null);
-                  setCheckoutStep(0);
+                  setCheckoutStep(1);
                   setPaymentError(null);
                 }}
                 className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors text-slate-500 dark:text-slate-300 z-50 shadow-sm border border-slate-200 dark:border-slate-750"
@@ -7643,268 +7753,25 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                 </div>
               </div>
 
-              {/* Right Column: Checkout input form and payment actions */}
+              {/* Right Column: Dynamic Activation Status */}
               <div className="flex-1 flex flex-col justify-center space-y-4 sm:space-y-6 py-2 border-t lg:border-t-0 lg:border-l border-slate-150 dark:border-slate-800/60 pt-6 lg:pt-0 lg:pl-8">
-                {checkoutStep === 0 && (
-                  <div className="space-y-4">
-                    {/* Razorpay Brand Bar */}
-                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-800/60">
-                      <div className="flex items-center gap-2">
-                        <span className="bg-blue-600 text-white rounded px-2.5 py-1 text-[9px] font-black tracking-wider uppercase shadow-sm">
-                          RAZORPAY
-                        </span>
-                        <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">SECURE CHECKOUT</span>
-                      </div>
-                      <span className="text-[9px] text-emerald-550 font-extrabold flex items-center gap-1">
-                        ● SECURED 256-BIT SSL
-                      </span>
-                    </div>
-
-                    {!razorpayServerEnabled && (
-                      <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-400 rounded-2xl text-[11px] leading-relaxed font-semibold flex flex-col gap-1">
-                        <span className="font-black flex items-center gap-1.5 uppercase text-[9px] tracking-wider text-amber-600 dark:text-amber-300">
-                          ⚠️ Sandbox Simulation Mode Active
-                        </span>
-                        <span>
-                          The host server is currently running without Razorpay API keys configured. Clicking below will trigger a mock sandbox upgrade to let you preview premium features safely.
-                        </span>
-                      </div>
-                    )}
-
-                    {paymentError && (
-                      <div className="p-3 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-455 border border-red-200 dark:border-red-900/30 rounded-xl text-xs font-bold animate-pulse">
-                        {paymentError}
-                      </div>
-                    )}
-
-                    {/* Secure Coupon Code Input Section */}
-                    <div className="bg-gradient-to-r from-gray-50 to-indigo-50/20 dark:from-slate-950 dark:to-indigo-950/10 p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                          <Tag className="w-3 h-3 text-indigo-500" /> Apply Promo Code / Coupon
-                        </span>
-                        {appliedCoupon && (
-                          <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
-                            ACTIVE
-                          </span>
-                        )}
-                      </div>
-
-                      {appliedCoupon ? (
-                        <div className="flex items-center justify-between bg-emerald-500/5 border border-emerald-500/25 p-2 rounded-xl">
-                          <div className="space-y-0.5">
-                            <p className="text-xs font-black text-emerald-600 dark:text-emerald-400 tracking-wide font-mono">
-                              {appliedCoupon.couponCode}
-                            </p>
-                            <p className="text-[10px] text-gray-500 font-medium">
-                              {appliedCoupon.description}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={removeCoupon}
-                            className="bg-transparent hover:bg-red-500/10 p-1 text-gray-400 hover:text-red-500 rounded-lg transition-colors text-xs font-bold"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="Promo / Coupon Code"
-                            value={typedCoupon}
-                            onChange={(e) => {
-                              setTypedCoupon(e.target.value);
-                              setCouponError(null);
-                            }}
-                            className="flex-1 py-1.5 px-3 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl outline-none text-xs font-mono font-bold text-gray-800 dark:text-white uppercase placeholder-gray-400 focus:border-indigo-500"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleApplyCoupon}
-                            disabled={validatingCoupon}
-                            className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-colors shadow-sm"
-                          >
-                            {validatingCoupon ? "Checking..." : "Apply"}
-                          </button>
-                        </div>
-                      )}
-
-                      {couponError && (
-                        <p className="text-[10px] text-red-500 font-bold tracking-wide animate-pulse">{couponError}</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-4 animate-fadeIn">
-                      {/* UPI Payment selector type tab */}
-                      <div className="flex bg-gray-100 dark:bg-gray-950 p-1 rounded-xl border border-gray-200 dark:border-gray-800/80 w-full sm:w-fit mx-auto">
-                        <button
-                          type="button"
-                          onClick={() => setQrScanActive(false)}
-                          className={cn(
-                            "flex-1 sm:flex-initial px-3 sm:px-4 py-2 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5",
-                            !qrScanActive ? "bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-                          )}
-                        >
-                          <Smartphone className="w-3.5 h-3.5" />
-                          UPI ID Setup
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setQrScanActive(true);
-                            setPaymentError(null);
-                          }}
-                          className={cn(
-                            "flex-1 sm:flex-initial px-3 sm:px-4 py-2 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5",
-                            qrScanActive ? "bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-                          )}
-                        >
-                          <QrCode className="w-3.5 h-3.5" />
-                          Dynamic QR Scanner
-                        </button>
-                      </div>
-
-                      {!qrScanActive ? (
-                        <div className="space-y-4">
-                          <h4 className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">Razorpay UPI VPA Routing</h4>
-                          
-                          <div className="space-y-4">
-                            {/* Selection of UPI App preset */}
-                            <div className="space-y-1.5">
-                              <label className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">Select Preferring UPI App Preset</label>
-                              <div className="grid grid-cols-4 gap-2">
-                                {[
-                                  { id: 'gpay', name: 'GPay', desc: '@okaxis' },
-                                  { id: 'phonepe', name: 'PhonePe', desc: '@ybl' },
-                                  { id: 'paytm', name: 'Paytm', desc: '@paytm' },
-                                  { id: 'bhim', name: 'BHIM', desc: '@upi' }
-                                ].map((app) => (
-                                  <button
-                                    key={app.id}
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedUpiApp(app.id as any);
-                                      const cleanVal = upiId.includes('@') ? upiId.split('@')[0] : upiId || 'premium';
-                                      setUpiId(`${cleanVal}${app.desc}`);
-                                    }}
-                                    className={cn(
-                                      "py-2 px-1 text-center rounded-xl border text-[10px] font-extrabold transition-all flex flex-col items-center justify-center gap-0.5",
-                                      selectedUpiApp === app.id
-                                        ? "border-amber-500 dark:border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/20"
-                                        : "border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-950 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900 hover:text-gray-900 dark:hover:text-white"
-                                    )}
-                                  >
-                                    <span>{app.name}</span>
-                                    <span className="text-[8px] font-normal text-gray-400 dark:text-gray-500 uppercase tracking-tight">{app.desc}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* UPI id field input */}
-                            <div className="space-y-1.5">
-                              <label className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-455">Virtual Private Address (UPI ID)</label>
-                              <input 
-                                type="text" 
-                                placeholder="username@okaxis"
-                                value={upiId}
-                                onChange={e => setUpiId(e.target.value)}
-                                className="w-full py-3.5 px-4 bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-2xl outline-none text-sm font-mono focus:border-indigo-500 dark:text-white font-bold text-center focus:ring-2 focus:ring-indigo-500/20 transition-all text-gray-800"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="pt-4">
-                            <button 
-                              onClick={processSecureCheckout}
-                              className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-black uppercase tracking-widest text-xs rounded-2xl transition-all shadow-lg shadow-indigo-600/10 flex items-center justify-center gap-2"
-                            >
-                              <Zap className="w-4 h-4 text-amber-400 fill-amber-400" /> Pay via UPI ID Securely &rarr;
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-4 text-center">
-                          <h4 className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">Dynamic Scan-to-Pay QR Code</h4>
-                          
-                          {/* Visual QR Code Representational Box */}
-                          <div className="bg-white p-5 rounded-3xl border border-gray-200 shadow-inner w-52 h-52 mx-auto flex flex-col justify-between items-center relative overflow-hidden group">
-                            {/* QR code matrix mockup strictly in custom design */}
-                            <svg className="w-40 h-40 text-slate-900" viewBox="0 0 100 100" fill="currentColor">
-                              {/* Corners */}
-                              <path d="M0,0 h30 v10 h-20 v20 h-10 z" />
-                              <path d="M70,0 h30 v30 h-10 v-20 h-20 z" />
-                              <path d="M0,70 h10 v20 h20 v10 h-30 z" />
-                              <path d="M90,70 h10 v30 h-30 v-10 h20 z" />
-                              {/* Center points representation */}
-                              <rect x="15" y="15" width="15" height="15" />
-                              <rect x="70" y="15" width="15" height="15" />
-                              <rect x="15" y="70" width="15" height="15" />
-                              <rect x="40" y="40" width="20" height="20" className="text-indigo-600 animate-pulse" />
-                              {/* Scatter random dots */}
-                              <rect x="40" y="15" width="5" height="5" />
-                              <rect x="50" y="20" width="5" height="10" />
-                              <rect x="15" y="40" width="10" height="5" />
-                              <rect x="25" y="50" width="5" height="5" />
-                              <rect x="70" y="40" width="5" height="15" />
-                              <rect x="80" y="45" width="5" height="5" />
-                              <rect x="45" y="70" width="10" height="5" />
-                              <rect x="55" y="80" width="5" height="5" />
-                              <rect x="70" y="70" width="15" height="15" />
-                            </svg>
-                            
-                            <div className="absolute inset-x-0 bottom-0 bg-indigo-600 text-white text-[9px] font-black uppercase text-center py-1 tracking-wider">
-                              BHIM UPI SECURE
-                            </div>
-                          </div>
-
-                          <div className="text-center space-y-1.5">
-                            <p className="text-sm font-black text-gray-900 dark:text-white">Amount to pay: ₹{
-                              billingPeriod === 'yearly'
-                                ? Math.floor(parseFloat(checkoutPlan.price.replace(/[^\d.]/g, '')) * 12 * 0.8)
-                                : parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''))
-                            }.00</p>
-                            <p className="text-[11px] text-gray-600 dark:text-gray-400 font-medium max-w-xs mx-auto">
-                              Scan using any compatible UPI app (Google Pay, PhonePe, Paytm, BHIM, Mobikwik, WhatsApp Pay) to verify instantly.
-                            </p>
-                          </div>
-
-                          <div className="pt-2">
-                            <button
-                              onClick={processSecureCheckout}
-                              className="w-full py-4 bg-amber-500 hover:bg-amber-600 active:scale-98 text-white font-black uppercase tracking-widest text-xs rounded-2xl transition-all shadow-lg shadow-amber-500/15 flex items-center justify-center gap-2"
-                            >
-                              <QrCode className="w-4 h-4" /> Verify QR Scan & Upgrade &rarr;
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
                 {/* Transition loading screens */}
                 {(checkoutStep === 1 || checkoutStep === 2) && (
-                  <div className="text-center py-10 space-y-6">
+                  <div className="text-center py-10 space-y-6 animate-pulse">
                     <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
                     <div className="space-y-2">
                       <h4 className="text-lg font-black dark:text-white">
                         {checkoutStep === 1 
-                          ? 'Connecting to Razorpay UPI Handshake Gateway...' 
-                          : !razorpayServerEnabled
-                            ? 'Simulating Razorpay UPI Payment Verification...'
-                            : 'Verifying Razorpay UPI Remittance Receipt Ledger...'}
+                          ? 'Checking subscription status...' 
+                          : 'Activating Premium Workspace...'}
                       </h4>
-                      <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed">
-                        {!razorpayServerEnabled
-                          ? 'Bypassing real VPA endpoints since live API keys are absent. Running target database schema upgrade in simulation mode.'
-                          : 'Validating real-time VPA endpoint token authentication. Completing premium active directory update. Please wait.'}
+                      <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed font-semibold">
+                        Configuring Supabase cloud endpoints. Synchronizing data tables to unlock academic calendars, unlimited habits, and priority matrices. Please wait...
                       </p>
                     </div>
                   </div>
                 )}
+
                 {checkoutStep === 3 && (
                   <div className="text-center py-6 space-y-6">
                     <div className="w-20 h-20 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-500 rounded-full flex items-center justify-center mx-auto shadow-inner animate-bounce">
@@ -7912,132 +7779,22 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                     </div>
                     <div className="space-y-2">
                       <h4 className="text-2xl font-black dark:text-white">
-                        {!razorpayServerEnabled ? "Simulated Payment Verified!" : "Transaction Verified!"}
+                        Workspace Upgraded!
                       </h4>
                       <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto leading-relaxed font-semibold">
-                        {!razorpayServerEnabled 
-                          ? `The payment checkout was simulated successfully! Your profile was upgraded to the premium ${checkoutPlan?.name || "Premium OS"} plan for testing purposes. Real live gateway credentials are currently disabled on the server.`
-                          : `The checkout transaction was logged and Supabase profiles was auto-upgraded to ${checkoutPlan?.name || "Premium OS"}. You can now use unlimited daily habit streaks, priorities matrices, and academic planners.`}
+                        Your active profile has been successfully configured to the premium {checkoutPlan?.name || "Premium OS"} plan. You can now use unlimited daily habit streaks, priorities matrices, and academic planners.
                       </p>
                     </div>
                     
-                    <div className="pt-4 flex flex-col gap-2">
+                    <div className="pt-4 flex flex-col gap-2 font-semibold">
                       <button 
                         onClick={() => {
                           setCheckoutPlan(null);
-                          setCheckoutStep(0);
+                          setCheckoutStep(1);
                         }}
-                        className="w-full py-3.5 bg-black dark:bg-indigo-600 font-bold text-white rounded-2xl text-xs uppercase tracking-widest active:scale-95 transition-all"
+                        className="w-full py-3.5 bg-black dark:bg-indigo-600 font-bold text-white rounded-2xl text-xs uppercase tracking-widest active:scale-95 transition-all text-center cursor-pointer"
                       >
                         Open Workspace Dashboards &rarr;
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Interactive Simulated Payment gateway stage */}
-                {checkoutStep === 4 && (
-                  <div className="space-y-6 py-4 text-center animate-fade-in">
-                    <div className="mx-auto w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500">
-                      <CreditCard className="w-6 h-6 animate-pulse" />
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="text-base font-black dark:text-white uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                        Simulated Razorpay Gateway
-                      </h4>
-                      <p className="text-xs text-gray-400 max-w-sm mx-auto leading-relaxed">
-                        Since live Razorpay keys are omitted, a high-fidelity payment simulation sandbox is running. You must manually select to pay or cancel this authorization.
-                      </p>
-                    </div>
-
-                    <div className="bg-slate-55 dark:bg-slate-900/40 p-4 border border-slate-150 dark:border-slate-800/80 rounded-2xl text-left space-y-2 font-sans">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-gray-400 font-bold">Subtotal Amount:</span>
-                        <span className="font-mono font-black text-gray-900 dark:text-white">₹{sandboxFinalPrice}.00 INR</span>
-                      </div>
-                      <div className="flex justify-between text-xs border-t border-slate-100 dark:border-slate-800/60 pt-2">
-                        <span className="text-gray-400 font-bold">Billing Gateway:</span>
-                        <span className="font-black text-indigo-500">Razorpay (Test Sandbox)</span>
-                      </div>
-                      <div className="flex justify-between text-xs border-t border-slate-100 dark:border-slate-800/60 pt-2">
-                        <span className="text-gray-400 font-bold">UPI/Remittance ID:</span>
-                        <span className="font-mono text-gray-700 dark:text-gray-300">{qrScanActive ? 'QR-SCAN-01' : (upiId || "anonymous@upi")}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-2.5">
-                      <button
-                        onClick={async () => {
-                          setCheckoutStep(2); // Verify loader
-                          setTimeout(async () => {
-                            try {
-                              const currentUserId = session?.user?.id || "local-user";
-                              if (sandboxFellBack) {
-                                setUpgradingTo(checkoutPlan?.id || null);
-                                const methodLabel = qrScanActive 
-                                  ? 'Razorpay Secure (UPI QR Scanner - Static Sandbox)' 
-                                  : `Razorpay Secure (UPI ID Sandbox: ${selectedUpiApp.toUpperCase()}: ${upiId})`;
-
-                                await onUpgrade(currentUserId, checkoutPlan!.name, 9999, `${sandboxFinalPrice}`, checkoutPlan!.id, methodLabel);
-                                setUpgradingTo(null);
-                                setCheckoutStep(3); // Upgraded successfully
-                                setSuccessMsg(`Congratulations! Upgraded successfully to ${checkoutPlan?.name} [Simulated Gateway Mode]! Premium functions active. ✨`);
-                                setTimeout(() => setSuccessMsg(null), 6000);
-                              } else {
-                                const verifyResponse = await fetch(`${API_URL}/api/payments/razorpay/verify`, {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({
-                                    razorpay_payment_id: `pay_mock_${Math.random().toString(36).substring(2, 9)}`,
-                                    razorpay_order_id: sandboxOrderData?.orderId || "order_mock",
-                                    razorpay_signature: "mock_checksum",
-                                    isSandbox: true,
-                                    couponCode: appliedCoupon ? appliedCoupon.couponCode : undefined,
-                                    userId: currentUserId,
-                                    userEmail: session?.user?.email || "user@wrindha.com",
-                                    discountApplied: appliedCoupon ? appliedCoupon.discountAmount : 0,
-                                    paidAmount: sandboxFinalPrice
-                                  })
-                                });
-
-                                if (!verifyResponse.ok) {
-                                  throw new Error("Local sandbox verification server returned connection error.");
-                                }
-
-                                const verifyData = await verifyResponse.json();
-                                if (!verifyData.success) {
-                                  throw new Error("Local sandbox webhook authorization error.");
-                                }
-
-                                setUpgradingTo(checkoutPlan?.id || null);
-                                const methodLabel = qrScanActive 
-                                  ? 'Razorpay Secure (UPI QR Scanner)' 
-                                  : `Razorpay Secure (UPI ID: ${selectedUpiApp.toUpperCase()}: ${upiId})`;
-
-                                await onUpgrade(currentUserId, checkoutPlan!.name, 9999, `${sandboxFinalPrice}`, checkoutPlan!.id, methodLabel);
-                                setUpgradingTo(null);
-                                setCheckoutStep(3); // Perfect
-                                setSuccessMsg(`Congratulations! Upgraded successfully to ${checkoutPlan?.name} [Paid via Razorpay Simulation]! Premium capabilities activated. ✨`);
-                                setTimeout(() => setSuccessMsg(null), 6000);
-                              }
-                            } catch (err: any) {
-                              setPaymentError(err.message || 'Error processing simulated billing upgrade.');
-                              setCheckoutStep(0);
-                            }
-                          }, 1500);
-                        }}
-                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black uppercase tracking-widest text-xs rounded-2xl transition-all shadow-lg shadow-emerald-600/10 flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        ✅ Authorize and Pay ₹{sandboxFinalPrice}.00
-                      </button>
-                      <button
-                        onClick={() => {
-                          setCheckoutStep(0);
-                          setPaymentError("Simulated sandbox payment transaction cancelled by the user.");
-                        }}
-                        className="w-full py-4 bg-slate-100 hover:bg-slate-200 active:scale-98 text-slate-600 dark:bg-slate-800 dark:text-gray-300 dark:hover:bg-slate-700 font-black uppercase tracking-widest text-[10px] rounded-2xl transition-all cursor-pointer"
-                      >
-                        ❌ Cancel Simulated Transaction
                       </button>
                     </div>
                   </div>
