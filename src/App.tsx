@@ -1,4 +1,3 @@
-const API_URL = "https://wrindha-os.onrender.com";
 import React, { useState, useEffect, useRef } from "react";
 import { 
   BarChart3, 
@@ -91,6 +90,8 @@ const infoModules = [
   { id: 'disclaimer', name: 'Disclaimer', icon: AlertCircle },
 ];
 
+const API_URL = import.meta.env.VITE_API_URL || "";
+
 const calculateTrialDates = (signupTimeStr: string | undefined | null, currentSecureTime: number) => {
   const JUNE_1_2026 = new Date("2026-06-01T00:00:00Z").getTime();
   const signupTime = signupTimeStr ? new Date(signupTimeStr).getTime() : currentSecureTime;
@@ -177,7 +178,7 @@ export default function App() {
     let active = true;
     const fetchConfig = async () => {
       try {
-        const res = await fetch('/api/config');
+        const res = await fetch(`${API_URL}/api/config`);
         if (res.ok) {
           const data = await res.json();
           if (active) {
@@ -6908,7 +6909,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
 
       // 1. Call custom server endpoint to initial Razorpay order session
       try {
-        const orderResponse = await fetch("/api/payments/razorpay/order", {
+        const orderResponse = await fetch(`${API_URL}/api/payments/razorpay/order`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -6966,7 +6967,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
           handler: async function (razorpayResponse: any) {
             setCheckoutStep(2); // Performing security webhook/signature verify
             try {
-              const verifyResponse = await fetch("/api/payments/razorpay/verify", {
+              const verifyResponse = await fetch(`${API_URL}/api/payments/razorpay/verify`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -7042,8 +7043,8 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
               setSuccessMsg(`Congratulations! Upgraded successfully to ${checkoutPlan.name} [Simulated Gateway Mode via Standalone Frontend Integration]! Premium capabilities activated. ✨`);
               setTimeout(() => setSuccessMsg(null), 6000);
             } else {
-              const verifyResponse = await fetch("/api/payments/razorpay/verify", {
-                method: "POST",
+                const verifyResponse = await fetch(`${API_URL}/api/payments/razorpay/verify`, {
+                  method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   razorpay_payment_id: `pay_mock_${Math.random().toString(36).substring(2, 9)}`,
