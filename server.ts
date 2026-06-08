@@ -1088,6 +1088,74 @@ Ensure your response is detailed, professional, encouraging, and tailored to the
     }
   });
 
+  // Standard Razorpay Create Order Endpoint
+  app.post("/api/create-order", async (req, res) => {
+    const { amount, currency, receipt } = req.body;
+
+    if (amount === undefined || amount === null) {
+      return res.status(400).json({ success: false, message: "Amount is required." });
+    }
+
+    const intAmount = parseInt(amount, 10);
+    if (isNaN(intAmount) || intAmount < 100) {
+      return res.status(400).json({ success: false, message: "Amount must be at least 100 paise (1 INR)." });
+    }
+
+    const rzp = getRazorpayInstance();
+    if (!rzp) {
+      return res.status(500).json({ success: false, message: "Razorpay keys are missing or unconfigured on the server." });
+    }
+
+    try {
+      const order = await rzp.orders.create({
+        amount: intAmount,
+        currency: currency || "INR",
+        receipt: receipt || `receipt_std_${Date.now()}`
+      });
+
+      return res.json({
+        success: true,
+        order_id: order.id,
+        amount: order.amount,
+        currency: order.currency
+      });
+    } catch (err: any) {
+      console.error("[Standard Razorpay Create Order Error]:", err);
+      return res.status(500).json({ success: false, message: err.message || "Failed to create Razorpay order." });
+    }
+  });
+
+  // Standard Razorpay Verify Signature Endpoint
+  app.post("/api/verify-payment", async (req, res) => {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({ success: false, message: "Missing required verification parameters." });
+    }
+
+    const secret = process.env.RAZORPAY_KEY_SECRET;
+    if (!secret) {
+      return res.status(500).json({ success: false, message: "Razorpay configuration secret is missing on the server." });
+    }
+
+    try {
+      const body = razorpay_order_id + "|" + razorpay_payment_id;
+      const expectedSignature = crypto
+        .createHmac("sha256", secret)
+        .update(body)
+        .digest("hex");
+
+      if (expectedSignature === razorpay_signature) {
+        return res.json({ success: true, message: "Payment successfully verified." });
+      } else {
+        return res.status(400).json({ success: false, message: "Invalid payment signature." });
+      }
+    } catch (err: any) {
+      console.error("[Standard Razorpay Verify Payment Error]:", err);
+      return res.status(500).json({ success: false, message: err.message || "Failed to verify transaction signature." });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
