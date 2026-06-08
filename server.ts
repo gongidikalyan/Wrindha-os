@@ -939,35 +939,17 @@ Ensure your response is detailed, professional, encouraging, and tailored to the
           finalAmount: cleanAmount
         });
       } catch (rzpErr: any) {
-        console.warn("[Razorpay Live Order Failed / Connection Error] Falling back to high-fidelity Sandbox Simulation:", rzpErr);
-        const mockOrderId = `order_sand_${Math.random().toString(36).substring(2, 10)}`;
-        return res.json({
-          success: true,
-          isSandbox: true,
-          isConnectionFallback: true,
-          orderId: mockOrderId,
-          keyId: "rzp_test_sandbox_dummy",
-          amount: Math.round(cleanAmount * 100),
-          currency: cleanCurrency,
-          receipt: `receipt_sand_${Date.now()}`,
-          discountApplied,
-          finalAmount: cleanAmount,
-          warningMessage: `Note: Unable to reach the Razorpay gateway natively (${rzpErr.message || "connection error"}). Seamlessly routed to sandbox testing mode.`
+        console.error("[Razorpay Live Order Failed] Crucial error during live transaction setup:", rzpErr);
+        return res.status(500).json({
+          success: false,
+          message: `Live Gateway Order failed: ${rzpErr.message || "communication error with Razorpay servers"}`
         });
       }
     } catch (err: any) {
       console.error("[Razorpay Core Handler Error]:", err);
-      const mockOrderId = `order_sand_${Math.random().toString(36).substring(2, 10)}`;
-      return res.json({
-        success: true,
-        isSandbox: true,
-        orderId: mockOrderId,
-        keyId: "rzp_test_sandbox_dummy",
-        amount: Math.round(cleanAmount * 100),
-        currency: cleanCurrency,
-        receipt: `receipt_sand_${Date.now()}`,
-        discountApplied,
-        finalAmount: cleanAmount
+      return res.status(500).json({
+        success: false,
+        message: err.message || "Razorpay Payment core initialization failure. Request refused."
       });
     }
   });
@@ -1043,6 +1025,13 @@ Ensure your response is detailed, professional, encouraging, and tailored to the
 
       if (isSandbox) {
         // Log coupon usage in local simulation
+        const hasSecret = !!process.env.RAZORPAY_KEY_SECRET;
+        if (hasSecret) {
+          return res.status(400).json({
+            success: false,
+            message: "Security violation: Sandbox payment verification is blocked in key-secured production environments."
+          });
+        }
         await recordCouponUsageAndIncrement();
         return res.json({
           success: true,

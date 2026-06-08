@@ -166,9 +166,30 @@ export default function App() {
     return saved ? parseInt(saved) : 9999;
   });
 
+  const [razorpayServerEnabled, setRazorpayServerEnabled] = useState<boolean>(false);
+
   const [serverTimeMs, setServerTimeMs] = useState<number | null>(null);
   const [bootPerfTime] = useState<number>(() => performance.now());
   const [secTicker, setSecTicker] = useState<number>(0);
+
+  useEffect(() => {
+    let active = true;
+    const fetchConfig = async () => {
+      try {
+        const res = await fetch('/api/config');
+        if (res.ok) {
+          const data = await res.json();
+          if (active) {
+            setRazorpayServerEnabled(!!data.razorpayEnabled);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch Razorpay config status from server, defaulting to local simulation checking:", err);
+      }
+    };
+    fetchConfig();
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -2018,7 +2039,7 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
                )}
                {activeTab === 'timetable' && <TimetableView entries={timetable} setEntries={setTimetable} onDelete={(id) => deleteFromSupabase('timetable', id)} theme={theme} />}
                {activeTab === 'blogs' && <BlogsView blogs={blogs} setBlogs={setBlogs} isAdmin={isAdmin} />}
-               {activeTab === 'pricing' && <PricingView plans={userPlans} subscriptionTier={subscriptionTier} onUpgrade={updateUserTier} onCancelSubscription={cancelUserSubscription} session={session} setActiveTab={setActiveTab} orders={orders} trialStartDateStr={trialStartDateStr} trialEndDateStr={trialEndDateStr} nowSecure={nowSecure} />}
+               {activeTab === 'pricing' && <PricingView plans={userPlans} subscriptionTier={subscriptionTier} onUpgrade={updateUserTier} onCancelSubscription={cancelUserSubscription} session={session} setActiveTab={setActiveTab} orders={orders} trialStartDateStr={trialStartDateStr} trialEndDateStr={trialEndDateStr} nowSecure={nowSecure} razorpayServerEnabled={razorpayServerEnabled} />}
                {activeTab === 'admin' && isAdmin && (
                  <AdminView 
                    plans={userPlans} 
@@ -6531,9 +6552,10 @@ interface PricingViewProps {
   trialStartDateStr: string;
   trialEndDateStr: string;
   nowSecure: number;
+  razorpayServerEnabled?: boolean;
 }
 
-function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription, session, setActiveTab, orders = [], trialStartDateStr, trialEndDateStr, nowSecure }: PricingViewProps) {
+function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription, session, setActiveTab, orders = [], trialStartDateStr, trialEndDateStr, nowSecure, razorpayServerEnabled = false }: PricingViewProps) {
   const [upgradingTo, setUpgradingTo] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
@@ -6784,28 +6806,54 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
 
       const finalPriceToOrder = appliedCoupon ? appliedCoupon.payableAmount : calculatedPrice;
 
+      let orderData;
+      let fellBackToLocal = false;
+
       // 1. Call custom server endpoint to initial Razorpay order session
-      const orderResponse = await fetch("/api/payments/razorpay/order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          planName: checkoutPlan.name,
-          amount: calculatedPrice,
+      try {
+        const orderResponse = await fetch("/api/payments/razorpay/order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            planName: checkoutPlan.name,
+            amount: calculatedPrice,
+            currency: "INR",
+            couponCode: appliedCoupon ? appliedCoupon.couponCode : undefined
+          })
+        });
+
+        if (!orderResponse.ok) {
+          throw new Error("HTTP status mismatch from payment agent.");
+        }
+
+        orderData = await orderResponse.json();
+        if (!orderData.success) {
+          throw new Error(orderData.message || "Failed to initialize secure pay order.");
+        }
+      } catch (fetchErr: any) {
+        if (razorpayServerEnabled) {
+          throw new Error(`Real Payment error: Unable to initialize secure gateway order. ${fetchErr.message || "Please check your network and key configs."}`);
+        }
+        console.warn("[Razorpay Connection Warning]: Unable to connect to backend payment server securely natively. Seamlessly routing to design sandbox simulation mode:", fetchErr);
+        fellBackToLocal = true;
+        orderData = {
+          success: true,
+          isSandbox: true,
+          orderId: `order_sand_${Math.random().toString(36).substring(2, 10)}`,
+          keyId: "rzp_test_sandbox_dummy",
+          amount: Math.round(finalPriceToOrder * 100),
           currency: "INR",
-          couponCode: appliedCoupon ? appliedCoupon.couponCode : undefined
-        })
-      });
-
-      if (!orderResponse.ok) {
-        throw new Error("HTTP connection error preparing Razorpay subscription order.");
-      }
-
-      const orderData = await orderResponse.json();
-      if (!orderData.success) {
-        throw new Error(orderData.message || "Failed to create active payment order state.");
+          receipt: `receipt_sand_${Date.now()}`,
+          discountApplied: appliedCoupon ? appliedCoupon.discountAmount : 0,
+          finalAmount: finalPriceToOrder
+        };
       }
 
       const currentUserId = session?.user?.id || "local-user";
+
+      if (orderData.isSandbox && razorpayServerEnabled) {
+        throw new Error("Security validation failed: Demo sandbox payment is strictly disabled in live production mode.");
+      }
 
       // 2. Determine authentic checkout vs high-fidelity design sandbox simulator
       if (!orderData.isSandbox && (window as any).Razorpay) {
@@ -6883,39 +6931,58 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
         setCheckoutStep(2); // Remitting payment through simulated core
         setTimeout(async () => {
           try {
-            const verifyResponse = await fetch("/api/payments/razorpay/verify", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                razorpay_payment_id: `pay_mock_${Math.random().toString(36).substring(2, 9)}`,
-                razorpay_order_id: orderData.orderId,
-                razorpay_signature: "mock_checksum",
-                isSandbox: true,
-                couponCode: appliedCoupon ? appliedCoupon.couponCode : undefined,
-                userId: currentUserId,
-                userEmail: session?.user?.email || "user@wrindha.com",
-                discountApplied: appliedCoupon ? appliedCoupon.discountAmount : 0,
-                paidAmount: finalPriceToOrder
-              })
-            });
+            if (fellBackToLocal) {
+              // Bypass backend webhooks check since we are on static frontend (e.g. GitHub Pages) or backend is down
+              setUpgradingTo(checkoutPlan.id);
+              const methodLabel = qrScanActive 
+                ? 'Razorpay Secure (UPI QR Scanner - Static Sandbox)' 
+                : `Razorpay Secure (UPI ID Sandbox: ${selectedUpiApp.toUpperCase()}: ${upiId})`;
 
-            const verifyData = await verifyResponse.json();
-            if (!verifyData.success) {
-              throw new Error("Local sandbox webhook authorization error.");
+              await onUpgrade(currentUserId, checkoutPlan.name, 9999, `${finalPriceToOrder}`, checkoutPlan.id, methodLabel);
+              setUpgradingTo(null);
+
+              setCheckoutStep(3); // Perfect
+              setSuccessMsg(`Congratulations! Upgraded successfully to ${checkoutPlan.name} [Simulated Gateway Mode via Standalone Frontend Integration]! Premium capabilities activated. ✨`);
+              setTimeout(() => setSuccessMsg(null), 6000);
+            } else {
+              const verifyResponse = await fetch("/api/payments/razorpay/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  razorpay_payment_id: `pay_mock_${Math.random().toString(36).substring(2, 9)}`,
+                  razorpay_order_id: orderData.orderId,
+                  razorpay_signature: "mock_checksum",
+                  isSandbox: true,
+                  couponCode: appliedCoupon ? appliedCoupon.couponCode : undefined,
+                  userId: currentUserId,
+                  userEmail: session?.user?.email || "user@wrindha.com",
+                  discountApplied: appliedCoupon ? appliedCoupon.discountAmount : 0,
+                  paidAmount: finalPriceToOrder
+                })
+              });
+
+              if (!verifyResponse.ok) {
+                throw new Error("Local sandbox verification server returned connection error.");
+              }
+
+              const verifyData = await verifyResponse.json();
+              if (!verifyData.success) {
+                throw new Error("Local sandbox webhook authorization error.");
+              }
+
+              // Persistence
+              setUpgradingTo(checkoutPlan.id);
+              const methodLabel = qrScanActive 
+                ? 'Razorpay Secure (UPI QR Scanner)' 
+                : `Razorpay Secure (UPI ID: ${selectedUpiApp.toUpperCase()}: ${upiId})`;
+
+              await onUpgrade(currentUserId, checkoutPlan.name, 9999, `${finalPriceToOrder}`, checkoutPlan.id, methodLabel);
+              setUpgradingTo(null);
+
+              setCheckoutStep(3); // Perfect
+              setSuccessMsg(`Congratulations! Upgraded successfully to ${checkoutPlan.name} [Paid ${billingPeriod === 'yearly' ? 'Yearly' : 'Monthly'} via Razorpay]! Premium capabilities activated. ✨`);
+              setTimeout(() => setSuccessMsg(null), 6000);
             }
-
-            // Persistence
-            setUpgradingTo(checkoutPlan.id);
-            const methodLabel = qrScanActive 
-              ? 'Razorpay Secure (UPI QR Scanner)' 
-              : `Razorpay Secure (UPI ID: ${selectedUpiApp.toUpperCase()}: ${upiId})`;
-
-            await onUpgrade(currentUserId, checkoutPlan.name, 9999, `${finalPriceToOrder}`, checkoutPlan.id, methodLabel);
-            setUpgradingTo(null);
-
-            setCheckoutStep(3); // Perfect
-            setSuccessMsg(`Congratulations! Upgraded successfully to ${checkoutPlan.name} [Paid ${billingPeriod === 'yearly' ? 'Yearly' : 'Monthly'} via Razorpay]! Premium capabilities activated. ✨`);
-            setTimeout(() => setSuccessMsg(null), 6000);
           } catch (err: any) {
             setPaymentError(err.message || 'Error processing simulated billing upgrade.');
             setCheckoutStep(0);
