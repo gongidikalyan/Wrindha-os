@@ -4022,6 +4022,7 @@ function HabitsView({ habits, setHabits, onDelete, theme, subscriptionTier = 'Fr
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [showHabitLimitModal, setShowHabitLimitModal] = useState(false);
 
   const weekDates = (() => {
     const current = new Date();
@@ -4042,6 +4043,10 @@ function HabitsView({ habits, setHabits, onDelete, theme, subscriptionTier = 'Fr
 
   const addHabit = () => {
     if (!newName.trim()) return;
+    if (subscriptionTier !== 'Premium' && habits.length >= 5) {
+      setShowHabitLimitModal(true);
+      return;
+    }
     const newHabit: Habit = {
       id: Math.random().toString(36).substr(2, 9),
       name: newName,
@@ -4136,7 +4141,7 @@ function HabitsView({ habits, setHabits, onDelete, theme, subscriptionTier = 'Fr
         <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
-            <span>⚡ Standard Free Tier Active: Enjoy <strong>unlimited habits & daily streaks</strong>. Upgrade to Premium to unlock Study Courses, Finances, and database cloud backup.</span>
+            <span>⚡ Standard Free Tier Active: Manage up to <strong>5 habits & 10 tasks</strong>. Upgrade to Premium to unlock unlimited workspace tools, Study Courses, Finances, and cloud synchronization.</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
@@ -4151,7 +4156,7 @@ function HabitsView({ habits, setHabits, onDelete, theme, subscriptionTier = 'Fr
         <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
-            <span>⚡ Standard 7-Day Free Trial Active: Build and track <strong>unlimited habit streaks</strong> with zero limits.</span>
+            <span>⚡ Standard 7-Day Free Trial: Manage up to <strong>5 habits & 10 priority tasks</strong>. Upgrade to Premium for absolute unlimited habits & tasks!</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
@@ -4208,6 +4213,49 @@ function HabitsView({ habits, setHabits, onDelete, theme, subscriptionTier = 'Fr
                 className="w-full py-3.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold rounded-2xl transition-all text-xs"
               >
                 Stay on Free version
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {showHabitLimitModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/45 backdrop-blur-md">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[2.5rem] p-8 border border-indigo-150 dark:border-gray-800 shadow-2xl space-y-6 text-center relative"
+          >
+            <button 
+              onClick={() => setShowHabitLimitModal(false)}
+              className="absolute top-6 right-6 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <Zap className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black dark:text-white">Habit Limit Reached ✨</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                You can create up to <strong className="text-[#4F46E5] dark:text-[#818CF8]">5 active habits</strong> in the Free/Trial version. Upgrade to Premium for unlimited habits, tasks, smart features, and cloud sync protection.
+              </p>
+            </div>
+            <div className="pt-2 flex flex-col gap-2">
+              <button 
+                onClick={() => {
+                  setShowHabitLimitModal(false);
+                  if (setActiveTab) setActiveTab('pricing');
+                }}
+                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-indigo-600/10 active:scale-95"
+              >
+                Unlock Unlimited Habits ⚡
+              </button>
+              <button 
+                onClick={() => setShowHabitLimitModal(false)}
+                className="w-full py-3.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold rounded-2xl transition-all text-xs"
+              >
+                Keep existing 5 habits
               </button>
             </div>
           </motion.div>
@@ -4337,9 +4385,14 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [showTaskLimitModal, setShowTaskLimitModal] = useState(false);
 
   const addTask = (q: EisenhowerQuadrant) => {
     if (!newTaskTitle.trim()) return;
+    if (subscriptionTier !== 'Premium' && tasks.length >= 10) {
+      setShowTaskLimitModal(true);
+      return;
+    }
     const newTask: Task = {
       id: Math.random().toString(36).substr(2, 9),
       title: newTaskTitle,
@@ -4378,7 +4431,7 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
         <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
-            <span>⚡ Standard Free Tier Active: Create and manage <strong>unlimited Eisenhower quadrant tasks</strong> for free. Upgrade to Premium to unlock Study Courses, Finances, and database cloud backup.</span>
+            <span>⚡ Standard Free Tier Active: Manage up to <strong>10 priority tasks & 5 habits</strong>. Upgrade to Premium to unlock Study Courses, Finances, and database cloud backup.</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
@@ -4391,7 +4444,7 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
         <div className="bg-gradient-to-r from-indigo-500/10 to-transparent p-4 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold text-indigo-700 dark:text-indigo-300 gap-3">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-indigo-500 animate-pulse shrink-0" />
-            <span>⚡ Standard 7-Day Free Trial Active: You can manage <strong>unlimited priority tasks</strong> during your active trial period.</span>
+            <span>⚡ Standard 7-Day Free Trial: Manage up to <strong>10 priority tasks & 5 habits</strong>. Upgrade to Premium for absolute unlimited habits & tasks! 🌌</span>
           </div>
           <button 
             onClick={() => setActiveTab && setActiveTab('pricing')} 
@@ -4446,6 +4499,49 @@ function TasksView({ tasks, setTasks, onDelete, subscriptionTier = 'Free', setAc
                 className="w-full py-3.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold rounded-2xl transition-all text-xs"
               >
                 Stay on Free version
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {showTaskLimitModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/45 backdrop-blur-md">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[2.5rem] p-8 border border-indigo-150 dark:border-gray-800 shadow-2xl space-y-6 text-center relative"
+          >
+            <button 
+              onClick={() => setShowTaskLimitModal(false)}
+              className="absolute top-6 right-6 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <Zap className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black dark:text-white">Task Limit Reached ✨</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                You can create up to <strong className="text-[#4F46E5] dark:text-[#818CF8]">10 active tasks</strong> in the Free/Trial version. Upgrade to Premium for absolute unlimited tasks, habit tracking, smart widgets, and cloud backup protection.
+              </p>
+            </div>
+            <div className="pt-2 flex flex-col gap-2">
+              <button 
+                onClick={() => {
+                  setShowTaskLimitModal(false);
+                  if (setActiveTab) setActiveTab('pricing');
+                }}
+                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-[#4F46E5]/10 active:scale-95"
+              >
+                Unlock Unlimited Tasks ⚡
+              </button>
+              <button 
+                onClick={() => setShowTaskLimitModal(false)}
+                className="w-full py-3.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold rounded-2xl transition-all text-xs"
+              >
+                Keep existing 10 tasks
               </button>
             </div>
           </motion.div>
