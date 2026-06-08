@@ -1085,10 +1085,13 @@ Ensure your response is detailed, professional, encouraging, and tailored to the
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+    app.get("/", (req, res) => {
+      res.json({
+        status: "ok",
+        service: "Wrindha OS Backend",
+        health: "/api/health",
+        config: "/api/config"
+      });
     });
   }
 
