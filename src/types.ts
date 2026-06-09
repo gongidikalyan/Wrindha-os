@@ -60,6 +60,7 @@ export interface Task {
   quadrant: EisenhowerQuadrant;
   dueDate?: string;
   tags: string[];
+  eisenhower_quadrant?: "do_first" | "schedule" | "delegate" | "eliminate";
 }
 
 // 6. Goal Setting

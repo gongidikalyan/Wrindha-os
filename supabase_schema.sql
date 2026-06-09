@@ -456,6 +456,209 @@ CREATE TRIGGER trg_check_task_limit
   FOR EACH ROW EXECUTE PROCEDURE public.check_task_limit();
 
 
+-- ==========================================
+-- MAIN SUB-MODULES & METRICS COMPLEMENT TABLES
+-- ==========================================
+
+-- 18. Goal Milestones Table (with RLS)
+CREATE TABLE IF NOT EXISTS public.goal_milestones (
+    id TEXT PRIMARY KEY,
+    goal_id TEXT REFERENCES public.goals ON DELETE CASCADE NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    target_date TEXT,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'completed')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.goal_milestones ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage goal milestones" ON public.goal_milestones
+    FOR ALL USING (EXISTS (SELECT 1 FROM public.goals WHERE goals.id = goal_milestones.goal_id AND goals.user_id = auth.uid()));
+
+-- 19. Habit Logs Table (with RLS)
+CREATE TABLE IF NOT EXISTS public.habit_logs (
+    id TEXT PRIMARY KEY,
+    habit_id TEXT REFERENCES public.habits ON DELETE CASCADE NOT NULL,
+    completed_date TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.habit_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage habit logs" ON public.habit_logs
+    FOR ALL USING (EXISTS (SELECT 1 FROM public.habits WHERE habits.id = habit_logs.habit_id AND habits.user_id = auth.uid()));
+
+-- 20. Study Sessions Table (with RLS)
+CREATE TABLE IF NOT EXISTS public.study_sessions (
+    id TEXT PRIMARY KEY,
+    course_id TEXT REFERENCES public.study_courses ON DELETE CASCADE NOT NULL,
+    session_date TEXT NOT NULL,
+    duration_minutes INTEGER NOT NULL,
+    topic TEXT NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.study_sessions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage study sessions" ON public.study_sessions
+    FOR ALL USING (EXISTS (SELECT 1 FROM public.study_courses WHERE study_courses.id = study_sessions.course_id AND study_courses.user_id = auth.uid()));
+
+-- 21. Timetable Entries Table (with RLS)
+CREATE TABLE IF NOT EXISTS public.timetable_entries (
+    id TEXT PRIMARY KEY,
+    timetable_id TEXT REFERENCES public.timetable ON DELETE CASCADE NOT NULL,
+    day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.timetable_entries ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage timetable entries" ON public.timetable_entries
+    FOR ALL USING (EXISTS (SELECT 1 FROM public.timetable WHERE timetable.id = timetable_entries.timetable_id AND timetable.user_id = auth.uid()));
+
+-- 22. Subscriptions Ledger Table (with RLS)
+CREATE TABLE IF NOT EXISTS public.subscriptions (
+    id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+    plan TEXT NOT NULL DEFAULT 'trial',
+    status TEXT NOT NULL DEFAULT 'active',
+    trial_start_at TIMESTAMP WITH TIME ZONE,
+    trial_end_at TIMESTAMP WITH TIME ZONE,
+    current_period_start TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    current_period_end TIMESTAMP WITH TIME ZONE,
+    razorpay_customer_id TEXT,
+    razorpay_subscription_id TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view their own subscriptions" ON public.subscriptions FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Admin can manage all subscriptions" ON public.subscriptions FOR ALL USING (auth.jwt()->>'email' = 'gongidikalyan08@gmail.com');
+
+-- 23. Payments Ledger Table (with RLS)
+CREATE TABLE IF NOT EXISTS public.payments (
+    id TEXT PRIMARY KEY DEFAULT 'pay_' || gen_random_uuid(),
+    user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+    razorpay_payment_id TEXT UNIQUE,
+    amount DECIMAL NOT NULL,
+    currency TEXT DEFAULT 'INR',
+    status TEXT NOT NULL DEFAULT 'captured',
+    paid_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view their own payments" ON public.payments FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Admin can manage all payments" ON public.payments FOR ALL USING (auth.jwt()->>'email' = 'gongidikalyan08@gmail.com');
+
+-- 24. Analytics Snapshots Table (with RLS)
+CREATE TABLE IF NOT EXISTS public.analytics_snapshots (
+    id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+    snapshot_date TEXT NOT NULL,
+    tasks_completed INTEGER DEFAULT 0,
+    habits_completed INTEGER DEFAULT 0,
+    study_minutes INTEGER DEFAULT 0,
+    goals_completed INTEGER DEFAULT 0,
+    productivity_score INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.analytics_snapshots ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage snapshots" ON public.analytics_snapshots FOR ALL USING (auth.uid() = user_id);
+
+-- 25. Support Tickets Table (with RLS)
+CREATE TABLE IF NOT EXISTS public.support_tickets (
+    id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+    subject TEXT NOT NULL,
+    message TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'closed')),
+    admin_response TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    resolved_at TIMESTAMP WITH TIME ZONE
+);
+ALTER TABLE public.support_tickets ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage progress support tickets" ON public.support_tickets FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Admin can manage all tickets" ON public.support_tickets FOR ALL USING (auth.jwt()->>'email' = 'gongidikalyan08@gmail.com');
+
+-- 26. Feature Requests Table (with RLS)
+CREATE TABLE IF NOT EXISTS public.feature_requests (
+    id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    upvotes INTEGER DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'implemented')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.feature_requests ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view feature requests" ON public.feature_requests FOR SELECT USING (true);
+CREATE POLICY "Users can handle own feature requests" ON public.feature_requests FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Admin can manage features requests" ON public.feature_requests FOR ALL USING (auth.jwt()->>'email' = 'gongidikalyan08@gmail.com');
+
+-- 27. Announcements Table (with RLS)
+CREATE TABLE IF NOT EXISTS public.announcements (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    start_date TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    end_date TIMESTAMP WITH TIME ZONE,
+    created_by TEXT DEFAULT 'admin',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Anyone can view announcements" ON public.announcements FOR SELECT USING (true);
+CREATE POLICY "Admin can manage announcements" ON public.announcements FOR ALL USING (auth.jwt()->>'email' = 'gongidikalyan08@gmail.com');
+
+-- 28. Admin Logs Table (with RLS)
+CREATE TABLE IF NOT EXISTS public.admin_logs (
+    id TEXT PRIMARY KEY DEFAULT 'log_' || gen_random_uuid(),
+    admin_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+    action TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT,
+    details JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.admin_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Admin can manage logs" ON public.admin_logs FOR ALL USING (auth.jwt()->>'email' = 'gongidikalyan08@gmail.com');
+
+-- 29. Career Trajectory Tables (with RLS)
+CREATE TABLE IF NOT EXISTS public.career_roadmaps (
+    id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'completed', 'archived')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.career_roadmaps ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage roadmaps" ON public.career_roadmaps FOR ALL USING (auth.uid() = user_id);
+
+CREATE TABLE IF NOT EXISTS public.skills (
+    id TEXT PRIMARY KEY,
+    roadmap_id TEXT REFERENCES public.career_roadmaps ON DELETE CASCADE NOT NULL,
+    skill_name TEXT NOT NULL,
+    proficiency_level TEXT DEFAULT 'beginner' CHECK (proficiency_level IN ('beginner', 'intermediate', 'advanced', 'expert')),
+    status TEXT DEFAULT 'learning' CHECK (status IN ('learning', 'mastered')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.skills ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage roadmap skills" ON public.skills
+    FOR ALL USING (EXISTS (SELECT 1 FROM public.career_roadmaps WHERE career_roadmaps.id = skills.roadmap_id AND career_roadmaps.user_id = auth.uid()));
+
+-- 30. Budgets Table (with RLS)
+CREATE TABLE IF NOT EXISTS public.budgets (
+    id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+    category TEXT NOT NULL,
+    amount DECIMAL NOT NULL CHECK (amount >= 0),
+    month TEXT NOT NULL, -- YYYY-MM-01 format
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.budgets ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage budgets" ON public.budgets FOR ALL USING (auth.uid() = user_id);
+
+
+
 
 
 

@@ -21,11 +21,15 @@ import {
   Award,
   Check,
   AlertCircle,
-  Timer
+  Timer,
+  Brain,
+  HelpCircle,
+  BookOpen,
+  Grid
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "../lib/supabase";
-import { Habit, Goal, Task, GoalType } from "../types";
+import { Habit, Goal, Task, GoalType, EisenhowerQuadrant } from "../types";
 
 // ================= TYPES DEFINITIONS =================
 export interface PyramidNode {
@@ -122,7 +126,7 @@ export default function LifeOSView({
   habits
 }: LifeOSViewProps) {
   // Navigation Tabs for Unified Productivity OS: Plan (Pyramid), Organize (Kanban), Execute (Timeblock), Dashboard, Focus Timer
-  const [activeSubTab, setActiveSubTab] = useState<"dashboard" | "pyramid" | "kanban" | "timeblock" | "focus">("dashboard");
+  const [activeSubTab, setActiveSubTab] = useState<"dashboard" | "pyramid" | "kanban" | "timeblock" | "focus" | "eisenhower">("dashboard");
 
   // Enhanced Pomodoro focus states
   const [focusTabMode, setFocusTabMode] = useState<"pomodoro" | "shortbreak" | "longbreak">("pomodoro");
@@ -132,6 +136,11 @@ export default function LifeOSView({
     longbreak: 15,
   });
   const [completedPomodorosCount, setCompletedPomodorosCount] = useState<number>(0);
+
+  // Eisenhower Matrix input states
+  const [eisenTitle, setEisenTitle] = useState("");
+  const [eisenDesc, setEisenDesc] = useState("");
+  const [eisenQuad, setEisenQuad] = useState<"do_first" | "schedule" | "delegate" | "eliminate">("do_first");
 
   // Local state and error logs
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -769,7 +778,8 @@ export default function LifeOSView({
             { id: "pyramid", label: "Priority Pyramid", icon: Layers },
             { id: "kanban", label: "Kanban Board", icon: ListTodo },
             { id: "timeblock", label: "Time Blocks", icon: CalendarIcon },
-            { id: "focus", label: "Focus Timer", icon: Timer }
+            { id: "focus", label: "Focus Timer", icon: Timer },
+            { id: "eisenhower", label: "Eisenhower Matrix", icon: Grid }
           ].map(tab => (
             <button
               key={tab.id}
@@ -2029,6 +2039,438 @@ export default function LifeOSView({
                 </div>
 
               </div>
+            </motion.div>
+          )}
+
+          {/* ================= VIEW 6: EISENHOWER PRIORITY MATRIX ================= */}
+          {activeSubTab === "eisenhower" && (
+            <motion.div
+              key="eisenhower"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="space-y-6"
+              id="eisenhower-matrix-section"
+            >
+              {/* HEADER CAPTION CONTAINER */}
+              <div className="bg-white dark:bg-gray-950 p-6 rounded-[2.5rem] border border-gray-100 dark:border-gray-900 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Grid className="w-5 h-5 text-indigo-500" />
+                    <h2 className="text-xl font-extrabold tracking-tight dark:text-white">The Eisenhower Priorities</h2>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed">
+                    Filter out noise and focus on strategic execution. Categorize tasks into high-yield, scheduling buffers, delegations, and eliminations. Let urgency and impact dictate your focus.
+                  </p>
+                </div>
+                <div className="bg-indigo-50/60 dark:bg-indigo-950/20 px-4 py-2.5 rounded-2xl border border-indigo-100/30 dark:border-indigo-900/30 text-center shrink-0">
+                  <span className="text-[10px] font-mono font-black text-indigo-600 dark:text-indigo-400 block uppercase tracking-wider">Workspace Integrity</span>
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">WrindhaOS SaaS V2</span>
+                </div>
+              </div>
+
+              {/* SPLIT COLUMN: ADD TASK FORM & MATRIX GRID */}
+              <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                
+                {/* 1. ADD NEW MATRIX TASK FORM WIDGET */}
+                <div className="xl:col-span-4 bg-white dark:bg-gray-950 p-6 rounded-[2rem] border border-gray-150/40 dark:border-gray-900 shadow-sm space-y-6">
+                  <div>
+                    <h3 className="text-md font-bold tracking-tight dark:text-white flex items-center gap-2">
+                      <Plus className="w-4 h-4 text-indigo-500" /> Prioritize New Task
+                    </h3>
+                    <p className="text-[11px] text-gray-400 mt-1">Populate details and allocate directly to a decision quadrant.</p>
+                  </div>
+
+                  <form 
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!eisenTitle.trim()) {
+                        setErrorMessage("Please enter a task title first.");
+                        setTimeout(() => setErrorMessage(null), 3000);
+                        return;
+                      }
+
+                      const newTaskId = `task_eisen_${Math.random().toString(36).substring(2, 11)}`;
+                      const mockTask: any = {
+                        id: newTaskId,
+                        title: eisenTitle.trim(),
+                        completed: false,
+                        quadrant: "UI",
+                        description: eisenDesc.trim() || undefined,
+                        eisenhower_quadrant: eisenQuad,
+                        status: "pending",
+                        created_at: new Date().toISOString()
+                      };
+
+                      setTasks((prev) => [...prev, mockTask]);
+                      setEisenTitle("");
+                      setEisenDesc("");
+
+                      try {
+                        const sessionResult = await supabase.auth.getSession();
+                        const currUserId = sessionResult.data.session?.user?.id || "anonymous_sandbox";
+                        
+                        await supabase.from("tasks").insert({
+                          id: newTaskId,
+                          user_id: currUserId,
+                          title: mockTask.title,
+                          completed: false,
+                          quadrant: "UI",
+                          description: mockTask.description || "Eisenhower matrix custom task",
+                          eisenhower_quadrant: eisenQuad,
+                          status: "pending",
+                          created_at: mockTask.created_at
+                        });
+                      } catch (err) {
+                        console.error("Database sync warning during matrix task insert:", err);
+                      }
+                    }}
+                    className="space-y-4"
+                  >
+                    <div>
+                      <label className="text-[11px] font-extrabold uppercase text-gray-500 dark:text-gray-400 block mb-1.5 tracking-wider font-mono">Task Heading</label>
+                      <input 
+                        type="text"
+                        placeholder="e.g. Draft midsem engineering report"
+                        value={eisenTitle}
+                        onChange={(e) => setEisenTitle(e.target.value)}
+                        className="w-full text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200/50 dark:border-gray-800 rounded-xl px-3.5 py-2.5 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-extrabold uppercase text-gray-500 dark:text-gray-400 block mb-1.5 tracking-wider font-mono">Brief Memo (Optional)</label>
+                      <textarea
+                        rows={3}
+                        placeholder="Describe key objectives or notes..."
+                        value={eisenDesc}
+                        onChange={(e) => setEisenDesc(e.target.value)}
+                        className="w-full text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200/50 dark:border-gray-800 rounded-xl px-3.5 py-2.5 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-white resize-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-extrabold uppercase text-gray-500 dark:text-gray-400 block mb-1.5 tracking-wider font-mono">Target Quadrant</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { id: "do_first", label: "Do First", desc: "Urgent & Important" },
+                          { id: "schedule", label: "Schedule It", desc: "Not Urgent but Important" },
+                          { id: "delegate", label: "Delegate", desc: "Urgent but Not Important" },
+                          { id: "eliminate", label: "Eliminate", desc: "Not Urgent & Not Important" }
+                        ].map((q) => (
+                          <button
+                            key={q.id}
+                            type="button"
+                            onClick={() => setEisenQuad(q.id as any)}
+                            className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                              eisenQuad === q.id 
+                                ? "border-indigo-500 bg-indigo-50/55 dark:bg-indigo-950/15" 
+                                : "border-gray-150/40 dark:border-gray-900 bg-white dark:bg-gray-950"
+                            }`}
+                          >
+                            <span className="text-[11px] font-black tracking-tight block dark:text-white leading-none">{q.label}</span>
+                            <span className="text-[9px] text-gray-450 mt-1 block leading-tight">{q.desc}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-3 h-10 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md active:scale-[0.98] cursor-pointer"
+                    >
+                      Allocate to Matrix
+                    </button>
+                  </form>
+                </div>
+
+                {/* 2. THE 2x2 EISENHOWER MATRIX GRAPHIC WIDGET */}
+                <div className="xl:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  
+                  {/* QUADRANT A: DO FIRST */}
+                  <div className="bg-rose-50/20 dark:bg-rose-950/5 border border-rose-100/40 dark:border-rose-900/10 rounded-[2rem] p-5 flex flex-col justify-between shadow-sm min-h-[300px]">
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center bg-rose-500/10 px-3 py-1.5 rounded-full border border-rose-200/20 w-max">
+                        <span className="flex h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse mr-2" />
+                        <span className="text-[10px] font-black tracking-widest text-rose-600 dark:text-rose-400 uppercase leading-none font-mono">1. DO FIRST</span>
+                      </div>
+                      
+                      <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                        {tasks.filter(t => t.eisenhower_quadrant === "do_first").length === 0 ? (
+                          <p className="text-[11px] text-gray-400 italic py-4">No tasks pending priority. Perfect calm.</p>
+                        ) : (
+                          tasks.filter(t => t.eisenhower_quadrant === "do_first").map(task => (
+                            <div 
+                              key={task.id} 
+                              className="flex items-start justify-between bg-white dark:bg-gray-950 p-3 rounded-2xl border border-rose-100/20 dark:border-rose-950/20 group hover:shadow-sm transition-all"
+                            >
+                              <div className="flex items-start gap-2.5 flex-1 pr-2">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const nextState = !task.completed;
+                                    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: nextState, status: nextState ? "completed" : "pending" } : t));
+                                    try {
+                                      await supabase.from("tasks").update({ completed: nextState, status: nextState ? "completed" : "pending" }).eq("id", task.id);
+                                    } catch (err) {
+                                      console.error(err);
+                                    }
+                                  }}
+                                  className={`w-4 h-4 rounded-md border mt-0.5 flex items-center justify-center transition-all cursor-pointer ${
+                                    task.completed 
+                                      ? "bg-rose-500 border-rose-500 text-white" 
+                                      : "border-gray-300 dark:border-gray-800 hover:border-rose-400"
+                                  }`}
+                                >
+                                  {task.completed && <Check className="w-2.5 h-2.5 stroke-[4]" />}
+                                </button>
+                                <div className="flex-1">
+                                  <span className={`text-[12px] font-bold block leading-tight ${task.completed ? "line-through text-gray-450" : "text-gray-800 dark:text-gray-200"}`}>
+                                    {task.title}
+                                  </span>
+                                  {task.description && (
+                                    <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 block truncate max-w-[200px]">
+                                      {task.description}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  setTasks(prev => prev.filter(t => t.id !== task.id));
+                                  try {
+                                    await supabase.from("tasks").delete().eq("id", task.id);
+                                  } catch (err) {
+                                    console.error(err);
+                                  }
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:text-rose-500 text-gray-400 transition-all cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                    <div className="pt-2 text-[10px] text-gray-450 dark:text-gray-500 font-medium">Urgent & Important. Handle these first today.</div>
+                  </div>
+
+                  {/* QUADRANT B: SCHEDULE IT */}
+                  <div className="bg-amber-50/20 dark:bg-amber-950/5 border border-amber-100/40 dark:border-amber-900/10 rounded-[2rem] p-5 flex flex-col justify-between shadow-sm min-h-[300px]">
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center bg-amber-500/10 px-3 py-1.5 rounded-full border border-amber-200/20 w-max">
+                        <span className="flex h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse mr-2" />
+                        <span className="text-[10px] font-black tracking-widest text-amber-600 dark:text-amber-400 uppercase leading-none font-mono">2. SCHEDULE IT</span>
+                      </div>
+
+                      <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                        {tasks.filter(t => t.eisenhower_quadrant === "schedule").length === 0 ? (
+                          <p className="text-[11px] text-gray-400 italic py-4">No schedule list pending.</p>
+                        ) : (
+                          tasks.filter(t => t.eisenhower_quadrant === "schedule").map(task => (
+                            <div 
+                              key={task.id} 
+                              className="flex items-start justify-between bg-white dark:bg-gray-950 p-3 rounded-2xl border border-amber-100/20 dark:border-amber-950/20 group hover:shadow-sm transition-all"
+                            >
+                              <div className="flex items-start gap-2.5 flex-1 pr-2">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const nextState = !task.completed;
+                                    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: nextState, status: nextState ? "completed" : "pending" } : t));
+                                    try {
+                                      await supabase.from("tasks").update({ completed: nextState, status: nextState ? "completed" : "pending" }).eq("id", task.id);
+                                    } catch (err) {
+                                      console.error(err);
+                                    }
+                                  }}
+                                  className={`w-4 h-4 rounded-md border mt-0.5 flex items-center justify-center transition-all cursor-pointer ${
+                                    task.completed 
+                                      ? "bg-amber-500 border-amber-500 text-white" 
+                                      : "border-gray-300 dark:border-gray-800 hover:border-amber-400"
+                                  }`}
+                                >
+                                  {task.completed && <Check className="w-2.5 h-2.5 stroke-[4]" />}
+                                </button>
+                                <div className="flex-1">
+                                  <span className={`text-[12px] font-bold block leading-tight ${task.completed ? "line-through text-gray-450" : "text-gray-800 dark:text-gray-200"}`}>
+                                    {task.title}
+                                  </span>
+                                  {task.description && (
+                                    <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 block truncate max-w-[200px]">
+                                      {task.description}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  setTasks(prev => prev.filter(t => t.id !== task.id));
+                                  try {
+                                    await supabase.from("tasks").delete().eq("id", task.id);
+                                  } catch (err) {
+                                    console.error(err);
+                                  }
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:text-amber-500 text-gray-400 transition-all cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                    <div className="pt-2 text-[10px] text-gray-455 dark:text-gray-500 font-medium">Important, not Urgent. Mark slot on schedule.</div>
+                  </div>
+
+                  {/* QUADRANT C: DELEGATE */}
+                  <div className="bg-sky-50/20 dark:bg-sky-950/5 border border-sky-100/40 dark:border-sky-900/10 rounded-[2rem] p-5 flex flex-col justify-between shadow-sm min-h-[300px]">
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center bg-sky-500/10 px-3 py-1.5 rounded-full border border-sky-200/20 w-max">
+                        <span className="flex h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse mr-2" />
+                        <span className="text-[10px] font-black tracking-widest text-sky-600 dark:text-sky-400 uppercase leading-none font-mono">3. DELEGATE</span>
+                      </div>
+
+                      <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                        {tasks.filter(t => t.eisenhower_quadrant === "delegate").length === 0 ? (
+                          <p className="text-[11px] text-gray-400 italic py-4">No delegations logged currently.</p>
+                        ) : (
+                          tasks.filter(t => t.eisenhower_quadrant === "delegate").map(task => (
+                            <div 
+                              key={task.id} 
+                              className="flex items-start justify-between bg-white dark:bg-gray-950 p-3 rounded-2xl border border-sky-100/20 dark:border-sky-950/20 group hover:shadow-sm transition-all"
+                            >
+                              <div className="flex items-start gap-2.5 flex-1 pr-2">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const nextState = !task.completed;
+                                    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: nextState, status: nextState ? "completed" : "pending" } : t));
+                                    try {
+                                      await supabase.from("tasks").update({ completed: nextState, status: nextState ? "completed" : "pending" }).eq("id", task.id);
+                                    } catch (err) {
+                                      console.error(err);
+                                    }
+                                  }}
+                                  className={`w-4 h-4 rounded-md border mt-0.5 flex items-center justify-center transition-all cursor-pointer ${
+                                    task.completed 
+                                      ? "bg-sky-500 border-sky-500 text-white" 
+                                      : "border-gray-300 dark:border-gray-800 hover:border-sky-400"
+                                  }`}
+                                >
+                                  {task.completed && <Check className="w-2.5 h-2.5 stroke-[4]" />}
+                                </button>
+                                <div className="flex-1">
+                                  <span className={`text-[12px] font-bold block leading-tight ${task.completed ? "line-through text-gray-450" : "text-gray-800 dark:text-gray-200"}`}>
+                                    {task.title}
+                                  </span>
+                                  {task.description && (
+                                    <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 block truncate max-w-[200px]">
+                                      {task.description}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  setTasks(prev => prev.filter(t => t.id !== task.id));
+                                  try {
+                                    await supabase.from("tasks").delete().eq("id", task.id);
+                                  } catch (err) {
+                                    console.error(err);
+                                  }
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:text-sky-500 text-gray-400 transition-all cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                    <div className="pt-2 text-[10px] text-gray-455 dark:text-gray-500 font-medium">Urgent, not Important. Hand off or automate.</div>
+                  </div>
+
+                  {/* QUADRANT D: ELIMINATE */}
+                  <div className="bg-emerald-50/20 dark:bg-emerald-950/5 border border-emerald-100/40 dark:border-emerald-900/10 rounded-[2rem] p-5 flex flex-col justify-between shadow-sm min-h-[300px]">
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-200/20 w-max">
+                        <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse mr-2" />
+                        <span className="text-[10px] font-black tracking-widest text-emerald-600 dark:text-emerald-400 uppercase leading-none font-mono">4. ELIMINATE</span>
+                      </div>
+
+                      <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                        {tasks.filter(t => t.eisenhower_quadrant === "eliminate").length === 0 ? (
+                          <p className="text-[11px] text-gray-400 italic py-4">No task clutter identified. Clean slate.</p>
+                        ) : (
+                          tasks.filter(t => t.eisenhower_quadrant === "eliminate").map(task => (
+                            <div 
+                              key={task.id} 
+                              className="flex items-start justify-between bg-white dark:bg-gray-950 p-3 rounded-2xl border border-emerald-100/20 dark:border-emerald-950/20 group hover:shadow-sm transition-all"
+                            >
+                              <div className="flex items-start gap-2.5 flex-1 pr-2">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const nextState = !task.completed;
+                                    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: nextState, status: nextState ? "completed" : "pending" } : t));
+                                    try {
+                                      await supabase.from("tasks").update({ completed: nextState, status: nextState ? "completed" : "pending" }).eq("id", task.id);
+                                    } catch (err) {
+                                      console.error(err);
+                                    }
+                                  }}
+                                  className={`w-4 h-4 rounded-md border mt-0.5 flex items-center justify-center transition-all cursor-pointer ${
+                                    task.completed 
+                                      ? "bg-emerald-500 border-emerald-500 text-white" 
+                                      : "border-gray-300 dark:border-gray-800 hover:border-emerald-400"
+                                  }`}
+                                >
+                                  {task.completed && <Check className="w-2.5 h-2.5 stroke-[4]" />}
+                                </button>
+                                <div className="flex-1">
+                                  <span className={`text-[12px] font-bold block leading-tight ${task.completed ? "line-through text-gray-450" : "text-gray-800 dark:text-gray-200"}`}>
+                                    {task.title}
+                                  </span>
+                                  {task.description && (
+                                    <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 block truncate max-w-[200px]">
+                                      {task.description}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  setTasks(prev => prev.filter(t => t.id !== task.id));
+                                  try {
+                                    await supabase.from("tasks").delete().eq("id", task.id);
+                                  } catch (err) {
+                                    console.error(err);
+                                  }
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:text-emerald-500 text-gray-400 transition-all cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                    <div className="pt-2 text-[10px] text-gray-455 dark:text-gray-500 font-medium">Not Important, not Urgent. Trash or drop.</div>
+                  </div>
+
+                </div>
+
+              </div>
+
             </motion.div>
           )}
 

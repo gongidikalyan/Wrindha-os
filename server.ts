@@ -8,6 +8,7 @@ import Razorpay from "razorpay";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { GoogleGenAI, Type } from "@google/genai";
+import v2Router from "./server/routes.ts";
 
 dotenv.config();
 
@@ -175,6 +176,9 @@ async function startServer() {
     }
     next();
   });
+
+  // Mount the SaaS v2 API core router
+  app.use("/api/v2", v2Router);
 
   app.get("/api/health", (req, res) => {
     res.json({ 
