@@ -44,7 +44,7 @@ router.post("/razorpay/webhook", async (req: Request, res: Response) => {
   const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
   if (webhookSecret && signature) {
-    const rawBody = JSON.stringify(req.body);
+    const rawBody = (req as any).rawBody || JSON.stringify(req.body);
     const isValid = verifyWebhookSignature(rawBody, signature, webhookSecret);
     if (!isValid) {
       console.warn("[Razorpay Security Warn] Received invalid Webhook Signature flag. Verification signature mismatch.");
@@ -390,6 +390,18 @@ router.post("/analytics/snapshot", authenticate as any, async (req: Authenticate
   try {
     const snap = await generateDailySnapshot(req.user!.id);
     res.json({ success: true, snapshot: snap });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get("/analytics/snapshots", authenticate as any, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const snapshotsRes = await dbQuery<any>("analytics_snapshots", "select", {
+      match: { user_id: req.user!.id },
+      queryBuilder: (qb) => qb.order("snapshot_date", { ascending: true })
+    });
+    res.json({ success: true, snapshots: snapshotsRes.data || [] });
   } catch (err) {
     next(err);
   }

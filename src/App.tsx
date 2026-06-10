@@ -58,7 +58,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { cn, formatCurrency, getStorage, setStorage } from "@/src/lib/utils";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, LineChart, Line, CartesianGrid } from "recharts";
-import { Task, EisenhowerQuadrant, Habit, Expense, Goal, GoalType, TimetableEntry, TimetableType, StudyCourse, Blog, PricingPlan, UserSubscription } from "./types";
+import { Task, EisenhowerQuadrant, Habit, Expense, Goal, GoalType, TimetableEntry, TimetableType, StudyCourse, StudySession, Blog, PricingPlan, UserSubscription } from "./types";
 import { supabase, isSupabaseConfigured, getSupabaseError, supabaseUrl } from "./lib/supabase";
 import AnalyticsView from "./components/AnalyticsView";
 import PomodoroTimer from "./components/PomodoroTimer";
@@ -72,7 +72,9 @@ const modules = [
   { id: 'dashboard', name: 'Overview', icon: LayoutDashboard, color: 'text-blue-500' },
   { id: 'analytics', name: 'Analytics', icon: BarChart3, color: 'text-pink-500' },
   { id: 'habits', name: 'Habit Tracker', icon: Flame, color: 'text-orange-500' },
-  { id: 'goals', name: 'Life OS', icon: Target, color: 'text-purple-500' },
+  { id: 'goals', name: 'Goal System', icon: Target, color: 'text-purple-500' },
+  { id: 'career', name: 'Career Trajectory', icon: Award, color: 'text-teal-500' },
+  { id: 'lifeos', name: 'Life OS', icon: Brain, color: 'text-indigo-500' },
   { id: 'study', name: 'Study Planner', icon: GraduationCap, color: 'text-indigo-500' },
   { id: 'finance', name: 'Expenses', icon: Wallet, color: 'text-emerald-500' },
   { id: 'timetable', name: 'Timetable', icon: Calendar, color: 'text-cyan-500' },
@@ -90,7 +92,27 @@ const infoModules = [
   { id: 'disclaimer', name: 'Disclaimer', icon: AlertCircle },
 ];
 
-const API_URL = import.meta.env.VITE_API_URL || "";
+const getApiUrl = () => {
+  const url = import.meta.env.VITE_API_URL || "";
+  if (!url || url.includes("your_") || url.includes("placeholder")) {
+    return "";
+  }
+  return url;
+};
+const API_URL = getApiUrl();
+
+export const authFetch = async (url: string, options: RequestInit = {}) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers = { ...options.headers } as Record<string, string>;
+  if (session?.access_token) {
+    headers["Authorization"] = `Bearer ${session.access_token}`;
+  }
+  if (session?.user?.id) {
+    headers["x-user-id"] = session.user.id;
+    headers["x-user-email"] = session.user.email || "";
+  }
+  return fetch(url, { ...options, headers });
+};
 
 const calculateTrialDates = (signupTimeStr: string | undefined | null, currentSecureTime: number) => {
   const JUNE_1_2026 = new Date("2026-06-01T00:00:00Z").getTime();
@@ -248,7 +270,7 @@ export default function App() {
     setMaxHabits(5);
     setHasFetchedFromDB(false);
     setUserName("Felix");
-    setUserBudget(5000);
+    setUserBudget(0);
     setHabits([]);
     setTasks([]);
     setExpenses([]);
@@ -379,9 +401,9 @@ export default function App() {
   const [userPlans, setUserPlans] = useState<PricingPlan[]>(() => {
     return [
       {
-        id: "premium-plan-49",
+        id: "premium-plan-59",
         name: "Premium",
-        price: "₹49",
+        price: "₹59",
         period: "month",
         features: [
           "7-day free trial (no credit card upfront)",
@@ -450,29 +472,25 @@ export default function App() {
         };
         if (!isBypassed()) {
           const uName = session.user.user_metadata?.full_name || localStorage.getItem('wrindha_user_name') || "Felix";
-          supabase.from('profiles').select('id').eq('id', session.user.id).single().then(({ data }) => {
-            if (data) {
-              supabase.from('profiles').update({ 
-                last_active: new Date().toISOString() 
-              }).eq('id', session.user.id).then();
-            } else {
-              const secureNow = getCurrentSecureTime();
-              const dates = calculateTrialDates(session.user.created_at, secureNow);
-              supabase.from('profiles').insert({ 
-                id: session.user.id, 
-                email: session.user.email,
-                full_name: uName,
-                last_active: new Date().toISOString(),
-                budget: userBudget,
-                currency: currency,
-                is_trial_activated: true,
-                trial_start_date: dates.startStr,
-                trial_end_date: dates.endStr,
-                subscription_tier: "TrialPremium",
-                has_paid: false
-              }).then();
-            }
+          fetch(`${API_URL}/api/v2/auth/register`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({
+              userId: session.user.id,
+              email: session.user.email,
+              fullName: uName
+            })
+          }).then(r => r.json()).then(pData => {
+            fetchData(true);
+          }).catch(err => {
+            console.warn("Backend registration bypass or offline. Falling back to direct database query.", err.message || err);
+            fetchData(true);
           });
+        } else {
+          fetchData(true);
         }
       } else {
         isFetchingRef.current = false;
@@ -496,29 +514,25 @@ export default function App() {
         };
         if (!isBypassed()) {
           const uName = session.user.user_metadata?.full_name || localStorage.getItem('wrindha_user_name') || "Felix";
-          supabase.from('profiles').select('id').eq('id', session.user.id).single().then(({ data }) => {
-            if (data) {
-              supabase.from('profiles').update({ 
-                last_active: new Date().toISOString() 
-              }).eq('id', session.user.id).then();
-            } else {
-              const secureNow = getCurrentSecureTime();
-              const dates = calculateTrialDates(session.user.created_at, secureNow);
-              supabase.from('profiles').insert({ 
-                id: session.user.id, 
-                email: session.user.email,
-                full_name: uName,
-                last_active: new Date().toISOString(),
-                budget: userBudget,
-                currency: currency,
-                is_trial_activated: true,
-                trial_start_date: dates.startStr,
-                trial_end_date: dates.endStr,
-                subscription_tier: "TrialPremium",
-                has_paid: false
-              }).then();
-            }
+          fetch(`${API_URL}/api/v2/auth/register`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({
+              userId: session.user.id,
+              email: session.user.email,
+              fullName: uName
+            })
+          }).then(r => r.json()).then(pData => {
+            fetchData(true);
+          }).catch(err => {
+            console.warn("Backend state change registration bypass or offline. Falling back to direct database query.", err.message || err);
+            fetchData(true);
           });
+        } else {
+          fetchData(true);
         }
       } else if (event === 'SIGNED_OUT') {
         setSession(null);
@@ -532,7 +546,7 @@ export default function App() {
         setStudyCourses([]);
         setUserName("Felix");
         if (localStorage.getItem('wrindha_budget_updated') !== 'true') {
-          setUserBudget(5000);
+          setUserBudget(0);
         }
         setCurrency("INR");
         setSubscriptionTier("Free");
@@ -612,6 +626,11 @@ export default function App() {
 
   const [studyCourses, _setStudyCourses] = useState<StudyCourse[]>(() => {
     const saved = localStorage.getItem('wrindha_study');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [studySessions, setStudySessions] = useState<StudySession[]>(() => {
+    const saved = localStorage.getItem('wrindha_study_sessions');
     return saved ? JSON.parse(saved) : [];
   });
 
@@ -907,8 +926,7 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
   }, [isSidebarOpen]);
 
   // Initial Fetch from Supabase
-  useEffect(() => {
-    async function fetchData(isBackground = false) {
+  const fetchData = async (isBackground = false) => {
       if (isFetchingRef.current) return;
       isFetchingRef.current = true;
       if (!isBackground) {
@@ -1085,12 +1103,12 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
           }
         }
 
-        // Bypassed database pricing plan query to keep standard premium OS ₹49 rate custom-configured
+        // Bypassed database pricing plan query to keep standard premium OS ₹59 rate custom-configured
         setUserPlans([
           {
-            id: "premium-plan-49",
+            id: "premium-plan-59",
             name: "Premium",
-            price: "₹49",
+            price: "₹59",
             period: "month",
             features: [
               "7-day free trial (no credit card upfront)",
@@ -1175,6 +1193,29 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
         if (!studyRes?.error) {
           const mappedStudy = studyRes.data && studyRes.data.length > 0 ? studyRes.data : [];
           setStudyCourses(mappedStudy);
+
+          // Fetch study sessions associated with these courses
+          try {
+            if (mappedStudy.length > 0) {
+              const courseIds = mappedStudy.map((c: any) => c.id);
+              const { data: sessionsData } = await supabase.from('study_sessions').select('*').in('course_id', courseIds);
+              if (sessionsData) {
+                const mappedSessions = sessionsData.map((s: any) => ({
+                  id: s.id,
+                  courseId: s.course_id,
+                  sessionDate: s.session_date,
+                  durationMinutes: s.duration_minutes,
+                  topic: s.topic,
+                  notes: s.notes
+                }));
+                setStudySessions(mappedSessions);
+              }
+            } else {
+              setStudySessions([]);
+            }
+          } catch (sessionFetchErr) {
+            console.warn("Could not load study sessions from Supabase:", sessionFetchErr);
+          }
         } else {
           console.warn("Could not fetch study courses from Supabase, preserving local state:", studyRes.error);
         }
@@ -1353,8 +1394,9 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
         setIsInitializing(false);
         isFetchingRef.current = false;
       }
-    }
+  };
 
+  useEffect(() => {
     fetchData();
 
     const handleFocus = () => {
@@ -1379,11 +1421,17 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
     try {
       // Add user_id to each item before upserting and map camelCase to snake_case if needed
       const mapItem = (item: any) => {
-        const mapped = { ...item, user_id: session.user.id };
+        const mapped = { ...item };
+        if (table !== 'study_sessions') {
+          mapped.user_id = session.user.id;
+        }
         // Handle common camelCase to snake_case mapping
         if (mapped.completedAt) { mapped.completed_at = mapped.completedAt; delete mapped.completedAt; }
         if (mapped.dueDate) { mapped.due_date = mapped.dueDate; delete mapped.dueDate; }
         if (mapped.targetDate) { mapped.target_date = mapped.targetDate; delete mapped.targetDate; }
+        if (mapped.courseId) { mapped.course_id = mapped.courseId; delete mapped.courseId; }
+        if (mapped.sessionDate) { mapped.session_date = mapped.sessionDate; delete mapped.sessionDate; }
+        if (mapped.durationMinutes) { mapped.duration_minutes = mapped.durationMinutes; delete mapped.durationMinutes; }
         return mapped;
       };
 
@@ -1438,6 +1486,11 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
     localStorage.setItem('wrindha_study', JSON.stringify(studyCourses));
     if (!isInitializing) syncToSupabase('study_courses', studyCourses);
   }, [studyCourses, isInitializing]);
+
+  useEffect(() => {
+    localStorage.setItem('wrindha_study_sessions', JSON.stringify(studySessions));
+    if (!isInitializing) syncToSupabase('study_sessions', studySessions);
+  }, [studySessions, isInitializing]);
 
   const syncBlogsToSupabase = async (blogList: Blog[]) => {
     if (!isSupabaseConfigured() || !session?.user?.id || bypassConfig) return;
@@ -2022,6 +2075,42 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
                         )}
                       </div>
 
+                      {/* Goal & Career Stats */}
+                      <div className="pt-3 border-t border-gray-100 dark:border-gray-800 space-y-2 text-[11px] text-left">
+                        <div className="flex justify-between items-center text-gray-500 dark:text-gray-400">
+                          <span className="flex items-center gap-1">
+                            <Target className="w-3.5 h-3.5 text-purple-500" />
+                            <span>Active Goals</span>
+                          </span>
+                          <span className="font-bold dark:text-white font-mono bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded">
+                            {goals.length}
+                          </span>
+                        </div>
+                        {(() => {
+                          const savedPath = localStorage.getItem("wrindha_active_career_path");
+                          const path = savedPath ? JSON.parse(savedPath) : null;
+                          const savedSkills = localStorage.getItem("wrindha_career_skills");
+                          const skillList = savedSkills ? JSON.parse(savedSkills) : [];
+                          const completedSkills = skillList.filter((s: any) => s.completed).length;
+                          const totalSkillsCount = skillList.length;
+                          const skillProgress = totalSkillsCount > 0 ? Math.round((completedSkills / totalSkillsCount) * 100) : 0;
+                          const progress = path ? (path.progress_percentage || skillProgress) : 0;
+                          return (
+                            <div className="flex justify-between items-center text-gray-500 dark:text-gray-400">
+                              <span className="flex items-center gap-1">
+                                <Award className="w-3.5 h-3.5 text-teal-500" />
+                                <span className="truncate max-w-[120px]" title={path?.target_position || "Career path"}>
+                                  {path?.target_position || "Career Path"}
+                                </span>
+                              </span>
+                              <span className="font-bold dark:text-white font-mono bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded">
+                                {progress}%
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
+
                       <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex flex-col gap-2">
                         <button
                           onClick={() => {
@@ -2071,7 +2160,7 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
                exit={{ opacity: 0, y: -10 }}
                transition={{ duration: 0.2 }}
              >
-               {activeTab === 'dashboard' && <DashboardView habits={habits} tasks={tasks} setTasks={setTasks} expenses={expenses} currency={currency} userName={userName} setUserName={setUserName} theme={theme} setActiveTab={setActiveTab} budget={userBudget} subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} />}
+               {activeTab === 'dashboard' && <DashboardView habits={habits} tasks={tasks} setTasks={setTasks} expenses={expenses} currency={currency} userName={userName} setUserName={setUserName} theme={theme} setActiveTab={setActiveTab} budget={userBudget} subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} goals={goals} studySessions={studySessions} setStudySessions={setStudySessions} studyCourses={studyCourses} />}
                 {activeTab === 'analytics' && <AnalyticsView expenses={expenses} habits={habits} tasks={tasks} goals={goals} courses={studyCourses} currency={currency} />}
                {activeTab === 'habits' && <HabitsView habits={habits} setHabits={setHabits} onDelete={(id) => deleteFromSupabase('habits', id)} theme={theme} subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} setActiveTab={setActiveTab} />}
                {activeTab === 'finance' && <FinanceView expenses={expenses} setExpenses={setExpenses} onDelete={(id) => deleteFromSupabase('expenses', id)} currency={currency} setCurrency={setCurrency} theme={theme} budget={userBudget} setBudget={setUserBudget} />}
@@ -2083,6 +2172,35 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
                    onDelete={(id) => deleteFromSupabase('goals', id)} 
                    subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} 
                    setActiveTab={setActiveTab}
+                   habits={habits}
+                   setHabits={setHabits}
+                   tasks={tasks}
+                   setTasks={setTasks}
+                   studyCourses={studyCourses}
+                   setStudyCourses={setStudyCourses}
+                 />
+               )}
+               {activeTab === 'career' && (
+                 <CareerPlannerView 
+                   habits={habits}
+                   setHabits={setHabits}
+                   tasks={tasks}
+                   setTasks={setTasks}
+                   goals={goals}
+                   setGoals={setGoals}
+                   studyCourses={studyCourses}
+                   setStudyCourses={setStudyCourses}
+                   hasActiveAccess={hasActiveAccess}
+                   onRequestUpgrade={() => setActiveTab('pricing')}
+                 />
+               )}
+               {activeTab === 'lifeos' && (
+                 <LifeOSView 
+                   goals={goals} 
+                   setGoals={setGoals} 
+                   onDelete={(id) => deleteFromSupabase('goals', id)} 
+                   subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} 
+                   setActiveTab={setActiveTab || (() => {})}
                    habits={habits}
                    setHabits={setHabits}
                    tasks={tasks}
@@ -2773,13 +2891,13 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan, 
   const fetchCouponsData = async () => {
     setLoadingCoupons(true);
     try {
-      const res = await fetch(`${API_URL}/api/admin/coupons`);
+      const res = await authFetch(`${API_URL}/api/admin/coupons`);
       const data = await res.json();
       if (data.success) {
         setCoupons(data.coupons || []);
       }
       
-      const statsRes = await fetch(`${API_URL}/api/admin/coupon-stats`);
+      const statsRes = await authFetch(`${API_URL}/api/admin/coupon-stats`);
       const statsData = await statsRes.json();
       if (statsData.success) {
         setUsages(statsData.usages || []);
@@ -2796,7 +2914,7 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan, 
     if (!newCode.trim()) return;
 
     try {
-      const res = await fetch(`${API_URL}/api/admin/coupons`, {
+      const res = await authFetch(`${API_URL}/api/admin/coupons`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2833,7 +2951,7 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan, 
   const handleDeleteCoupon = async (id: string) => {
     if (!window.confirm("Are you absolutely sure you want to delete this coupon? This is permanent.")) return;
     try {
-      const res = await fetch(`${API_URL}/api/admin/coupons/${id}`, { method: "DELETE" });
+      const res = await authFetch(`${API_URL}/api/admin/coupons/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (data.success) {
         fetchCouponsData();
@@ -2845,7 +2963,7 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan, 
 
   const handleToggleActive = async (coupon: any) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/coupons/${coupon.id}`, {
+      const res = await authFetch(`${API_URL}/api/admin/coupons/${coupon.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ is_active: !coupon.is_active })
@@ -2861,7 +2979,7 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan, 
 
   const handleUpdateCoupon = async (id: string) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/coupons/${id}`, {
+      const res = await authFetch(`${API_URL}/api/admin/coupons/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3847,7 +3965,23 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan, 
 
 // --- Views ---
 
-function DashboardView({ habits, tasks, setTasks, expenses, currency, userName, setUserName, theme, setActiveTab, budget, subscriptionTier = 'Free' }: { 
+function DashboardView({ 
+  habits, 
+  tasks, 
+  setTasks, 
+  expenses, 
+  currency, 
+  userName, 
+  setUserName, 
+  theme, 
+  setActiveTab, 
+  budget, 
+  subscriptionTier = 'Free', 
+  goals = [],
+  studySessions = [],
+  setStudySessions,
+  studyCourses = []
+}: { 
   habits: Habit[], 
   tasks: Task[], 
   setTasks: (t: Task[]) => void,
@@ -3858,20 +3992,92 @@ function DashboardView({ habits, tasks, setTasks, expenses, currency, userName, 
   theme: 'light' | 'dark',
   setActiveTab: (tab: string) => void,
   budget: number,
-  subscriptionTier?: string
+  subscriptionTier?: string,
+  goals?: Goal[],
+  studySessions?: StudySession[],
+  setStudySessions?: React.Dispatch<React.SetStateAction<StudySession[]>>,
+  studyCourses?: StudyCourse[]
 }) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState(userName);
   
-  const [quickTaskTitle, setQuickTaskTitle] = useState("");
-  const [quickQuadrant, setQuickQuadrant] = useState<EisenhowerQuadrant>(EisenhowerQuadrant.URGENT_IMPORTANT);
-  const [quickAddError, setQuickAddError] = useState<string | null>(null);
-  
-  const totalSpent = expenses.reduce((acc, curr) => acc + curr.amount, 0);
-  const remaining = budget - totalSpent;
-  const progressPercent = Math.max(0, Math.min(100, (remaining / budget) * 100));
+  const [showLogStudyModal, setShowLogStudyModal] = useState(false);
+  const [logCourseId, setLogCourseId] = useState("");
+  const [logMinutes, setLogMinutes] = useState(30);
+  const [logTopic, setLogTopic] = useState("");
+  const [logNotes, setLogNotes] = useState("");
+  const [logError, setLogError] = useState("");
 
-  const isPremium = !!(subscriptionTier?.toLowerCase().includes('premium') || subscriptionTier?.toLowerCase().includes('trial') || subscriptionTier?.toLowerCase().includes('pro') || subscriptionTier?.toLowerCase().includes('active'));
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  useEffect(() => {
+    if (studyCourses && studyCourses.length > 0 && !logCourseId) {
+      setLogCourseId(studyCourses[0].id);
+    }
+  }, [studyCourses]);
+
+  // Calculations for summaries
+  const totalTasks = tasks.length;
+  const completedTasks = tasks.filter(t => t.completed).length;
+  const pendingTasks = tasks.filter(t => !t.completed).length;
+
+  const habitsCompletedToday = habits.filter(h => h.completedAt?.some(d => d.startsWith(todayStr))).length;
+  const currentStreakVal = habits.length > 0 ? Math.max(...habits.map(h => h.streak || 0)) : 0;
+
+  const studySessionsToday = studySessions.filter(s => s.sessionDate === todayStr);
+  const studyMinutesToday = studySessionsToday.reduce((acc, curr) => acc + curr.durationMinutes, 0);
+
+  const getStartOfWeek = () => {
+    const current = new Date();
+    const day = current.getDay();
+    const diff = current.getDate() - day + (day === 0 ? -6 : 1); // Monday
+    const monday = new Date(current.setDate(diff));
+    monday.setHours(0,0,0,0);
+    return monday;
+  };
+  const startOfWeek = getStartOfWeek();
+  const weeklySessions = studySessions.filter(s => new Date(s.sessionDate) >= startOfWeek);
+  const weeklyStudyMinutes = weeklySessions.reduce((acc, curr) => acc + curr.durationMinutes, 0);
+  const weeklyProgressPercentage = Math.round(Math.min(100, (weeklyStudyMinutes / 300) * 100)); // Target 300 min/week
+
+  const shortTermGoals = goals.filter(g => g.type === GoalType.SHORT);
+  const shortTermProgress = shortTermGoals.length > 0 ? Math.round(shortTermGoals.reduce((acc, curr) => acc + curr.progress, 0) / shortTermGoals.length) : 0;
+
+  const mediumTermGoals = goals.filter(g => g.type === GoalType.MEDIUM);
+  const mediumTermProgress = mediumTermGoals.length > 0 ? Math.round(mediumTermGoals.reduce((acc, curr) => acc + curr.progress, 0) / mediumTermGoals.length) : 0;
+
+  const longTermGoals = goals.filter(g => g.type === GoalType.LONG);
+  const longTermProgress = longTermGoals.length > 0 ? Math.round(longTermGoals.reduce((acc, curr) => acc + curr.progress, 0) / longTermGoals.length) : 0;
+
+  // Career
+  const savedPath = localStorage.getItem("wrindha_active_career_path");
+  const path = savedPath ? JSON.parse(savedPath) : null;
+  const savedSkills = localStorage.getItem("wrindha_career_skills");
+  const skillList = savedSkills ? JSON.parse(savedSkills) : [];
+  const completedSkills = skillList.filter((s: any) => s.completed).length;
+  const totalSkillsCount = skillList.length;
+  const skillsProgressPercent = totalSkillsCount > 0 ? Math.round((completedSkills / totalSkillsCount) * 100) : 0;
+
+  // Expenses & Budget
+  const currentMonthStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  const monthlyExpenses = expenses.filter(e => e.date?.startsWith(currentMonthStr));
+  const monthlyTotalSpent = monthlyExpenses.reduce((acc, curr) => acc + curr.amount, 0);
+  const budgetRemaining = budget - monthlyTotalSpent;
+  const budgetProgressPercent = budget > 0 ? Math.max(0, Math.min(100, (budgetRemaining / budget) * 100)) : 0;
+
+  // Productivity Score Calculation
+  const taskRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+  const habitRate = habits.length > 0 ? (habitsCompletedToday / habits.length) * 100 : 0;
+  const studyRate = Math.min(100, (studyMinutesToday / 45) * 100); // 45-min daily target
+  const goalsRate = goals.length > 0 ? (goals.reduce((acc, curr) => acc + curr.progress, 0) / goals.length) : 0;
+
+  const productivityScore = Math.round(
+    (taskRate * 0.3) +
+    (habitRate * 0.3) +
+    (studyRate * 0.2) +
+    (goalsRate * 0.2)
+  );
+
   const isUnlimitedTasks = !!(
     subscriptionTier?.toLowerCase() === 'premium' || 
     subscriptionTier?.toLowerCase() === 'pro space' || 
@@ -3881,10 +4087,6 @@ function DashboardView({ habits, tasks, setTasks, expenses, currency, userName, 
     subscriptionTier?.toLowerCase().includes('pro')
   );
   const isPremiumBadgeVisible = !isUnlimitedTasks;
-  const isTrial = subscriptionTier === 'Trial' || subscriptionTier?.toLowerCase() === 'trialpremium';
-  const maxTasksAllowed = isUnlimitedTasks ? Infinity : (isTrial ? 10 : 3);
-  const activeTasksCount = tasks.filter(t => !t.completed).length;
-  const activeTasks = tasks.filter(t => !t.completed);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -3904,49 +4106,66 @@ function DashboardView({ habits, tasks, setTasks, expenses, currency, userName, 
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency === 'USD' ? 'USD' : 'INR',
+      maximumFractionDigits: 0
     }).format(val);
   };
 
-  const handleQuickAdd = () => {
-    if (!quickTaskTitle.trim()) return;
-    if (activeTasksCount >= maxTasksAllowed) {
-      setQuickAddError(`Task limit reached (${maxTasksAllowed} active tasks on ${isTrial ? 'Free Trial' : 'Free Version'}). Please upgrade!`);
-      setTimeout(() => setQuickAddError(null), 5005);
-      return;
-    }
-    const newTask: Task = {
-      id: Math.random().toString(36).substr(2, 9),
-      title: quickTaskTitle,
-      quadrant: quickQuadrant,
-      completed: false,
-      tags: []
-    };
-    setTasks([...tasks, newTask]);
-    setQuickTaskTitle("");
-    setQuickAddError(null);
+  const handleToggleTask = (id: string) => {
+    const updated = tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t);
+    setTasks(updated);
   };
 
-  const priorityTasks = tasks.filter(t => t.quadrant === EisenhowerQuadrant.URGENT_IMPORTANT && !t.completed);
+  const handleLogStudySession = () => {
+    if (!logCourseId) {
+      setLogError("Please select a study course first.");
+      return;
+    }
+    if (logMinutes <= 0) {
+      setLogError("Log duration must be greater than 0 minutes.");
+      return;
+    }
+
+    const newSession: StudySession = {
+      id: Math.random().toString(36).substr(2, 9),
+      courseId: logCourseId,
+      sessionDate: todayStr,
+      durationMinutes: Number(logMinutes),
+      topic: logTopic.trim() || "Independent Session",
+      notes: logNotes.trim() || undefined
+    };
+
+    if (setStudySessions) {
+      setStudySessions(prev => [...prev, newSession]);
+    }
+    
+    // Reset modal fields
+    setLogTopic("");
+    setLogNotes("");
+    setLogMinutes(30);
+    setLogError("");
+    setShowLogStudyModal(false);
+  };
+
+  const topFocusTasks = tasks.filter(t => t.quadrant === EisenhowerQuadrant.URGENT_IMPORTANT && !t.completed);
 
   return (
     <div className="space-y-8">
+      {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-150 dark:border-gray-800 pb-5">
         <div>
           <div className="flex items-center gap-3 flex-wrap">
             {isEditingName ? (
-              <div className="flex items-center gap-2">
-                <input 
-                  autoFocus
-                  className="text-3xl font-bold tracking-tight bg-gray-100 dark:bg-gray-800 dark:text-white rounded-lg px-2 outline-none border-2 border-black/10 dark:border-white/10 focus:border-black dark:focus:border-indigo-600 transition-all"
-                  value={editName}
-                  onChange={e => setEditName(e.target.value)}
-                  onBlur={handleNameSave}
-                  onKeyDown={e => e.key === 'Enter' && handleNameSave()}
-                />
-              </div>
+              <input 
+                autoFocus
+                className="text-3xl font-bold tracking-tight bg-gray-100 dark:bg-gray-850 dark:text-white rounded-lg px-2 outline-none border-2 border-indigo-500/20 focus:border-indigo-500 transition-all"
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
+                onBlur={handleNameSave}
+                onKeyDown={e => e.key === 'Enter' && handleNameSave()}
+              />
             ) : (
               <h1 
-                className="text-3xl font-bold tracking-tight cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-white rounded-xl px-2 -ml-2 transition-colors flex items-center gap-2 group md:max-w-max"
+                className="text-3xl font-extrabold tracking-tight cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 dark:text-white rounded-xl px-2 -ml-2 transition-colors flex items-center gap-2 group md:max-w-max"
                 onClick={() => setIsEditingName(true)}
               >
                 {getGreeting()}, {userName}
@@ -3954,95 +4173,475 @@ function DashboardView({ habits, tasks, setTasks, expenses, currency, userName, 
               </h1>
             )}
             {isPremiumBadgeVisible && (
-              <span className="px-3 py-1 bg-indigo-100 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 text-xs font-black rounded-full border border-indigo-200 dark:border-indigo-900/50 shrink-0 capitalize">
+              <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 text-xs font-black rounded-full border border-indigo-100 dark:border-indigo-900/40 shrink-0 capitalize">
                 {subscriptionTier === 'Trial' ? 'Free Trial' : 'Free Version'}
               </span>
             )}
           </div>
-          <p className="text-[#6B7280] dark:text-gray-500 mt-1">You have {habits.length} active habits.</p>
+          <p className="text-[#6B7280] dark:text-gray-400 mt-1">Welcome back toWrindhaOS. Your unified workspace is synchronized.</p>
         </div>
 
         <div className="flex items-center gap-4 flex-wrap">
           {!isUnlimitedTasks && (
             <button
               onClick={() => setActiveTab('pricing')}
-              className="px-5 py-3 bg-indigo-650 hover:bg-indigo-700 bg-indigo-600 text-white font-black uppercase tracking-wider text-xs rounded-2xl hover:shadow-lg active:scale-97 transition-all cursor-pointer flex items-center gap-2 shadow-lg shadow-indigo-600/10"
+              className="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-wider text-xs rounded-2xl hover:shadow-lg active:scale-97 transition-all cursor-pointer flex items-center gap-2 shadow-lg shadow-indigo-600/10"
             >
               <Zap className="w-4 h-4 animate-bounce shrink-0" />
-              Subscribe Now
+              Subscribe to Premium
             </button>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Habit Card */}
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-[#E5E7EB] dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow group">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-2 bg-orange-50 dark:bg-orange-500/10 rounded-xl group-hover:bg-orange-100 dark:group-hover:bg-orange-500/20 transition-colors">
-              <Flame className="w-6 h-6 text-orange-500" />
+      {/* Hero: Productivity Score & Today's Focus Card */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Productivity Score Indicator */}
+        <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 dark:from-slate-900 dark:to-indigo-950/40 p-8 rounded-[2rem] border border-indigo-105 dark:border-indigo-900/30 flex flex-col justify-between relative overflow-hidden group">
+          <div className="space-y-4">
+            <span className="text-xs font-black uppercase tracking-wider text-indigo-650 dark:text-indigo-400 flex items-center gap-1.5 ">
+              <Brain className="w-4 h-4 text-indigo-500" /> Executive Score
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-6xl font-black text-indigo-950 dark:text-white font-mono tracking-tight">{productivityScore}</span>
+              <span className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">/ 100</span>
             </div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-orange-500">Active Streaks</span>
+            <div>
+              <h3 className="text-base font-bold text-indigo-950 dark:text-gray-100">
+                {productivityScore >= 80 ? "Aura Master Mode" : productivityScore >= 50 ? "In Flow State" : "Gathering Focus"}
+              </h3>
+              <p className="text-xs text-indigo-800/80 dark:text-indigo-300 leading-relaxed mt-1">
+                A synthesized assessment across your Tasks (30%), Habits (30%), Study (20%), and Goals (20%). Keep building momentum today.
+              </p>
+            </div>
           </div>
-          <h3 className="text-lg font-bold mb-4 dark:text-white">{habits[0]?.name || "No active habits"}</h3>
-          <div className="flex gap-2 mb-4">
-            {(() => {
-              const current = new Date();
-              const day = current.getDay();
-              const diff = current.getDate() - day + (day === 0 ? -6 : 1);
-              const monday = new Date(current.setDate(diff));
-              const dates = [];
-              for (let i = 0; i < 7; i++) {
-                const d = new Date(monday);
-                d.setDate(monday.getDate() + i);
-                const yyyy = d.getFullYear();
-                const mm = String(d.getMonth() + 1).padStart(2, '0');
-                const dd = String(d.getDate()).padStart(2, '0');
-                dates.push(`${yyyy}-${mm}-${dd}`);
-              }
-              
-              return dates.map((dateStr, i) => {
-                const isCompleted = habits[0]?.completedAt?.some(d => d.startsWith(dateStr));
-                return (
-                  <div 
-                    key={i} 
-                    className={cn(
-                      "flex-1 h-12 rounded-lg flex items-center justify-center font-mono text-xs font-bold transition-all", 
-                      isCompleted 
-                        ? "bg-orange-500 text-white shadow-sm shadow-orange-500/20 font-black animate-pulse" 
-                        : "bg-[#F3F4F6] dark:bg-gray-800 text-[#9CA3AF] dark:text-gray-600"
-                    )}
-                    title={`${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][i]} (${dateStr})`}
-                  >
-                    {['M', 'Y', 'W', 'T', 'F', 'S', 'S'][i] === 'Y' ? 'T' : ['M', 'Y', 'W', 'T', 'F', 'S', 'S'][i]}
-                  </div>
-                );
-              });
-            })()}
+          <div className="w-full h-2.5 bg-indigo-200/50 dark:bg-indigo-950/70 rounded-full overflow-hidden mt-6">
+            <div 
+              className="h-full bg-indigo-600 rounded-full transition-all duration-1000"
+              style={{ width: `${productivityScore}%` }}
+            />
           </div>
-          <p className="text-sm text-[#6B7280] dark:text-gray-400">Streak: {habits[0]?.streak || 0} days. Keep pushing!</p>
         </div>
 
-        {/* Expenses Card */}
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-[#E5E7EB] dark:border-gray-800 shadow-sm flex flex-col justify-between">
-          <div>
-            <div className="p-2 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl w-fit mb-4">
-              <Wallet className="w-6 h-6 text-emerald-500" />
+        {/* Eisenhower Today's Focus (Urgent-Important list) */}
+        <div className="lg:col-span-2 bg-white dark:bg-gray-900 p-8 rounded-[2rem] border border-gray-150 dark:border-gray-800 shadow-sm flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-black uppercase tracking-wider text-rose-500 flex items-center gap-1.5">
+                <Target className="w-4 h-4" /> Today's Focus
+              </span>
+              <span className="text-xs font-bold text-gray-400">Quadrant: Urgent & Important</span>
             </div>
-            <h3 className="text-lg font-bold dark:text-white">Budget Health</h3>
-            <div className="mt-4">
-              <div className="flex items-end gap-1">
-                <span className="text-2xl font-bold font-mono dark:text-white">{formatVal(remaining)}</span>
-                <span className="text-xs text-[#6B7280] dark:text-gray-500 mb-1">left</span>
+            
+            <div className="space-y-2.5 max-h-[140px] overflow-y-auto pr-1">
+              {topFocusTasks.length > 0 ? (
+                topFocusTasks.map((task) => (
+                  <div 
+                    key={task.id} 
+                    className="flex items-center gap-3 p-3 bg-gray-50/50 dark:bg-gray-850/50 border border-gray-100 dark:border-gray-800/40 rounded-xl transition-all hover:bg-gray-50 dark:hover:bg-gray-800 group"
+                  >
+                    <button 
+                      onClick={() => handleToggleTask(task.id)}
+                      className="w-5 h-5 rounded-md border border-gray-300 dark:border-gray-700 flex items-center justify-center transition-all hover:border-indigo-500 bg-white dark:bg-gray-900 group-hover:scale-105"
+                    >
+                      <Check className="w-3 h-3 text-indigo-600 opacity-0 group-hover:opacity-40" />
+                    </button>
+                    <span className="text-sm font-semibold text-gray-855 dark:text-gray-200 truncate">{task.title}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="h-[105px] flex flex-col items-center justify-center text-center text-gray-400 dark:text-gray-600">
+                  <CheckCircle2 className="w-8 h-8 text-indigo-400/30 mb-2" />
+                  <p className="text-xs font-medium">All Urgent & Important tasks completed!</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center text-xs text-gray-400 pt-4 border-t border-gray-100 dark:border-gray-800/60 mt-4">
+            <span>Eisenhower Matrix integration</span>
+            <button 
+              onClick={() => setActiveTab('lifeos')}
+              className="text-indigo-600 hover:text-indigo-750 dark:hover:text-indigo-450 font-bold hover:underline"
+            >
+              Open Life OS &rarr;
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Beautiful Bento Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        {/* 1. Tasks Summary Card */}
+        <div 
+          onClick={() => setActiveTab('lifeos')}
+          className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] border border-gray-150 dark:border-gray-800 shadow-sm hover:shadow-md hover:scale-[1.01] transition-all group cursor-pointer flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-2 bg-indigo-50 dark:bg-indigo-950/40 rounded-xl group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/60 transition-colors">
+                <ListTodo className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
               </div>
-              <div className="w-full bg-[#F3F4F6] dark:bg-gray-800 h-2 rounded-full mt-2 overflow-hidden">
-                <div className="bg-emerald-500 h-full transition-all" style={{ width: `${progressPercent}%` }}></div>
+              <span className="text-xs font-black uppercase tracking-wider text-indigo-500 dark:text-indigo-400">Life OS</span>
+            </div>
+            
+            <h3 className="text-lg font-extrabold mb-1 dark:text-white">Tasks Summary</h3>
+            <p className="text-xs text-gray-400 dark:text-gray-500">Managing project delivery and to-do lists.</p>
+
+            <div className="grid grid-cols-3 gap-2 mt-5 text-center">
+              <div className="bg-gray-50 dark:bg-gray-850 p-2.5 rounded-2xl border border-gray-100/50 dark:border-gray-800/40">
+                <span className="block text-lg font-black font-mono dark:text-white">{totalTasks}</span>
+                <span className="text-[10px] uppercase font-black text-gray-400 dark:text-gray-500">Total</span>
+              </div>
+              <div className="bg-indigo-50/40 dark:bg-indigo-950/20 p-2.5 rounded-2xl border border-indigo-100/30 dark:border-indigo-900/20">
+                <span className="block text-lg font-black font-mono text-indigo-600 dark:text-indigo-400">{completedTasks}</span>
+                <span className="text-[10px] uppercase font-black text-indigo-400 dark:text-indigo-500">Done</span>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-850 p-2.5 rounded-2xl border border-gray-100/50 dark:border-gray-800/40">
+                <span className="block text-lg font-black font-mono text-gray-700 dark:text-gray-300">{pendingTasks}</span>
+                <span className="text-[10px] uppercase font-black text-gray-400 dark:text-gray-500">Pending</span>
               </div>
             </div>
           </div>
-          <p className="text-[10px] text-[#6B7280] dark:text-gray-500 uppercase mt-6">Total Spent: {formatVal(totalSpent)}</p>
+          
+          <div className="w-full bg-gray-100 dark:bg-gray-800 h-1.5 rounded-full mt-6 overflow-hidden">
+            <div 
+              className="bg-indigo-600 h-full transition-all duration-500" 
+              style={{ width: `${totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0}%` }}
+            />
+          </div>
         </div>
+
+        {/* 2. Habit Tracker Card */}
+        <div 
+          onClick={() => setActiveTab('habits')}
+          className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] border border-gray-150 dark:border-gray-800 shadow-sm hover:shadow-md hover:scale-[1.01] transition-all group cursor-pointer flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-2 bg-orange-50 dark:bg-orange-950/40 rounded-xl group-hover:bg-orange-100 dark:group-hover:bg-orange-900/60 transition-colors">
+                <Flame className="w-6 h-6 text-orange-500" />
+              </div>
+              <span className="text-xs font-black uppercase tracking-wider text-orange-500">Habit Tracker</span>
+            </div>
+
+            <h3 className="text-lg font-extrabold mb-1 dark:text-white">Habit Summary</h3>
+            <p className="text-xs text-gray-400 dark:text-gray-500">Build daily consistency and momentum.</p>
+
+            <div className="grid grid-cols-2 gap-3 mt-5">
+              <div className="bg-orange-50/20 dark:bg-orange-950/20 p-3 rounded-2xl border border-orange-100/20 dark:border-orange-900/20">
+                <span className="text-[10px] uppercase font-black text-orange-600 dark:text-orange-400 block">Done Today</span>
+                <span className="text-2xl font-black font-mono text-orange-600 dark:text-orange-455">{habitsCompletedToday} habits</span>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-850 p-3 rounded-2xl border border-gray-100/50 dark:border-gray-800/40">
+                <span className="text-[10px] uppercase font-black text-gray-400 dark:text-gray-500 block">Max Streak</span>
+                <span className="text-2xl font-black font-mono text-gray-800 dark:text-gray-100">{currentStreakVal} days</span>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-[10px] text-gray-400 dark:text-gray-500 uppercase mt-6 tracking-wider">
+            Total active habits: {habits.length}
+          </p>
+        </div>
+
+        {/* 3. Study Planner Summary Card */}
+        <div 
+          onClick={() => setActiveTab('study')}
+          className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] border border-gray-150 dark:border-gray-800 shadow-sm hover:shadow-md hover:scale-[1.01] transition-all group cursor-pointer flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-2 bg-blue-50 dark:bg-blue-950/40 rounded-xl group-hover:bg-blue-100 dark:group-hover:bg-blue-900/60 transition-colors">
+                <GraduationCap className="w-6 h-6 text-blue-500" />
+              </div>
+              <span className="text-xs font-black uppercase tracking-wider text-blue-500">Study Planner</span>
+            </div>
+
+            <h3 className="text-lg font-extrabold mb-1 dark:text-white">Study Summary</h3>
+            <p className="text-xs text-gray-400 dark:text-gray-500">Track focus sessions and course progress.</p>
+
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <div className="bg-blue-50/20 dark:bg-blue-950/20 p-2.5 rounded-2xl border border-blue-100/20 dark:border-blue-900/20">
+                <span className="text-[10px] uppercase font-black text-blue-600 dark:text-blue-400 block">Today</span>
+                <span className="text-xl font-black font-mono text-blue-600 dark:text-blue-455">{studyMinutesToday} mins</span>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-850 p-2.5 rounded-2xl border border-gray-100/50 dark:border-gray-800/40">
+                <span className="text-[10px] uppercase font-black text-gray-400 dark:text-gray-500 block">Week Total</span>
+                <span className="text-xl font-black font-mono text-gray-800 dark:text-gray-150">{weeklyStudyMinutes} mins</span>
+              </div>
+            </div>
+            
+            <div className="mt-3">
+              <div className="flex justify-between text-[10px] text-gray-400 dark:text-gray-500 font-bold mb-1 uppercase tracking-wider">
+                <span>Weekly progress target</span>
+                <span>{weeklyProgressPercentage}%</span>
+              </div>
+              <div className="w-full bg-[#F3F4F6] dark:bg-gray-800 h-1.5 rounded-full overflow-hidden">
+                <div className="bg-blue-500 h-full transition-all" style={{ width: `${weeklyProgressPercentage}%` }} />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 pt-3 border-t border-gray-100 dark:border-gray-800/50 flex justify-between items-center">
+            <span className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-widest">{studyCourses.length} subjects</span>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowLogStudyModal(true);
+              }}
+              className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 hover:underline bg-gray-50 dark:bg-gray-850/50 px-2.5 py-1.5 rounded-lg border border-gray-100 dark:border-gray-800/60"
+            >
+              + Log Study
+            </button>
+          </div>
+        </div>
+
+        {/* 4. Goal System Card */}
+        <div 
+          onClick={() => setActiveTab('goals')}
+          className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] border border-gray-150 dark:border-gray-800 shadow-sm hover:shadow-md hover:scale-[1.01] transition-all group cursor-pointer flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-2 bg-purple-50 dark:bg-purple-950/40 rounded-xl group-hover:bg-purple-100 dark:group-hover:bg-purple-900/60 transition-colors">
+                <Target className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              </div>
+              <span className="text-xs font-black uppercase tracking-wider text-purple-500">Goal System</span>
+            </div>
+
+            <h3 className="text-lg font-extrabold mb-1 dark:text-white">Goal Summary</h3>
+            <p className="text-xs text-gray-400 dark:text-gray-500">Track short, mid, and long-term milestones.</p>
+
+            <div className="space-y-3 mt-4">
+              <div>
+                <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider dark:text-gray-300">
+                  <span className="text-purple-600 dark:text-purple-400">Short-Term</span>
+                  <span className="font-mono">{shortTermProgress}%</span>
+                </div>
+                <div className="w-full bg-gray-100 dark:bg-gray-800 h-1.5 rounded-full overflow-hidden mt-1">
+                  <div className="bg-purple-500 h-full transition-all" style={{ width: `${shortTermProgress}%` }} />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider dark:text-gray-300">
+                  <span className="text-purple-600 dark:text-purple-400">Medium-Term</span>
+                  <span className="font-mono">{mediumTermProgress}%</span>
+                </div>
+                <div className="w-full bg-gray-100 dark:bg-gray-800 h-1.5 rounded-full overflow-hidden mt-1">
+                  <div className="bg-purple-500 h-full transition-all" style={{ width: `${mediumTermProgress}%` }} />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider dark:text-gray-300">
+                  <span className="text-purple-600 dark:text-purple-400">Long-Term</span>
+                  <span className="font-mono">{longTermProgress}%</span>
+                </div>
+                <div className="w-full bg-gray-100 dark:bg-gray-800 h-1.5 rounded-full overflow-hidden mt-1">
+                  <div className="bg-purple-500 h-full transition-all" style={{ width: `${longTermProgress}%` }} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-[10px] text-gray-400 dark:text-gray-500 uppercase mt-5 tracking-wider">
+            Total strategic goals registered: {goals.length}
+          </p>
+        </div>
+
+        {/* 5. Career Trajectory Card */}
+        <div 
+          onClick={() => setActiveTab('career')}
+          className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] border border-gray-150 dark:border-gray-800 shadow-sm hover:shadow-md hover:scale-[1.01] transition-all group cursor-pointer flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-2 bg-teal-50 dark:bg-teal-950/40 rounded-xl group-hover:bg-teal-100 dark:group-hover:bg-teal-900/60 transition-colors">
+                <Award className="w-6 h-6 text-teal-600 dark:text-teal-450" />
+              </div>
+              <span className="text-xs font-black uppercase tracking-wider text-teal-500">Career Trajectory</span>
+            </div>
+
+            <h3 className="text-lg font-extrabold mb-1 dark:text-white">Trajectory Summary</h3>
+            <p className="text-xs text-gray-400 dark:text-gray-500">Plan learning pathways & status.</p>
+
+            <div className="space-y-4 mt-5">
+              <div className="bg-teal-50/10 dark:bg-teal-950/10 p-3 rounded-2xl border border-teal-100/20 dark:border-teal-900/20">
+                <span className="text-[10px] uppercase font-black text-teal-500 block leading-tight">Active Roadmap</span>
+                <span className="text-xs font-bold text-gray-800 dark:text-gray-100 leading-normal block mt-1">
+                  {path ? `${path.current_position} ➔ ${path.target_position}` : "No active trajectory"}
+                </span>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider dark:text-gray-300">
+                  <span className="text-teal-600 dark:text-teal-400">Skills Progress</span>
+                  <span className="font-mono">{skillsProgressPercent}%</span>
+                </div>
+                <div className="w-full bg-[#F3F4F6] dark:bg-gray-800 h-1.5 rounded-full overflow-hidden mt-1">
+                  <div className="bg-teal-500 h-full transition-all" style={{ width: `${skillsProgressPercent}%` }} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-[10px] text-gray-400 dark:text-gray-500 uppercase mt-5 tracking-widest truncate">
+            {path ? `Category: ${path.category} | target ${path.target_year}` : "Launch a brand-new target trajectory"}
+          </p>
+        </div>
+
+        {/* 6. Expense Card */}
+        <div 
+          onClick={() => setActiveTab('finance')}
+          className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] border border-gray-150 dark:border-gray-800 shadow-sm hover:shadow-md hover:scale-[1.01] transition-all group cursor-pointer flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/60 transition-colors">
+                <Wallet className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <span className="text-xs font-black uppercase tracking-wider text-emerald-500">Financial OS</span>
+            </div>
+
+            <h3 className="text-lg font-extrabold mb-1 dark:text-white">Expense Summary</h3>
+            <p className="text-xs text-gray-400 dark:text-gray-500">Stay balanced against spending thresholds.</p>
+
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <div className="bg-emerald-50/20 dark:bg-emerald-950/20 p-2.5 rounded-2xl border border-emerald-100/20 dark:border-emerald-900/20">
+                <span className="text-[10px] uppercase font-black text-emerald-600 dark:text-emerald-400 block">This Month</span>
+                <span className="text-lg font-black font-mono text-emerald-600 dark:text-emerald-455 truncate block">
+                  {formatVal(monthlyTotalSpent)}
+                </span>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-850 p-2.5 rounded-2xl border border-gray-100/50 dark:border-gray-800/40">
+                <span className="text-[10px] uppercase font-black text-gray-400 dark:text-gray-500 block">Remaining</span>
+                <span className={cn(
+                  "text-lg font-black font-mono truncate block",
+                  budgetRemaining >= 0 ? "text-gray-800 dark:text-gray-100" : "text-rose-500"
+                )}>
+                  {budget === 0 ? "N/A" : formatVal(budgetRemaining)}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <div className="flex justify-between text-[10px] text-gray-400 dark:text-gray-500 font-bold mb-1 uppercase tracking-wider">
+                <span>Month limit health</span>
+                <span>{budget === 0 ? "0%" : `${Math.round(budgetProgressPercent)}%`}</span>
+              </div>
+              <div className="w-full bg-[#F3F4F6] dark:bg-gray-800 h-1.5 rounded-full overflow-hidden">
+                <div className="bg-emerald-500 h-full transition-all" style={{ width: `${budget > 0 ? budgetProgressPercent : 0}%` }} />
+              </div>
+            </div>
+          </div>
+
+          <p className="text-[10px] text-gray-400 dark:text-gray-500 uppercase mt-5 tracking-wider truncate">
+            {budget === 0 ? "No monthly budget threshold configured" : `Allocated Budget: ${formatVal(budget)}`}
+          </p>
+        </div>
+
       </div>
+
+      {/* QUICK LOG STUDY MODAL */}
+      <AnimatePresence>
+        {showLogStudyModal && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/45 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[2rem] p-8 border border-gray-150 dark:border-gray-800 shadow-2xl relative space-y-6"
+            >
+              <button 
+                onClick={() => setShowLogStudyModal(false)}
+                className="absolute top-6 right-6 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              
+              <div className="space-y-1">
+                <h3 className="text-xl font-bold dark:text-white">Log Study Session</h3>
+                <p className="text-xs text-gray-400 dark:text-gray-500">Record focused minutes completed manually.</p>
+              </div>
+
+              {logError && (
+                <div className="bg-red-50 dark:bg-red-950/20 text-red-650 dark:text-red-400 border border-red-100 dark:border-red-900/20 p-3 rounded-xl text-xs font-semibold">
+                  {logError}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Subject / Course</label>
+                  <select 
+                    value={logCourseId}
+                    onChange={e => setLogCourseId(e.target.value)}
+                    className="w-full p-3 bg-gray-50 dark:bg-gray-850 dark:text-white border border-gray-150 dark:border-gray-800/80 rounded-xl outline-none text-sm font-semibold transition focus:border-indigo-550"
+                  >
+                    {studyCourses.length > 0 ? (
+                      studyCourses.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))
+                    ) : (
+                      <option value="">-- No Courses Registered --</option>
+                    )}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Duration (Minutes)</label>
+                  <input 
+                    type="number"
+                    value={logMinutes}
+                    onChange={e => setLogMinutes(Math.max(1, Number(e.target.value)))}
+                    className="w-full p-3 bg-gray-50 dark:bg-gray-850 dark:text-white border border-gray-150 dark:border-gray-800/80 rounded-xl outline-none text-sm font-semibold transition focus:border-indigo-550"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Topic / Concepts studied</label>
+                  <input 
+                    type="text"
+                    placeholder="e.g. Linear Regression, Fluid Dynamics"
+                    value={logTopic}
+                    onChange={e => setLogTopic(e.target.value)}
+                    className="w-full p-3 bg-gray-50 dark:bg-gray-850 dark:text-white border border-gray-150 dark:border-gray-800/80 rounded-xl outline-none text-sm font-semibold transition focus:border-indigo-550"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Session notes (Optional)</label>
+                  <textarea 
+                    placeholder="Write key takeaways or milestones..."
+                    rows={2}
+                    value={logNotes}
+                    onChange={e => setLogNotes(e.target.value)}
+                    className="w-full p-3 bg-gray-50 dark:bg-gray-850 dark:text-white border border-gray-150 dark:border-gray-800/80 rounded-xl outline-none text-sm font-semibold transition focus:border-indigo-550 resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={handleLogStudySession}
+                  className="flex-1 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition"
+                >
+                  Save Log Session
+                </button>
+                <button 
+                  onClick={() => setShowLogStudyModal(false)}
+                  className="py-3.5 px-5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-750 text-gray-600 dark:text-gray-300 font-semibold rounded-xl text-xs transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -5441,23 +6040,6 @@ function GoalsView({
   hasActiveAccess?: boolean,
   onRequestUpgrade?: () => void
 }) {
-  return (
-    <LifeOSView 
-      goals={goals} 
-      setGoals={setGoals} 
-      onDelete={onDelete} 
-      subscriptionTier={subscriptionTier} 
-      setActiveTab={setActiveTab || (() => {})}
-      habits={habits}
-      setHabits={setHabits}
-      tasks={tasks}
-      setTasks={setTasks}
-      studyCourses={studyCourses}
-      setStudyCourses={setStudyCourses}
-    />
-  );
-
-  const [goalsTab, setGoalsTab] = useState<'board' | 'career'>('board');
   const [showAdd, setShowAdd] = useState(false);
   const [newGoal, setNewGoal] = useState({ title: '', type: GoalType.SHORT, date: '' });
   const [showLimitModal, setShowLimitModal] = useState(false);
@@ -5486,46 +6068,7 @@ function GoalsView({
 
   return (
     <div className="space-y-8">
-      {/* Visual Sub Tabs Segment Navigator for Career and Goal Board */}
-      <div className="flex bg-gray-50 dark:bg-gray-950 p-1.5 rounded-2xl max-w-sm border border-gray-100 dark:border-gray-800">
-        <button
-          onClick={() => setGoalsTab('board')}
-          className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
-            goalsTab === 'board'
-              ? 'bg-white dark:bg-gray-900 text-indigo-600 dark:text-indigo-400 shadow-sm border border-gray-150 dark:border-gray-800'
-              : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
-          }`}
-        >
-          <Target className="w-4 h-4 text-indigo-500" /> Goal Board
-        </button>
-        <button
-          onClick={() => setGoalsTab('career')}
-          className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 relative cursor-pointer ${
-            goalsTab === 'career'
-              ? 'bg-white dark:bg-gray-900 text-indigo-600 dark:text-indigo-400 shadow-sm border border-gray-150 dark:border-gray-800'
-              : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
-          }`}
-        >
-          <Award className="w-4 h-4 text-indigo-500" /> Career Trajectory
-        </button>
-      </div>
-
-      {goalsTab === 'career' ? (
-        <CareerPlannerView 
-          habits={habits}
-          setHabits={setHabits}
-          tasks={tasks}
-          setTasks={setTasks}
-          goals={goals}
-          setGoals={setGoals}
-          studyCourses={studyCourses}
-          setStudyCourses={setStudyCourses}
-          hasActiveAccess={hasActiveAccess}
-          onRequestUpgrade={onRequestUpgrade}
-        />
-      ) : (
-        <div className="space-y-8">
-          <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center">
             <div>
               <h2 className="text-3xl font-bold dark:text-white">Goal Architecture</h2>
               <p className="text-gray-500 dark:text-gray-400">Manual tracking for long-term vision.</p>
@@ -5699,8 +6242,6 @@ function GoalsView({
           </div>
         ))}
       </div>
-      </div>
-      )}
     </div>
   );
 }
@@ -6788,7 +7329,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
 
   // SaaS states
   const [checkoutPlan, setCheckoutPlan] = useState<PricingPlan | null>(null);
-  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
+  const billingPeriod = 'monthly';
   const [autoRenew, setAutoRenew] = useState<boolean>(() => {
     return localStorage.getItem('wrindha_autorenew') !== 'false';
   });
@@ -6809,7 +7350,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
     setAppliedCoupon(null);
     setTypedCoupon('');
     setCouponError(null);
-  }, [billingPeriod, checkoutPlan?.id]);
+  }, [checkoutPlan?.id]);
 
   const handleApplyCoupon = async () => {
     const code = typedCoupon.trim().toUpperCase();
@@ -6823,12 +7364,10 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
     setCouponError(null);
 
     const rawPrice = parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''));
-    const originalPrice = billingPeriod === 'yearly' 
-      ? Math.floor(rawPrice * 12 * 0.8) 
-      : rawPrice;
+    const originalPrice = rawPrice;
 
     try {
-      const res = await fetch(`${API_URL}/api/coupons/validate`, {
+      const res = await authFetch(`${API_URL}/api/coupons/validate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -6993,9 +7532,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
     try {
       // Calculate precise plan pricing
       const rawPrice = parseFloat(plan.price.replace(/[^\d.]/g, ''));
-      const calculatedPrice = billingPeriod === 'yearly' 
-        ? Math.floor(rawPrice * 12 * 0.8) 
-        : rawPrice;
+      const calculatedPrice = rawPrice;
 
       const finalPriceToOrder = appliedCoupon ? appliedCoupon.payableAmount : calculatedPrice;
 
@@ -7032,7 +7569,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
 
       // 1. Call custom server endpoint to initial Razorpay order session
       try {
-        const orderResponse = await fetch(`${API_URL}/api/payments/razorpay/order`, {
+        const orderResponse = await authFetch(`${API_URL}/api/payments/razorpay/order`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -7044,7 +7581,14 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
         });
 
         if (!orderResponse.ok) {
-          throw new Error("HTTP status mismatch from payment agent.");
+          let errorMsg = "HTTP status mismatch from payment agent.";
+          try {
+            const body = await orderResponse.json();
+            if (body && body.message) {
+              errorMsg = body.message;
+            }
+          } catch(e) {}
+          throw new Error(errorMsg);
         }
 
         orderData = await orderResponse.json();
@@ -7093,7 +7637,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
           handler: async function (razorpayResponse: any) {
             setCheckoutStep(2); // Performing security webhook/signature verify
             try {
-              const verifyResponse = await fetch(`${API_URL}/api/payments/razorpay/verify`, {
+              const verifyResponse = await authFetch(`${API_URL}/api/payments/razorpay/verify`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -7323,29 +7867,6 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
         </div>
       </div>
 
-      {/* Switch billing cycle period */}
-      <div className="flex items-center justify-center gap-4 py-4 bg-gray-50/50 dark:bg-gray-900/10 rounded-2xl max-w-sm mx-auto border border-gray-100 dark:border-gray-800/40">
-        <button 
-          onClick={() => setBillingPeriod('monthly')}
-          className={cn(
-            "px-4 py-2 text-xs font-black rounded-lg transition-all",
-            billingPeriod === 'monthly' ? "bg-black text-white dark:bg-indigo-600" : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
-          )}
-        >
-          Bill Monthly
-        </button>
-        <button 
-          onClick={() => setBillingPeriod('yearly')}
-          className={cn(
-            "px-4 py-2 text-xs font-black rounded-lg transition-all flex items-center gap-1.5",
-            billingPeriod === 'yearly' ? "bg-black text-white dark:bg-indigo-600" : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
-          )}
-        >
-          Bill Annually
-          <span className="bg-emerald-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-bold">Save 20%</span>
-        </button>
-      </div>
-
       {plans.length === 0 ? (
         <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] p-12 text-center border border-gray-100 dark:border-gray-800 space-y-6 max-w-2xl mx-auto shadow-sm">
           <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto">
@@ -7375,12 +7896,6 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
           {plans.map((p) => {
           const isCurrent = parsedCleanTier.toLowerCase() === p.name.toLowerCase() && !cancellationInfo.isCancelled;
           
-          // Apply annual discount calculation display
-          const rawPrice = parseFloat(p.price.replace(/[^\d.]/g, ''));
-          const calculatedDisplayPrice = billingPeriod === 'yearly' 
-            ? Math.floor(rawPrice * 12 * 0.8) 
-            : rawPrice;
-
           return (
             <div 
               key={p.id}
@@ -7408,10 +7923,10 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
 
                 <div className="flex items-baseline gap-1 pt-2">
                   <span className={cn("text-5xl font-black font-mono", isCurrent ? "text-white" : "text-gray-900 dark:text-white")}>
-                    {p.price.startsWith('₹') ? '₹' : p.price.startsWith('$') ? '$' : ''}
-                    {billingPeriod === 'yearly' && p.period === 'month' ? calculatedDisplayPrice : p.price.replace(/[^\d.]/g, '')}
+                    {p.price.startsWith('₹') ? '₹' : p.price.startsWith('$') ? '$' : '₹'}
+                    {p.price.replace(/[^\d.]/g, '')}
                   </span>
-                  <span className="text-gray-400 text-sm font-semibold">/ {billingPeriod === 'yearly' && p.period === 'month' ? 'year' : p.period || 'month'}</span>
+                  <span className="text-gray-400 text-sm font-semibold">/ {p.period || 'month'}</span>
                 </div>
 
                 <div className="h-[2px] bg-gray-100 dark:bg-gray-800/60 w-full"></div>
@@ -7550,8 +8065,12 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Product Purchased:</span>
-                  <span className="font-bold text-indigo-600 dark:text-indigo-400">{selectedReceipt.plan_name}</span>
+                  <span>Plan Name:</span>
+                  <span className="font-bold text-indigo-600 dark:text-indigo-400">WrindhaOS Premium</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Billing Cycle:</span>
+                  <span className="font-bold text-gray-800 dark:text-gray-200">Monthly</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Payment Gateway:</span>
@@ -7559,15 +8078,15 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                 </div>
                 <div className="flex justify-between">
                   <span>Verification Status:</span>
-                  <span className="font-bold text-emerald-500 uppercase">{selectedReceipt.status}</span>
+                  <span className="font-bold text-emerald-500 uppercase">{selectedReceipt.status || 'Paid'}</span>
                 </div>
               </div>
 
               {/* Invoice Value Summary */}
               <div className="py-6 flex items-baseline justify-between">
-                <span className="text-sm font-black dark:text-white font-mono">Total Paid</span>
+                <span className="text-sm font-black dark:text-white font-mono">Amount</span>
                 <span className="text-3xl font-black font-mono text-gray-900 dark:text-white">
-                  {selectedReceipt.currency === 'INR' ? '₹' : '$'}{parseFloat(selectedReceipt.amount).toFixed(2)}
+                  ₹59
                 </span>
               </div>
 
@@ -7577,20 +8096,20 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                     const printContents = document.createElement("div");
                     printContents.innerHTML = `
                       <div style="font-family: monospace; padding: 40px; border: 2px solid #000; max-width: 400px; margin: 0 auto; background: #fff; color: #000;">
-                        <h2 style="font-weight: 900; margin-bottom: 2px;">WRINDHA OS</h2>
-                        <h4 style="text-transform: uppercase; color: #666; margin-top: 0; font-size: 11px; letter-spacing: 2px;">Receipt & Verification Details</h4>
-                        <hr style="border: 1px dashed #ccc;" />
+                        <h2 style="font-weight: 900; margin-bottom: 2px; text-align: center;">WRINDHA OS</h2>
+                        <h4 style="text-transform: uppercase; color: #666; margin-top: 0; font-size: 11px; letter-spacing: 2px; text-align: center; margin-bottom: 20px;">Official Receipt</h4>
+                        <hr style="border: 1px dashed #000;" />
                         <p><strong>Invoice Reference:</strong> ${selectedReceipt.id}</p>
                         <p><strong>Transaction Date:</strong> ${new Date(selectedReceipt.created_at).toLocaleString()}</p>
-                        <p><strong>Product:</strong> ${selectedReceipt.plan_name}</p>
-                        <p><strong>Payment Method:</strong> ${selectedReceipt.payment_method.toUpperCase()}</p>
-                        <p><strong>Status:</strong> ${selectedReceipt.status.toUpperCase()}</p>
-                        <hr style="border: 1px dashed #ccc;" />
+                        <p><strong>Plan Name:</strong> WrindhaOS Premium</p>
+                        <p><strong>Billing Cycle:</strong> Monthly</p>
+                        <p><strong>Status:</strong> ${selectedReceipt.status ? selectedReceipt.status.toUpperCase() : 'PAID'}</p>
+                        <hr style="border: 1px dashed #000; margin-top: 20px;" />
                         <h3 style="display: flex; justify-content: space-between; font-weight: 900; margin-top: 20px;">
-                          <span>TOTAL PAID:</span>
-                          <span>${selectedReceipt.currency === 'INR' ? '₹' : '$'}${parseFloat(selectedReceipt.amount).toFixed(2)}</span>
+                          <span>AMOUNT:</span>
+                          <span>₹59</span>
                         </h3>
-                        <p style="text-align: center; color: #888; font-size: 10px; margin-top: 40px;">Thank you for upgrading! Your system credentials has been recompiled successfully.</p>
+                        <p style="text-align: center; color: #888; font-size: 10px; margin-top: 40px;">Thank you for upgrading! Your system credentials have been recompiled successfully.</p>
                       </div>
                     `;
                     const win = window.open("", "_blank");
@@ -7717,12 +8236,6 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                       <span>Billing Interval Cycle:</span>
                       <span className="capitalize">{billingPeriod}</span>
                     </div>
-                    {billingPeriod === 'yearly' && (
-                      <div className="flex justify-between text-xs font-semibold text-emerald-600 dark:text-emerald-450">
-                        <span>Corporate Discount Active:</span>
-                        <span>-20% Applied</span>
-                      </div>
-                    )}
                     <div className="h-[1px] bg-slate-200 dark:bg-slate-800 my-2"></div>
                     <div className="flex justify-between items-baseline pt-1">
                       <span className="text-sm font-black text-gray-900 dark:text-white">Authorized Total Paid:</span>
@@ -7730,9 +8243,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                         {appliedCoupon ? (
                           <>
                             <span className="text-xs line-through text-gray-400 dark:text-gray-550 mr-2 font-mono">
-                              ₹{billingPeriod === 'yearly'
-                                ? Math.floor(parseFloat(checkoutPlan.price.replace(/[^\d.]/g, '')) * 12 * 0.8)
-                                : parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''))}
+                              ₹{parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''))}
                             </span>
                             <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
                               ₹{appliedCoupon.payableAmount}
@@ -7742,9 +8253,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                         ) : (
                           <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400 font-mono">
                             {checkoutPlan.price.startsWith('₹') ? '₹' : checkoutPlan.price.startsWith('$') ? '$' : '₹'}
-                            {billingPeriod === 'yearly' 
-                              ? Math.floor(parseFloat(checkoutPlan.price.replace(/[^\d.]/g, '')) * 12 * 0.8)
-                              : parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''))}
+                            {parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''))}
                           </span>
                         )}
                       </div>
@@ -7755,49 +8264,83 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
 
               {/* Right Column: Dynamic Activation Status */}
               <div className="flex-1 flex flex-col justify-center space-y-4 sm:space-y-6 py-2 border-t lg:border-t-0 lg:border-l border-slate-150 dark:border-slate-800/60 pt-6 lg:pt-0 lg:pl-8">
-                {/* Transition loading screens */}
-                {(checkoutStep === 1 || checkoutStep === 2) && (
-                  <div className="text-center py-10 space-y-6 animate-pulse">
-                    <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                    <div className="space-y-2">
-                      <h4 className="text-lg font-black dark:text-white">
-                        {checkoutStep === 1 
-                          ? 'Checking subscription status...' 
-                          : 'Activating Premium Workspace...'}
-                      </h4>
-                      <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed font-semibold">
-                        Configuring Supabase cloud endpoints. Synchronizing data tables to unlock academic calendars, unlimited habits, and priority matrices. Please wait...
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {checkoutStep === 3 && (
+                {paymentError ? (
                   <div className="text-center py-6 space-y-6">
-                    <div className="w-20 h-20 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-500 rounded-full flex items-center justify-center mx-auto shadow-inner animate-bounce">
-                      <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+                    <div className="w-16 h-16 bg-rose-50 dark:bg-rose-950/20 border border-rose-100/50 dark:border-rose-900/30 rounded-2xl flex items-center justify-center mx-auto text-rose-600 dark:text-rose-400">
+                      <ShieldAlert className="w-8 h-8" />
                     </div>
                     <div className="space-y-2">
-                      <h4 className="text-2xl font-black dark:text-white">
-                        Workspace Upgraded!
+                      <h4 className="text-lg font-black text-rose-600 dark:text-rose-400">
+                        Checkout Handshake Failed
                       </h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto leading-relaxed font-semibold">
-                        Your active profile has been successfully configured to the premium {checkoutPlan?.name || "Premium OS"} plan. You can now use unlimited daily habit streaks, priorities matrices, and academic planners.
+                      <p className="text-xs text-rose-800 dark:text-rose-400 bg-rose-50/50 dark:bg-rose-950/10 border border-rose-200/50 dark:border-rose-900/20 p-4 rounded-2xl max-w-sm mx-auto text-left leading-relaxed font-semibold">
+                        {paymentError}
                       </p>
                     </div>
-                    
-                    <div className="pt-4 flex flex-col gap-2 font-semibold">
+                    <div className="pt-2 flex flex-col gap-2 max-w-sm mx-auto">
+                      <button 
+                        onClick={() => processSecureCheckout()}
+                        className="w-full py-3 bg-black dark:bg-indigo-600 font-bold text-white rounded-xl text-xs uppercase tracking-widest active:scale-95 transition-all text-center cursor-pointer"
+                      >
+                        Try Again
+                      </button>
                       <button 
                         onClick={() => {
                           setCheckoutPlan(null);
-                          setCheckoutStep(1);
+                          setPaymentError(null);
                         }}
-                        className="w-full py-3.5 bg-black dark:bg-indigo-600 font-bold text-white rounded-2xl text-xs uppercase tracking-widest active:scale-95 transition-all text-center cursor-pointer"
+                        className="w-full py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs uppercase tracking-widest transition-colors text-center cursor-pointer"
                       >
-                        Open Workspace Dashboards &rarr;
+                        Cancel
                       </button>
                     </div>
                   </div>
+                ) : (
+                  <>
+                    {(checkoutStep === 1 || checkoutStep === 2) && (
+                      <div className="text-center py-10 space-y-6 animate-pulse">
+                        <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                        <div className="space-y-2">
+                          <h4 className="text-lg font-black dark:text-white">
+                            {checkoutStep === 1 
+                              ? 'Checking subscription status...' 
+                              : 'Activating Premium Workspace...'}
+                          </h4>
+                          <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed font-semibold">
+                            Configuring Supabase cloud endpoints. Synchronizing data tables to unlock academic calendars, unlimited habits, and priority matrices. Please wait...
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {checkoutStep === 3 && (
+                      <div className="text-center py-6 space-y-6">
+                        <div className="w-20 h-20 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-500 rounded-full flex items-center justify-center mx-auto shadow-inner animate-bounce">
+                          <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+                        </div>
+                        <div className="space-y-2">
+                          <h4 className="text-2xl font-black dark:text-white">
+                            Workspace Upgraded!
+                          </h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto leading-relaxed font-semibold">
+                            Your active profile has been successfully configured to the premium {checkoutPlan?.name || "Premium OS"} plan. You can now use unlimited daily habit streaks, priorities matrices, and academic planners.
+                          </p>
+                        </div>
+                        
+                        <div className="pt-4 flex flex-col gap-2 font-semibold">
+                          <button 
+                            onClick={() => {
+                              setCheckoutPlan(null);
+                              setCheckoutStep(1);
+                            }}
+                            className="w-full py-3.5 bg-black dark:bg-indigo-600 font-bold text-white rounded-2xl text-xs uppercase tracking-widest active:scale-95 transition-all text-center cursor-pointer"
+                          >
+                            Open Workspace Dashboards &rarr;
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </motion.div>
@@ -7906,8 +8449,12 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Product Purchased:</span>
-                  <span className="font-bold text-indigo-600 dark:text-indigo-400">{selectedReceipt.plan_name}</span>
+                  <span>Plan Name:</span>
+                  <span className="font-bold text-indigo-600 dark:text-indigo-400">WrindhaOS Premium</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Billing Cycle:</span>
+                  <span className="font-bold text-gray-800 dark:text-gray-200 font-sans">Monthly</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Payment Gateway:</span>
@@ -7915,15 +8462,15 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                 </div>
                 <div className="flex justify-between">
                   <span>Verification Status:</span>
-                  <span className="font-bold text-emerald-500 uppercase">{selectedReceipt.status}</span>
+                  <span className="font-bold text-emerald-500 uppercase">{selectedReceipt.status || 'Paid'}</span>
                 </div>
               </div>
 
               {/* Invoice Value Summary */}
               <div className="py-6 flex items-baseline justify-between">
-                <span className="text-sm font-black dark:text-white font-mono">Total Paid</span>
+                <span className="text-sm font-black dark:text-white font-mono">Amount</span>
                 <span className="text-3xl font-black font-mono text-gray-900 dark:text-white">
-                  {selectedReceipt.currency === 'INR' ? '₹' : '$'}{parseFloat(selectedReceipt.amount).toFixed(2)}
+                  ₹59
                 </span>
               </div>
 
@@ -7933,20 +8480,20 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                     const printContents = document.createElement("div");
                     printContents.innerHTML = `
                       <div style="font-family: monospace; padding: 40px; border: 2px solid #000; max-width: 400px; margin: 0 auto; background: #fff; color: #000;">
-                        <h2 style="font-weight: 900; margin-bottom: 2px;">WRINDHA OS</h2>
-                        <h4 style="text-transform: uppercase; color: #666; margin-top: 0; font-size: 11px; letter-spacing: 2px;">Receipt & Verification Details</h4>
-                        <hr style="border: 1px dashed #ccc;" />
+                        <h2 style="font-weight: 900; margin-bottom: 2px; text-align: center;">WRINDHA OS</h2>
+                        <h4 style="text-transform: uppercase; color: #666; margin-top: 0; font-size: 11px; letter-spacing: 2px; text-align: center; margin-bottom: 20px;">Official Receipt</h4>
+                        <hr style="border: 1px dashed #000;" />
                         <p><strong>Invoice Reference:</strong> ${selectedReceipt.id}</p>
                         <p><strong>Transaction Date:</strong> ${new Date(selectedReceipt.created_at).toLocaleString()}</p>
-                        <p><strong>Product:</strong> ${selectedReceipt.plan_name}</p>
-                        <p><strong>Payment Method:</strong> ${selectedReceipt.payment_method.toUpperCase()}</p>
-                        <p><strong>Status:</strong> ${selectedReceipt.status.toUpperCase()}</p>
-                        <hr style="border: 1px dashed #ccc;" />
+                        <p><strong>Plan Name:</strong> WrindhaOS Premium</p>
+                        <p><strong>Billing Cycle:</strong> Monthly</p>
+                        <p><strong>Status:</strong> ${selectedReceipt.status ? selectedReceipt.status.toUpperCase() : 'PAID'}</p>
+                        <hr style="border: 1px dashed #000; margin-top: 20px;" />
                         <h3 style="display: flex; justify-content: space-between; font-weight: 900; margin-top: 20px;">
-                          <span>TOTAL PAID:</span>
-                          <span>${selectedReceipt.currency === 'INR' ? '₹' : '$'}${parseFloat(selectedReceipt.amount).toFixed(2)}</span>
+                          <span>AMOUNT:</span>
+                          <span>₹59</span>
                         </h3>
-                        <p style="text-align: center; color: #888; font-size: 10px; margin-top: 40px;">Thank you for upgrading! Your system credentials has been recompiled successfully.</p>
+                        <p style="text-align: center; color: #888; font-size: 10px; margin-top: 40px;">Thank you for upgrading! Your system credentials have been recompiled successfully.</p>
                       </div>
                     `;
                     const win = window.open("", "_blank");

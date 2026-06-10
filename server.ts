@@ -9,6 +9,7 @@ import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { GoogleGenAI, Type } from "@google/genai";
 import v2Router from "./server/routes.ts";
+import { authContext } from "./server/db.ts";
 
 dotenv.config();
 
@@ -25,9 +26,9 @@ let DUMMY_COUPONS = [
   {
     id: "coupon-1",
     coupon_code: "FIRST29",
-    description: "First Month ₹29 instead of ₹49",
+    description: "First Month ₹29 instead of ₹59",
     discount_type: "fixed",
-    discount_value: 20,
+    discount_value: 30,
     is_active: true,
     max_uses: 100,
     current_uses: 12,
@@ -137,11 +138,13 @@ function validateCouponCode(coupon: any, originalPrice: number) {
 
 // Lazy init handler for Razorpay
 function getRazorpayInstance() {
-  const keyId = process.env.RAZORPAY_KEY_ID;
-  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  let keyId = process.env.RAZORPAY_KEY_ID;
+  let keySecret = process.env.RAZORPAY_KEY_SECRET;
   if (!keyId || !keySecret) {
     return null;
   }
+  keyId = keyId.trim().replace(/^["']|["']$/g, "");
+  keySecret = keySecret.trim().replace(/^["']|["']$/g, "");
   return new Razorpay({
     key_id: keyId,
     key_secret: keySecret
@@ -152,7 +155,11 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({
+    verify: (req: any, res: any, buf: Buffer) => {
+      req.rawBody = buf;
+    }
+  }));
 
   // Enable CORS headers to allow cross-origin requests from frontends (e.g. GitHub Pages or specific client origins)
   app.use((req, res, next) => {
@@ -177,8 +184,14 @@ async function startServer() {
     next();
   });
 
-  // Mount the SaaS v2 API core router
-  app.use("/api/v2", v2Router);
+  // Mount the SaaS v2 API core router with request-scoped Bearer token propagation
+  app.use("/api/v2", (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : undefined;
+    authContext.run({ token }, () => {
+      v2Router(req, res, next);
+    });
+  });
 
   app.get("/api/health", (req, res) => {
     res.json({ 
@@ -634,7 +647,7 @@ Ensure your response is detailed, professional, encouraging, and tailored to the
      ========================================== */
   app.post("/api/coupons/validate", async (req, res) => {
     const { couponCode, originalPrice } = req.body;
-    const cleanOrigPrice = parseFloat(originalPrice) || 49;
+    const cleanOrigPrice = parseFloat(originalPrice) || 59;
 
     if (!couponCode || typeof couponCode !== "string") {
       return res.status(400).json({ success: false, message: "Please enter a coupon code." });
@@ -866,7 +879,7 @@ Ensure your response is detailed, professional, encouraging, and tailored to the
       success: true,
       usages: MOCK_COUPON_USAGES,
       availableOffers: [
-        { name: "First Month ₹29", code: "FIRST29", type: "fixed", value: 20 },
+        { name: "First Month ₹29", code: "FIRST29", type: "fixed", value: 30 },
         { name: "50% Off Lifetime Space Voucher", code: "FIFTYOFF", type: "percentage", value: 50 },
         { name: "Flat ₹20 Off Checkouts", code: "FLAT20", type: "fixed", value: 20 },
         { name: "Festival Offer Flat ₹15 Off", code: "FESTIVAL", type: "fixed", value: 15 },
@@ -878,7 +891,7 @@ Ensure your response is detailed, professional, encouraging, and tailored to the
   // Create Razorpay Order with Secure Coupon calculation
   app.post("/api/payments/razorpay/order", async (req, res) => {
     const { planName, amount, currency, couponCode } = req.body;
-    let cleanAmount = parseFloat(amount) || 49;
+    let cleanAmount = parseFloat(amount) || 59;
     const cleanCurrency = currency || "INR";
 
     let discountApplied = 0;
@@ -955,9 +968,24 @@ Ensure your response is detailed, professional, encouraging, and tailored to the
         });
       } catch (rzpErr: any) {
         console.error("[Razorpay Live Order Failed] Crucial error during live transaction setup:", rzpErr);
+        let errMsg = "communication error with Razorpay servers";
+        if (rzpErr && typeof rzpErr === "object") {
+          if (rzpErr.error && rzpErr.error.description) {
+            errMsg = rzpErr.error.description;
+          } else if (rzpErr.description) {
+            errMsg = rzpErr.description;
+          } else if (rzpErr.message) {
+            errMsg = rzpErr.message;
+          }
+        }
+        
+        if (errMsg.toLowerCase().includes("authentication failed") || (rzpErr.error && rzpErr.error.code === "BAD_REQUEST_ERROR" && rzpErr.error.description === "Authentication failed")) {
+          errMsg = "Razorpay Authentication Failed: Your RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET is incorrect or invalid. Please check your developer API credentials dashboard and verify your workspace environment secrets.";
+        }
+
         return res.status(500).json({
           success: false,
-          message: `Live Gateway Order failed: ${rzpErr.message || "communication error with Razorpay servers"}`
+          message: `Live Gateway Order failed: ${errMsg}`
         });
       }
     } catch (err: any) {

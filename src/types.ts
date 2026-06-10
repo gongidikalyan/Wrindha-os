@@ -44,6 +44,15 @@ export interface StudyCourse {
   materials: Material[];
 }
 
+export interface StudySession {
+  id: string;
+  courseId: string;
+  sessionDate: string; // YYYY-MM-DD
+  durationMinutes: number;
+  topic: string;
+  notes?: string;
+}
+
 // 4. Eisenhower Matrix & 5. To-Do List
 export enum EisenhowerQuadrant {
   URGENT_IMPORTANT = 'UI',

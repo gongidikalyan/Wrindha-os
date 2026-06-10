@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { supabase, dbQuery } from "./db.ts";
+import { checkSubscriptionStatus } from "./services.ts";
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -23,7 +24,7 @@ export async function authenticate(
     let userId: string | null = null;
     let email: string | null = null;
 
-    // Check custom headers for Sandbox & developer trials
+    // Check custom headers for Sandbox & developer trials (only in development)
     const demoUserId = req.headers["x-user-id"];
     const demoEmail = req.headers["x-user-email"];
 
@@ -38,17 +39,17 @@ export async function authenticate(
       }
     }
 
-    // 2. Resolve from Sandbox dev bypass if no live token extracted
-    if (!userId && demoUserId) {
+    // 2. Resolve from Sandbox dev bypass if no live token extracted (ONLY when NODE_ENV is development)
+    if (!userId && demoUserId && process.env.NODE_ENV === "development") {
       userId = String(demoUserId);
       email = String(demoEmail || "sandbox_user@wrindha.io");
-      console.log(`[Auth Middleware] Authenticating via sandbox developer custom header: userId=${userId}`);
+      console.log(`[Auth Middleware] Authenticating via sandbox developer custom header in development mode: userId=${userId}`);
     }
 
     if (!userId) {
       return res.status(401).json({
         success: false,
-        message: "Authentication required. Please log in or provide security access headers."
+        message: "Authentication required. Please log in with a valid JWT token."
       });
     }
 
@@ -66,7 +67,7 @@ export async function authenticate(
       accountStatus = profile.account_status || "trial";
     } else {
       // Auto-create or default profile internally
-      role = req.headers["x-user-role"] === "admin" ? "admin" : "user";
+      role = (process.env.NODE_ENV === "development" && req.headers["x-user-role"] === "admin") ? "admin" : "user";
     }
 
     req.user = {
@@ -76,11 +77,59 @@ export async function authenticate(
       account_status: accountStatus
     };
 
+    // Global active write blocking for expired/non-premium accounts (except admin)
+    const isWriteMethod = ["POST", "PUT", "PATCH", "DELETE"].includes(req.method);
+    if (isWriteMethod && role !== "admin") {
+      const statusCheck = await checkSubscriptionStatus(userId);
+      if (!statusCheck.canModify) {
+        return res.status(403).json({
+          success: false,
+          message: "Subscription expired. Your account is in Read Only Mode.",
+          actionRequired: "UPGRADE"
+        });
+      }
+    }
+
     next();
   } catch (error: any) {
     console.error("[Authentication Middleware Exception]:", error);
     return res.status(401).json({ success: false, message: "Invalid or expired token sessions." });
   }
+}
+
+/**
+ * 1b. Enforce Read-Only Mode for Expired Trial Users
+ * Intercepts POST, PUT, PATCH, DELETE operations.
+ */
+export async function enforceReadOnlyMode(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  if (!req.user) {
+    return next();
+  }
+  if (req.user.role === "admin") {
+    return next();
+  }
+
+  const isWriteMethod = ["POST", "PUT", "PATCH", "DELETE"].includes(req.method);
+  if (isWriteMethod) {
+    try {
+      const status = await checkSubscriptionStatus(req.user.id);
+      if (!status.canModify) {
+        return res.status(403).json({
+          success: false,
+          message: "Subscription expired. Your account is in Read Only Mode.",
+          actionRequired: "UPGRADE"
+        });
+      }
+    } catch (err: any) {
+      console.error("[Read Only Mode Middleware Exception]:", err);
+    }
+  }
+
+  next();
 }
 
 /**

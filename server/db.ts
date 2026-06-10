@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { AsyncLocalStorage } from "async_hooks";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -7,6 +8,22 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || "https://lbthopvezqjcynkfpc
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidGhvcHZlenFqY3lua2ZwY25uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyMTg4NDgsImV4cCI6MjA5Mzc5NDg0OH0.-fCSsMSyk1Ay_dDb0juQWhCObfKtzo6L01NhqueY7J8";
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+export const authContext = new AsyncLocalStorage<{ token?: string }>();
+
+export function getSupabaseClient(token: string) {
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }
+  });
+}
 
 /**
  * Robust Sandboxed Fallback Memory Cache
@@ -45,7 +62,7 @@ class SanboxDB {
     // Seed system settings
     this.systemSettings.set("pricing_standard", {
       setting_key: "pricing_standard",
-      setting_value: { price: 49, currency: "INR", trial_days: 7 },
+      setting_value: { price: 59, currency: "INR", trial_days: 7 },
       description: "Standard plan definitions",
       updated_at: new Date().toISOString()
     });
@@ -82,7 +99,10 @@ export async function dbQuery<T>(
   }
 ): Promise<{ data: T | T[] | null; error: any; source: "supabase" | "sandbox" }> {
   try {
-    let query = supabase.from(table);
+    const store = authContext.getStore();
+    const token = store?.token;
+    const client = token ? getSupabaseClient(token) : supabase;
+    let query = client.from(table);
     let res: any;
 
     if (operation === "select") {

@@ -29,7 +29,8 @@ import {
   Filter,
   Percent,
   CheckCircle,
-  FileCheck
+  FileCheck,
+  Award
 } from "lucide-react";
 import { Task, EisenhowerQuadrant, Habit, Expense, Goal, GoalType, StudyCourse } from "../types";
 import { cn } from "../lib/utils";
@@ -333,9 +334,9 @@ export default function AnalyticsView({
       </div>
 
       {/* OVERALL METRICS GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {/* Expenses Metric */}
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800/80 shadow-sm flex flex-col justify-between" id="analytics-spent-card">
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-150 dark:border-gray-800/80 shadow-sm flex flex-col justify-between" id="analytics-spent-card">
           <div className="flex justify-between items-start">
             <div className="p-2.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl">
               <Wallet className="w-5 h-5 text-emerald-500" />
@@ -349,7 +350,7 @@ export default function AnalyticsView({
         </div>
 
         {/* Habits Completion Metric */}
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800/80 shadow-sm flex flex-col justify-between" id="analytics-habits-card">
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-150 dark:border-gray-800/80 shadow-sm flex flex-col justify-between" id="analytics-habits-card">
           <div className="flex justify-between items-start">
             <div className="p-2.5 bg-orange-50 dark:bg-orange-500/10 rounded-2xl">
               <Flame className="w-5 h-5 text-orange-500" />
@@ -365,7 +366,7 @@ export default function AnalyticsView({
         </div>
 
         {/* Goals Metric */}
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800/80 shadow-sm flex flex-col justify-between" id="analytics-goals-card">
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-150 dark:border-gray-800/80 shadow-sm flex flex-col justify-between" id="analytics-goals-card">
           <div className="flex justify-between items-start">
             <div className="p-2.5 bg-purple-50 dark:bg-purple-500/10 rounded-2xl">
               <Target className="w-5 h-5 text-purple-500" />
@@ -377,6 +378,36 @@ export default function AnalyticsView({
             <p className="text-xs text-gray-400 mt-1">{achievedGoalsCount} of {totalGoals} reached 100%</p>
           </div>
         </div>
+
+        {/* Career Trajectory Metric */}
+        {(() => {
+          const savedPath = localStorage.getItem("wrindha_active_career_path");
+          const path = savedPath ? JSON.parse(savedPath) : null;
+          const savedSkills = localStorage.getItem("wrindha_career_skills");
+          const skillList = savedSkills ? JSON.parse(savedSkills) : [];
+          const completedSkills = skillList.filter((s: any) => s.completed).length;
+          const totalSkillsCount = skillList.length;
+          const skillProgress = totalSkillsCount > 0 ? Math.round((completedSkills / totalSkillsCount) * 100) : 0;
+          
+          return (
+            <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-150 dark:border-gray-800/80 shadow-sm flex flex-col justify-between" id="analytics-career-card">
+              <div className="flex justify-between items-start">
+                <div className="p-2.5 bg-teal-50 dark:bg-teal-500/10 rounded-2xl">
+                  <Award className="w-5 h-5 text-teal-500" />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-teal-400 bg-teal-50 dark:bg-teal-500/10 px-2 py-1 rounded-md">Career</span>
+              </div>
+              <div className="mt-4">
+                <p className="text-2xl font-black font-mono tracking-tight dark:text-white">
+                  {path ? `${path.progress_percentage || skillProgress}%` : '0%'}
+                </p>
+                <p className="text-xs text-gray-400 mt-1 truncate">
+                  {path ? `Target: ${path.target_position}` : "No active career path"}
+                </p>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* DETAILED STATS SECTIONS */}
@@ -675,6 +706,79 @@ export default function AnalyticsView({
             )}
           </div>
         </div>
+
+        {/* ================= 6. CAREER DEVELOPMENT ANALYSIS ================= */}
+        {(() => {
+          const savedPath = localStorage.getItem("wrindha_active_career_path");
+          const path = savedPath ? JSON.parse(savedPath) : null;
+          const savedSkills = localStorage.getItem("wrindha_career_skills");
+          const skillList = savedSkills ? JSON.parse(savedSkills) : [];
+          const completedSkills = skillList.filter((s: any) => s.completed).length;
+          const totalSkillsCount = skillList.length;
+          const skillProgress = totalSkillsCount > 0 ? Math.round((completedSkills / totalSkillsCount) * 100) : 0;
+          const actualProgress = path ? (path.progress_percentage || skillProgress) : 0;
+
+          return (
+            <div className="bg-white dark:bg-gray-900 p-6 md:p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800/80 shadow-sm flex flex-col justify-between min-h-[420px] lg:col-span-2">
+              <div>
+                <h3 className="text-lg font-bold mb-6 dark:text-white flex items-center gap-2">
+                  <Award className="w-5 h-5 text-teal-500 animate-pulse" />
+                  Career Trajectory Development Analytics
+                </h3>
+                
+                {!path ? (
+                  <div className="h-64 flex flex-col items-center justify-center text-gray-300 dark:text-gray-600">
+                    <p className="text-sm italic">Initiate a structured career trajectory roadmap to monitor learning pathway progress.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                    <div className="space-y-5">
+                      <div className="p-5 bg-teal-50/20 dark:bg-teal-950/20 rounded-2xl border border-teal-100/30 dark:border-teal-900/40">
+                        <span className="text-[10px] uppercase font-black text-teal-600 dark:text-teal-400 block tracking-wider mb-1">Active Career Roadmap</span>
+                        <p className="text-sm font-bold text-gray-800 dark:text-gray-100">
+                          {path.current_position} <span className="text-teal-500">&rarr;</span> {path.target_position}
+                        </p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                          Mapped for targeted year: <span className="font-semibold text-teal-600 dark:text-teal-400">{path.target_year}</span> | Category: <span className="font-semibold text-teal-600 dark:text-teal-400">{path.category}</span>
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">Overall Roadmap Progress</span>
+                          <span className="font-mono font-black text-teal-600 dark:text-teal-400 text-lg">{actualProgress}%</span>
+                        </div>
+                        <div className="w-full bg-gray-100 dark:bg-gray-800 h-2.5 rounded-full overflow-hidden">
+                          <div className="bg-teal-500 h-full transition-all duration-500" style={{ width: `${actualProgress}%` }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/60 text-center">
+                        <span className="text-xs text-gray-400 block font-semibold uppercase tracking-wider">Acquired Skill Metrics</span>
+                        <span className="text-4xl font-mono font-black text-teal-500 mt-1 block">
+                          {completedSkills} <span className="text-lg text-gray-400 font-bold font-sans">/ {totalSkillsCount}</span>
+                        </span>
+                        <p className="text-xs text-gray-400 mt-2">Required pathway competency completion rate</p>
+                      </div>
+
+                      <div className="p-4 border border-gray-100 dark:border-gray-800/60 rounded-2xl">
+                        <div className="flex justify-between items-center mb-1.5 text-xs">
+                          <span className="text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">Skill Milestone Rate</span>
+                          <span className="font-mono font-bold text-gray-800 dark:text-gray-250">{skillProgress}%</span>
+                        </div>
+                        <div className="w-full bg-gray-100 dark:bg-gray-800 h-1.5 rounded-full overflow-hidden">
+                          <div className="bg-teal-400 h-full transition-all duration-500" style={{ width: `${skillProgress}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
       </div>
     </div>

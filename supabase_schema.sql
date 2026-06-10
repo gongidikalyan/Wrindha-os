@@ -392,68 +392,13 @@ CREATE POLICY "Users can manage their own career plans" ON public.career_plans
 -- 17. Backend Rule: Enforce Triggers for Task Limit based on user account status ('trial' vs 'premium')
 CREATE OR REPLACE FUNCTION public.check_task_limit()
 RETURNS TRIGGER AS $$
-DECLARE
-  v_status TEXT;
-  v_is_trial_activated BOOLEAN;
-  v_trial_end_date TIMESTAMP WITH TIME ZONE;
-  v_has_paid BOOLEAN;
-  v_active_count INTEGER;
-  v_email TEXT;
 BEGIN
-  -- If this is an update or an upsert on an already existing task, bypass the insertion limit check
-  IF EXISTS (SELECT 1 FROM public.tasks WHERE id = NEW.id) THEN
-    RETURN NEW;
-  END IF;
-
-  -- Get user subscription tier, trial status, and explicit transaction/pay confirmations
-  SELECT 
-    COALESCE(subscription_tier, 'Free'), 
-    COALESCE(is_trial_activated, false), 
-    trial_end_date, 
-    COALESCE(has_paid, false),
-    email
-  INTO v_status, v_is_trial_activated, v_trial_end_date, v_has_paid, v_email
-  FROM public.profiles
-  WHERE id = NEW.user_id;
-
-  -- If this is the platform administrator, bypass completely
-  IF v_email = 'gongidikalyan08@gmail.com' THEN
-    RETURN NEW;
-  END IF;
-
-  -- Check if user is premium or has explicitly paid
-  IF v_has_paid OR LOWER(v_status) = 'premium' OR LOWER(v_status) LIKE 'premium%' OR LOWER(v_status) = 'pro space' OR LOWER(v_status) = 'ultimate matrix' OR LOWER(v_status) = 'active' THEN
-    RETURN NEW;
-  END IF;
-
-  -- Count existing active (incomplete) tasks
-  SELECT COUNT(*) INTO v_active_count
-  FROM public.tasks
-  WHERE user_id = NEW.user_id AND completed = false;
-
-  -- Support standard active trial rules (Trial active meaning trial is activated and trial_end_date hasn't expired)
-  IF v_is_trial_activated AND (v_trial_end_date IS NULL OR v_trial_end_date > now()) THEN
-    -- Active trial has 10 tasks limit
-    IF v_active_count >= 10 THEN
-      RAISE EXCEPTION 'You have reached the 10-task limit available during your Free Trial. Subscribe to WrindhaOS Premium to unlock unlimited tasks and all premium features.';
-    END IF;
-    RETURN NEW;
-  END IF;
-
-  -- Free Tier / Expired trial has 3 tasks limit
-  IF v_active_count >= 3 THEN
-    RAISE EXCEPTION 'You have reached the 3-task limit available on the Standard Free Tier. Subscribe to WrindhaOS Premium to unlock unlimited tasks and all premium features.';
-  END IF;
-
+  -- Task limits are removed in WrindhaOS V2 to support unlimited trial and premium usage.
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 DROP TRIGGER IF EXISTS trg_check_task_limit ON public.tasks;
-
-CREATE TRIGGER trg_check_task_limit
-  BEFORE INSERT ON public.tasks
-  FOR EACH ROW EXECUTE PROCEDURE public.check_task_limit();
 
 
 -- ==========================================
@@ -530,6 +475,7 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
 );
 ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view their own subscriptions" ON public.subscriptions FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can manage their own subscriptions" ON public.subscriptions FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Admin can manage all subscriptions" ON public.subscriptions FOR ALL USING (auth.jwt()->>'email' = 'gongidikalyan08@gmail.com');
 
 -- 23. Payments Ledger Table (with RLS)
@@ -544,6 +490,7 @@ CREATE TABLE IF NOT EXISTS public.payments (
 );
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view their own payments" ON public.payments FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can manage their own payments" ON public.payments FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Admin can manage all payments" ON public.payments FOR ALL USING (auth.jwt()->>'email' = 'gongidikalyan08@gmail.com');
 
 -- 24. Analytics Snapshots Table (with RLS)
@@ -656,6 +603,22 @@ CREATE TABLE IF NOT EXISTS public.budgets (
 );
 ALTER TABLE public.budgets ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can manage budgets" ON public.budgets FOR ALL USING (auth.uid() = user_id);
+
+
+-- ==========================================
+-- PERFORMANCE OPTIMIZATION INDEXES
+-- ==========================================
+
+-- High-performance indexes for foreign key filtering on user_id
+CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON public.tasks (user_id);
+CREATE INDEX IF NOT EXISTS idx_goals_user_id ON public.goals (user_id);
+CREATE INDEX IF NOT EXISTS idx_habits_user_id ON public.habits (user_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_user_id ON public.expenses (user_id);
+CREATE INDEX IF NOT EXISTS idx_study_courses_user_id ON public.study_courses (user_id);
+CREATE INDEX IF NOT EXISTS idx_career_roadmaps_user_id ON public.career_roadmaps (user_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON public.subscriptions (user_id);
+CREATE INDEX IF NOT EXISTS idx_payments_user_id ON public.payments (user_id);
+
 
 
 

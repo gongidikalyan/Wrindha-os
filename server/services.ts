@@ -10,7 +10,30 @@ export async function createProfileAndTrial(userId: string, email: string, fullN
   const now = new Date();
   const trialEndDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 Days onwards
 
-  // 1. Insert Profile
+  // 1. Check if profile already exists
+  const existingProfileRes = await dbQuery<any>("profiles", "select", { match: { id: userId } });
+  if (existingProfileRes.data && Array.isArray(existingProfileRes.data) && existingProfileRes.data.length > 0) {
+    const existingProfile = existingProfileRes.data[0];
+    
+    // Update last active
+    await dbQuery("profiles", "update", {
+      match: { id: userId },
+      data: {
+        last_active: now.toISOString(),
+        last_login_at: now.toISOString()
+      }
+    });
+
+    // Check for existing subscription
+    const existingSubRes = await dbQuery<any>("subscriptions", "select", { match: { user_id: userId } });
+    const existingSub = existingSubRes.data && Array.isArray(existingSubRes.data) && existingSubRes.data.length > 0
+      ? existingSubRes.data[0]
+      : null;
+
+    return { profile: existingProfile, subscription: existingSub };
+  }
+
+  // 2. Insert Profile (New User)
   const profilePayload = {
     id: userId,
     email: email,
@@ -36,9 +59,9 @@ export async function createProfileAndTrial(userId: string, email: string, fullN
     throw new Error(`Profile creation failed: ${profileRes.error.message || profileRes.error}`);
   }
 
-  // 2. Insert Trial Subscription Record
+  // 3. Insert Trial Subscription Record
   const subscriptionPayload = {
-    id: `sub_${Math.random().toString(36).substring(2, 10)}`,
+    id: crypto.randomUUID(),
     user_id: userId,
     plan: "trial",
     status: "active",
@@ -798,7 +821,7 @@ export async function generateDailySnapshot(userId: string) {
 // =========================================================================
 
 // Safe verification helper if signature comes in Webhook payloads
-export function verifyWebhookSignature(payload: string, signature: string, secret: string): boolean {
+export function verifyWebhookSignature(payload: string | Buffer, signature: string, secret: string): boolean {
   const calculatedSignature = crypto
     .createHmac("sha256", secret)
     .update(payload)
@@ -917,11 +940,13 @@ export async function handleRazorpayWebhookSecure(eventBody: any) {
 
 // Helper to instanciate Razorpay server-side in services
 function getRazorpayInstance() {
-  const keyId = process.env.RAZORPAY_KEY_ID;
-  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  let keyId = process.env.RAZORPAY_KEY_ID;
+  let keySecret = process.env.RAZORPAY_KEY_SECRET;
   if (!keyId || !keySecret) {
     return null;
   }
+  keyId = keyId.trim().replace(/^["']|["']$/g, "");
+  keySecret = keySecret.trim().replace(/^["']|["']$/g, "");
   return new Razorpay({
     key_id: keyId,
     key_secret: keySecret
@@ -993,7 +1018,7 @@ export async function createTrialSubscription(userId: string) {
   const now = new Date();
   const trialEndDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const payload = {
-    id: `sub_${Math.random().toString(36).substring(2, 10)}`,
+    id: crypto.randomUUID(),
     user_id: userId,
     plan: "trial",
     status: "active",
