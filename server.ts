@@ -163,9 +163,28 @@ async function startServer() {
 
   // Enable CORS headers to allow cross-origin requests from frontends (e.g. GitHub Pages or specific client origins)
   app.use((req, res, next) => {
-    res.header("Access-Control-Allow-Origin", "*");
+    const origin = req.headers.origin;
+    const allowedPatterns = [
+      /^https?:\/\/(.*\.)?wrindhaos\.in$/,
+      /^https?:\/\/.*\.github\.io$/,
+      /^http:\/\/localhost:\d+$/,
+      /^https?:\/\/.*\.run\.app$/ // For AI Studio development/shared previews
+    ];
+
+    if (origin) {
+      const isAllowed = allowedPatterns.some(pattern => pattern.test(origin));
+      if (isAllowed) {
+        res.header("Access-Control-Allow-Origin", origin);
+        res.header("Access-Control-Allow-Credentials", "true");
+      } else {
+        res.header("Access-Control-Allow-Origin", "*");
+      }
+    } else {
+      res.header("Access-Control-Allow-Origin", "*");
+    }
+
     res.header("Access-Control-Allow-Methods", "GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-user-id, x-user-email");
     if (req.method === "OPTIONS") {
       return res.sendStatus(200);
     }

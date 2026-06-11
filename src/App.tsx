@@ -170,7 +170,7 @@ export default function App() {
     return saved ? parseInt(saved) : 9999;
   });
 
-  const [razorpayServerEnabled, setRazorpayServerEnabled] = useState<boolean>(false);
+  const [razorpayServerEnabled, setRazorpayServerEnabled] = useState<boolean>(true);
 
   const [serverTimeMs, setServerTimeMs] = useState<number | null>(null);
   const [bootPerfTime] = useState<number>(() => performance.now());
@@ -7516,10 +7516,6 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
 
       const finalPriceToOrder = appliedCoupon ? appliedCoupon.payableAmount : calculatedPrice;
 
-      if (!razorpayServerEnabled) {
-        throw new Error("Razorpay payment gateway is not active or configured on the server. Live payment is required.");
-      }
-
       let orderData;
 
       // Call custom server endpoint to initialize Razorpay order session
@@ -7551,7 +7547,11 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
           throw new Error(orderData.message || "Failed to initialize secure pay order.");
         }
       } catch (fetchErr: any) {
-        throw new Error(`Real Payment error: Unable to initialize secure gateway order. ${fetchErr.message || "Please check your network and key configs."}`);
+        let msg = fetchErr.message || "";
+        if (msg.toLowerCase().includes("failed to fetch")) {
+          msg = "Underlying server connection failed. The backend service may be sleeping (cold start) or taking slightly longer to load. Please try again in 30 seconds.";
+        }
+        throw new Error(`Real Payment error: Unable to initialize secure gateway order. ${msg}`);
       }
 
       const currentUserId = session?.user?.id || "local-user";
