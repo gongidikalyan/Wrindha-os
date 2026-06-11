@@ -31,8 +31,7 @@ jobs:
         run: npm install
         env:
   VITE_API_URL: https://wrindha-os.onrender.com
-Example:
-YAML
+
 - name: Build
   run: npm run build
   env:
@@ -44,6 +43,7 @@ YAML
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+           VITE_RAZORPAY_KEY_ID: ${{ secrets.VITE_RAZORPAY_KEY_ID }}
           VITE_API_URL: https://wrindha-os.onrender.com
 
       - name: Setup Pages
