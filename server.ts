@@ -931,18 +931,9 @@ Ensure your response is detailed, professional, encouraging, and tailored to the
     try {
       const rzp = getRazorpayInstance();
       if (!rzp) {
-        // Safe sandbox fallback mode if credential keys are absent in environment
-        const mockOrderId = `order_sand_${Math.random().toString(36).substring(2, 10)}`;
-        return res.json({
-          success: true,
-          isSandbox: true,
-          orderId: mockOrderId,
-          keyId: "rzp_test_sandbox_dummy",
-          amount: Math.round(cleanAmount * 100),
-          currency: cleanCurrency,
-          receipt: `receipt_sand_${Date.now()}`,
-          discountApplied,
-          finalAmount: cleanAmount
+        return res.status(400).json({
+          success: false,
+          message: "Razorpay keys (RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET) are not configured on the server. Live payment gateway is unavailable and sandbox mode has been disabled."
         });
       }
 
@@ -1067,19 +1058,9 @@ Ensure your response is detailed, professional, encouraging, and tailored to the
       };
 
       if (isSandbox) {
-        // Log coupon usage in local simulation
-        const hasSecret = !!process.env.RAZORPAY_KEY_SECRET;
-        if (hasSecret) {
-          return res.status(400).json({
-            success: false,
-            message: "Security violation: Sandbox payment verification is blocked in key-secured production environments."
-          });
-        }
-        await recordCouponUsageAndIncrement();
-        return res.json({
-          success: true,
-          status: "verified",
-          message: "Sandbox payment verified in core mock ledger."
+        return res.status(400).json({
+          success: false,
+          message: "Security violation: Sandbox payment verification is disabled."
         });
       }
 

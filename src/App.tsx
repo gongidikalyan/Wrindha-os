@@ -92,27 +92,7 @@ const infoModules = [
   { id: 'disclaimer', name: 'Disclaimer', icon: AlertCircle },
 ];
 
-const getApiUrl = () => {
-  const url = import.meta.env.VITE_API_URL || "";
-  if (!url || url.includes("your_") || url.includes("placeholder")) {
-    return "";
-  }
-  return url;
-};
-const API_URL = getApiUrl();
-
-export const authFetch = async (url: string, options: RequestInit = {}) => {
-  const { data: { session } } = await supabase.auth.getSession();
-  const headers = { ...options.headers } as Record<string, string>;
-  if (session?.access_token) {
-    headers["Authorization"] = `Bearer ${session.access_token}`;
-  }
-  if (session?.user?.id) {
-    headers["x-user-id"] = session.user.id;
-    headers["x-user-email"] = session.user.email || "";
-  }
-  return fetch(url, { ...options, headers });
-};
+import { API_URL, authFetch } from "./lib/api";
 
 const calculateTrialDates = (signupTimeStr: string | undefined | null, currentSecureTime: number) => {
   const JUNE_1_2026 = new Date("2026-06-01T00:00:00Z").getTime();
@@ -7537,37 +7517,12 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
       const finalPriceToOrder = appliedCoupon ? appliedCoupon.payableAmount : calculatedPrice;
 
       if (!razorpayServerEnabled) {
-        // Direct, instant, seamless free upgrade when Razorpay keys are not configured on host server
-        setCheckoutStep(2); // Activating Premium Workspace loader step
-        const currentUserId = session?.user?.id || "local-user";
-        
-        setTimeout(async () => {
-          try {
-            setUpgradingTo(plan.id);
-            await onUpgrade(
-              currentUserId, 
-              plan.name, 
-              9999, 
-              `${finalPriceToOrder}`, 
-              plan.id, 
-              `Direct Promoted Upgrade`
-            );
-            setUpgradingTo(null);
-            setCheckoutStep(3); // Upgraded successfully -> transition to checkmark Success view
-            setSuccessMsg(`Congratulations! Upgraded successfully to ${plan.name}! All premium capabilities are now active. ✨`);
-            setTimeout(() => setSuccessMsg(null), 6000);
-          } catch (upgradeErr: any) {
-            setPaymentError(upgradeErr.message || "Error processing workspace billing upgrade.");
-            setCheckoutStep(1);
-          }
-        }, 1200);
-        return;
+        throw new Error("Razorpay payment gateway is not active or configured on the server. Live payment is required.");
       }
 
       let orderData;
-      let fellBackToLocal = false;
 
-      // 1. Call custom server endpoint to initial Razorpay order session
+      // Call custom server endpoint to initialize Razorpay order session
       try {
         const orderResponse = await authFetch(`${API_URL}/api/payments/razorpay/order`, {
           method: "POST",
@@ -7596,133 +7551,88 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
           throw new Error(orderData.message || "Failed to initialize secure pay order.");
         }
       } catch (fetchErr: any) {
-        if (razorpayServerEnabled) {
-          throw new Error(`Real Payment error: Unable to initialize secure gateway order. ${fetchErr.message || "Please check your network and key configs."}`);
-        }
-        console.warn("[Razorpay Connection Warning]: Unable to connect to backend payment server securely natively. Seamlessly routing to design sandbox simulation mode:", fetchErr);
-        fellBackToLocal = true;
-        orderData = {
-          success: true,
-          isSandbox: true,
-          orderId: `order_sand_${Math.random().toString(36).substring(2, 10)}`,
-          keyId: "rzp_test_sandbox_dummy",
-          amount: Math.round(finalPriceToOrder * 100),
-          currency: "INR",
-          receipt: `receipt_sand_${Date.now()}`,
-          discountApplied: appliedCoupon ? appliedCoupon.discountAmount : 0,
-          finalAmount: finalPriceToOrder
-        };
+        throw new Error(`Real Payment error: Unable to initialize secure gateway order. ${fetchErr.message || "Please check your network and key configs."}`);
       }
 
       const currentUserId = session?.user?.id || "local-user";
 
-      if (orderData.isSandbox && razorpayServerEnabled) {
-        throw new Error("Security validation failed: Demo sandbox payment is strictly disabled in live production mode.");
+      if (orderData.isSandbox) {
+        throw new Error("Security validation failed: Demo sandbox payment is strictly disabled.");
       }
 
-      // 2. Determine authentic checkout vs high-fidelity design sandbox simulator
-      if (!orderData.isSandbox) {
-        if (!(window as any).Razorpay) {
-          throw new Error("Razorpay Checkout SDK was not found or was blocked by this browser's iframe rules. Please open the application in a new tab to pay with real Razorpay.");
-        }
-        setCheckoutStep(2); // Initializing official overlay
-        
-        const rzpOptions = {
-          key: orderData.keyId,
-          amount: orderData.amount,
-          currency: orderData.currency,
-          name: "Wrindha OS",
-          description: `Upgrading to ${plan.name} Subscription`,
-          order_id: orderData.orderId,
-          handler: async function (razorpayResponse: any) {
-            setCheckoutStep(2); // Performing security webhook/signature verify
-            try {
-              const verifyResponse = await authFetch(`${API_URL}/api/payments/razorpay/verify`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  razorpay_payment_id: razorpayResponse.razorpay_payment_id,
-                  razorpay_order_id: razorpayResponse.razorpay_order_id,
-                  razorpay_signature: razorpayResponse.razorpay_signature,
-                  isSandbox: false,
-                  couponCode: appliedCoupon ? appliedCoupon.couponCode : undefined,
-                  userId: currentUserId,
-                  userEmail: session?.user?.email || "user@wrindha.com",
-                  discountApplied: appliedCoupon ? appliedCoupon.discountAmount : 0,
-                  paidAmount: finalPriceToOrder
-                })
-              });
-
-              const verifyData = await verifyResponse.json();
-              if (verifyData.success) {
-                // Perform state persistence upgrades
-                setUpgradingTo(plan.id);
-                await onUpgrade(
-                  currentUserId, 
-                  plan.name, 
-                  9999, 
-                  `${finalPriceToOrder}`, 
-                  plan.id, 
-                  `Razorpay Gateway (${razorpayResponse.razorpay_payment_id})`
-                );
-                setUpgradingTo(null);
-                setCheckoutStep(3); // Upgraded successfully
-                setSuccessMsg(`Congratulations! Upgraded successfully to ${plan.name} [Paid via Razorpay Live Gateway]! Premium functions active. ✨`);
-                setTimeout(() => setSuccessMsg(null), 6000);
-              } else {
-                throw new Error(verifyData.message || "Security authorization signature is invalid.");
-              }
-            } catch (err: any) {
-              setPaymentError(err.message || "Razorpay Payment verification failure. Ledger transaction rejected.");
-              setCheckoutStep(1);
-            }
-          },
-          prefill: {
-            name: session?.user?.user_metadata?.full_name || "Productive Student",
-            email: session?.user?.email || "user@wrindha.com"
-          },
-          theme: {
-            color: "#6366f1"
-          },
-          modal: {
-            ondismiss: function () {
-              setCheckoutStep(1);
-              setPaymentError("Razorpay transaction session cancelled by user.");
-            }
-          }
-        };
-
-        const razorInstance = new (window as any).Razorpay(rzpOptions);
-        razorInstance.open();
-      } else {
-        // High fidelity sandbox simulation mode with instant automatic upgrade
-        // No checkout manual forms or simulators. Fully automated upgrade on local/sandbox environment.
-        setSandboxOrderData(orderData);
-        setSandboxFellBack(fellBackToLocal);
-        setSandboxFinalPrice(finalPriceToOrder);
-        setCheckoutStep(2); // Progress to verifying loading segment
-
-        setTimeout(async () => {
+      // Determine authentic checkout
+      if (!(window as any).Razorpay) {
+        throw new Error("Razorpay Checkout SDK was not found or was blocked by this browser's iframe rules. Please open the application in a new tab to pay with real Razorpay.");
+      }
+      setCheckoutStep(2); // Initializing official overlay
+      
+      const rzpOptions = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "Wrindha OS",
+        description: `Upgrading to ${plan.name} Subscription`,
+        order_id: orderData.orderId,
+        handler: async function (razorpayResponse: any) {
+          setCheckoutStep(2); // Performing security webhook/signature verify
           try {
-            setUpgradingTo(plan.id);
-            await onUpgrade(
-              currentUserId, 
-              plan.name, 
-              9999, 
-              `${finalPriceToOrder}`, 
-              plan.id, 
-              `Simulated Razorpay (Instant Interactive-Free Trial Upgrade Session V1)`
-            );
-            setUpgradingTo(null);
-            setCheckoutStep(3); // Success Screen Active!
-            setSuccessMsg(`Congratulations! Upgraded successfully to ${plan.name} [Simulated Gateway Verified]! All premium functions active. ✨`);
-            setTimeout(() => setSuccessMsg(null), 6000);
-          } catch (upgradeErr: any) {
-            setPaymentError(upgradeErr.message || "Error processing simulated sandbox billing upgrade.");
+            const verifyResponse = await authFetch(`${API_URL}/api/payments/razorpay/verify`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_payment_id: razorpayResponse.razorpay_payment_id,
+                razorpay_order_id: razorpayResponse.razorpay_order_id,
+                razorpay_signature: razorpayResponse.razorpay_signature,
+                isSandbox: false,
+                couponCode: appliedCoupon ? appliedCoupon.couponCode : undefined,
+                userId: currentUserId,
+                userEmail: session?.user?.email || "user@wrindha.com",
+                discountApplied: appliedCoupon ? appliedCoupon.discountAmount : 0,
+                paidAmount: finalPriceToOrder
+              })
+            });
+
+            const verifyData = await verifyResponse.json();
+            if (verifyData.success) {
+              // Perform state persistence upgrades
+              setUpgradingTo(plan.id);
+              await onUpgrade(
+                currentUserId, 
+                plan.name, 
+                9999, 
+                `${finalPriceToOrder}`, 
+                plan.id, 
+                `Razorpay Gateway (${razorpayResponse.razorpay_payment_id})`
+              );
+              setUpgradingTo(null);
+              setCheckoutStep(3); // Upgraded successfully
+              setSuccessMsg(`Congratulations! Upgraded successfully to ${plan.name} [Paid via Razorpay Live Gateway]! Premium functions active. ✨`);
+              setTimeout(() => setSuccessMsg(null), 6000);
+            } else {
+              throw new Error(verifyData.message || "Security authorization signature is invalid.");
+            }
+          } catch (err: any) {
+            setPaymentError(err.message || "Razorpay Payment verification failure. Ledger transaction rejected.");
             setCheckoutStep(1);
           }
-        }, 1200);
-      }
+        },
+        prefill: {
+          name: session?.user?.user_metadata?.full_name || "Productive Student",
+          email: session?.user?.email || "user@wrindha.com"
+        },
+        theme: {
+          color: "#6366f1"
+        },
+        modal: {
+          ondismiss: function () {
+            setCheckoutStep(1);
+            setPaymentError("Razorpay transaction session cancelled by user.");
+          }
+        }
+      };
+
+      const razorInstance = new (window as any).Razorpay(rzpOptions);
+      razorInstance.open();
     } catch (err: any) {
       setPaymentError(err.message || 'Unable to establish secure Razorpay handshake checkout.');
       setCheckoutStep(1);
