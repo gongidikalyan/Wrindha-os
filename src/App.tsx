@@ -3481,7 +3481,7 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan, 
                           <Sparkles className="w-3 h-3 text-amber-500" />
                           Suggested Website Features to Include:
                         </span>
-                        <p className="text-[11px] text-gray-450 dark:text-gray-400 leading-snug">
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-snug">
                           Align your plans with actual app modules. Click any capability below to instantly append it to this plan:
                         </p>
                         <div className="flex flex-wrap gap-1.5 pt-1 max-h-[140px] overflow-y-auto pr-1">
@@ -3607,11 +3607,11 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan, 
                 <p className="text-xs text-gray-400 mt-1">Directly correlated checkouts</p>
               </div>
               <div className="p-6 bg-gradient-to-br from-emerald-950/25 to-teal-900/10 dark:from-emerald-950/40 dark:to-teal-950/20 border border-emerald-500/20 rounded-[2rem] shadow-sm">
-                <p className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-450">Remittance Revenue via Promos</p>
+                <p className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Remittance Revenue via Promos</p>
                 <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
                   ₹{Math.round(coupons.reduce((sum, cp) => sum + (parseFloat(cp.total_revenue_generated) || 0), 0))}
                 </p>
-                <p className="text-xs text-gray-550 mt-1">Verified checkout transactions</p>
+                <p className="text-xs text-gray-500 mt-1">Verified checkout transactions</p>
               </div>
             </div>
 
@@ -4262,7 +4262,7 @@ function DashboardView({
             <span>Eisenhower Matrix integration</span>
             <button 
               onClick={() => setActiveTab('lifeos')}
-              className="text-indigo-600 hover:text-indigo-750 dark:hover:text-indigo-450 font-bold hover:underline"
+              className="text-indigo-600 hover:text-indigo-700 dark:hover:text-indigo-400 font-bold hover:underline"
             >
               Open Life OS &rarr;
             </button>
@@ -4460,7 +4460,7 @@ function DashboardView({
           <div>
             <div className="flex justify-between items-start mb-4">
               <div className="p-2 bg-teal-50 dark:bg-teal-950/40 rounded-xl group-hover:bg-teal-100 dark:group-hover:bg-teal-900/60 transition-colors">
-                <Award className="w-6 h-6 text-teal-600 dark:text-teal-450" />
+                <Award className="w-6 h-6 text-teal-600 dark:text-teal-400" />
               </div>
               <span className="text-xs font-black uppercase tracking-wider text-teal-500">Career Trajectory</span>
             </div>
@@ -4512,11 +4512,11 @@ function DashboardView({
             <div className="grid grid-cols-2 gap-3 mt-4">
               <div className="bg-emerald-50/20 dark:bg-emerald-950/20 p-2.5 rounded-2xl border border-emerald-100/20 dark:border-emerald-900/20">
                 <span className="text-[10px] uppercase font-black text-emerald-600 dark:text-emerald-400 block">This Month</span>
-                <span className="text-lg font-black font-mono text-emerald-600 dark:text-emerald-455 truncate block">
+                <span className="text-lg font-black font-mono text-emerald-600 dark:text-emerald-400 truncate block">
                   {formatVal(monthlyTotalSpent)}
                 </span>
               </div>
-              <div className="bg-gray-50 dark:bg-gray-850 p-2.5 rounded-2xl border border-gray-100/50 dark:border-gray-800/40">
+              <div className="bg-gray-50 dark:bg-gray-800/60 p-2.5 rounded-2xl border border-gray-100/50 dark:border-gray-800/40">
                 <span className="text-[10px] uppercase font-black text-gray-400 dark:text-gray-500 block">Remaining</span>
                 <span className={cn(
                   "text-lg font-black font-mono truncate block",
@@ -7822,7 +7822,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
               {isPremiumPaid && (
                 <div className="sm:col-span-2 pt-4 border-t border-gray-50 dark:border-gray-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
-                    <p className="text-[10px] uppercase font-bold text-rose-505">Subscription Actions</p>
+                    <p className="text-[10px] uppercase font-bold text-rose-500">Subscription Actions</p>
                     <p className="text-[11px] text-gray-400 leading-relaxed">
                       {cancellationInfo.isCancelled 
                         ? `This subscription will terminate on ${nextRenewalDate}. You can buy a plan below at any time to renew your subscription.` 
@@ -7832,7 +7832,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                   {!cancellationInfo.isCancelled && (
                     <button
                       onClick={() => setShowCancelModal(true)}
-                      className="px-4 py-2 bg-rose-50 dark:bg-rose-950/20 hover:bg-rose-100 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-450 text-[10px] uppercase font-black tracking-widest rounded-xl transition-all border border-rose-100 dark:border-rose-900/30 shrink-0 select-none"
+                      className="px-4 py-2 bg-rose-50 dark:bg-rose-950/20 hover:bg-rose-100 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-[10px] uppercase font-black tracking-widest rounded-xl transition-all border border-rose-100 dark:border-rose-900/30 shrink-0 select-none"
                     >
                       Cancel Subscription
                     </button>
@@ -7932,14 +7932,14 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                 <div className="h-[2px] bg-gray-100 dark:bg-gray-800/60 w-full"></div>
 
                 <div className="space-y-4">
-                  <h4 className={cn("text-xs font-black uppercase tracking-wider", isCurrent ? "text-indigo-300" : "text-gray-450 dark:text-gray-400")}>
+                  <h4 className={cn("text-xs font-black uppercase tracking-wider", isCurrent ? "text-indigo-300" : "text-gray-500 dark:text-gray-400")}>
                     Included Capabilities
                   </h4>
                   <ul className="space-y-3.5">
                     {p.features.map((feature, index) => (
                        <li key={index} className="flex items-center gap-3">
                         <CheckCircle2 className="w-5 h-5 text-indigo-500 shrink-0 animate-none" />
-                        <span className={cn("text-sm", isCurrent ? "text-gray-200" : "text-gray-650 dark:text-gray-300")}>{feature}</span>
+                        <span className={cn("text-sm", isCurrent ? "text-gray-200" : "text-gray-600 dark:text-gray-300")}>{feature}</span>
                       </li>
                     ))}
                   </ul>
@@ -8182,7 +8182,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                 <button
                   disabled={cancelling}
                   onClick={() => setShowCancelModal(false)}
-                  className="w-full py-3.5 bg-gray-150 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-extrabold rounded-xl text-[10px] uppercase tracking-widest transition-colors text-center shadow-sm border border-gray-200 dark:border-gray-700/50"
+                  className="w-full py-3.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-extrabold rounded-xl text-[10px] uppercase tracking-widest transition-colors text-center shadow-sm border border-gray-200 dark:border-gray-700/50"
                 >
                   No, Keep Premium Access
                 </button>
@@ -8209,7 +8209,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                   setCheckoutStep(1);
                   setPaymentError(null);
                 }}
-                className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors text-slate-500 dark:text-slate-300 z-50 shadow-sm border border-slate-200 dark:border-slate-750"
+                className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors text-slate-500 dark:text-slate-300 z-50 shadow-sm border border-slate-200 dark:border-slate-700"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -8242,7 +8242,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                       <div className="text-right">
                         {appliedCoupon ? (
                           <>
-                            <span className="text-xs line-through text-gray-400 dark:text-gray-550 mr-2 font-mono">
+                            <span className="text-xs line-through text-gray-400 dark:text-gray-500 mr-2 font-mono">
                               ₹{parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''))}
                             </span>
                             <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
