@@ -165,10 +165,10 @@ async function startServer() {
   app.use((req, res, next) => {
     const origin = req.headers.origin;
     const allowedPatterns = [
-      /^https?:\/\/(.*\.)?wrindhaos\.in$/,
-      /^https?:\/\/.*\.github\.io$/,
+      /^https:\/\/wrindhaos\.in$/,
+      /^https:\/\/.*\.github\.io$/,
       /^http:\/\/localhost:\d+$/,
-      /^https?:\/\/.*\.run\.app$/ // For AI Studio development/shared previews
+      /^https:\/\/.*\.run\.app$/ // For AI Studio development/shared previews
     ];
 
     if (origin) {
@@ -1018,7 +1018,9 @@ Ensure your response is detailed, professional, encouraging, and tailored to the
       userId,
       userEmail,
       discountApplied,
-      paidAmount
+      paidAmount,
+      planName,
+      planId
     } = req.body;
 
     try {
@@ -1076,6 +1078,91 @@ Ensure your response is detailed, professional, encouraging, and tailored to the
         }
       };
 
+      const recordPaymentLedgerTransaction = async () => {
+        const pName = planName || "Premium";
+        const pId = planId || "premium-plan-59";
+        const coin = req.body.currency || "INR";
+        const numAmount = parseFloat(paidAmount) || 0;
+        const nowIso = new Date().toISOString();
+
+        const isValidUuid = (uuidStr: string) => {
+          if (!uuidStr) return false;
+          return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuidStr);
+        };
+
+        const targetUserId = userId || "local-user";
+
+        console.log(`[Payment Ledger Audit] Recording transactional success for ${targetUserId} - Plan: ${pName}, Amount: ${numAmount}`);
+
+        const paymentRecord = {
+          id: razorpay_payment_id,
+          user_id: targetUserId,
+          razorpay_payment_id: razorpay_payment_id,
+          amount: numAmount,
+          currency: coin,
+          status: "captured",
+          paid_at: nowIso,
+          created_at: nowIso
+        };
+
+        const orderRecord = {
+          id: razorpay_order_id,
+          user_id: targetUserId,
+          plan_id: null,
+          plan_name: pName,
+          amount: numAmount,
+          currency: coin,
+          status: "completed",
+          payment_method: "razorpay",
+          created_at: nowIso
+        };
+
+        const subscriptionRecord = {
+          id: "sub_" + Math.random().toString(36).substring(2, 12),
+          user_id: targetUserId,
+          plan: pName,
+          status: "active",
+          trial_start_at: nowIso,
+          trial_end_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          current_period_start: nowIso,
+          current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          razorpay_customer_id: null,
+          razorpay_subscription_id: razorpay_order_id || null,
+          created_at: nowIso
+        };
+
+        if (isValidUuid(targetUserId) && process.env.VITE_SUPABASE_URL) {
+          try {
+            console.log("[Payment Ledger Audit] Inserting standard production ledger records into Supabase...");
+            
+            // 1. Payment insertion
+            const { error: payErr } = await supabase.from("payments").upsert(paymentRecord);
+            if (payErr) console.error("[Payment Ledger Audit] Supabase payments table write failed:", payErr);
+
+            // 2. Order insertion
+            const { error: ordErr } = await supabase.from("orders").upsert(orderRecord);
+            if (ordErr) console.error("[Payment Ledger Audit] Supabase orders table write failed:", ordErr);
+
+            // 3. Subscription insertion
+            const { error: subErr } = await supabase.from("subscriptions").upsert(subscriptionRecord);
+            if (subErr) console.error("[Payment Ledger Audit] Supabase subscriptions table write failed:", subErr);
+
+            // 4. Update profile subscription tier for complete parity
+            const { error: profErr } = await supabase.from("profiles").update({
+              subscription_tier: pName,
+              max_habits: 9999,
+              has_paid: true,
+              account_status: "premium"
+            }).eq("id", targetUserId);
+            if (profErr) console.error("[Payment Ledger Audit] Supabase profiles update failed:", profErr);
+
+            console.log("[Payment Ledger Audit] Production DB writes resolved successfully.");
+          } catch (supaErr) {
+            console.error("[Payment Ledger Audit] Fatal Supabase insert thread error:", supaErr);
+          }
+        }
+      };
+
       if (isSandbox) {
         return res.status(400).json({
           success: false,
@@ -1100,6 +1187,7 @@ Ensure your response is detailed, professional, encouraging, and tailored to the
 
       if (expectedSignature === razorpay_signature) {
         await recordCouponUsageAndIncrement();
+        await recordPaymentLedgerTransaction();
         return res.json({
           success: true,
           status: "verified",

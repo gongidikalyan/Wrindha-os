@@ -7588,7 +7588,9 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                 userId: currentUserId,
                 userEmail: session?.user?.email || "user@wrindha.com",
                 discountApplied: appliedCoupon ? appliedCoupon.discountAmount : 0,
-                paidAmount: finalPriceToOrder
+                paidAmount: finalPriceToOrder,
+                planName: plan.name,
+                planId: plan.id
               })
             });
 
