@@ -29,6 +29,14 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+        env:
+  VITE_API_URL: https://wrindha-os.onrender.com
+Example:
+YAML
+- name: Build
+  run: npm run build
+  env:
+    VITE_API_URL: https://wrindha-os.onrender.com
 
       - name: Build
         run: npm run build
