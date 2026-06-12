@@ -3,6 +3,20 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Premium Workspace custom color variables for seamless light and dark utility rendering */
+  --color-gray-150: #ECEEF1;
+  --color-gray-205: #E2E5E9;
+  --color-gray-450: #7F8A9E;
+  --color-gray-455: #758197;
+  --color-gray-850: #182232;
+  --color-gray-855: #151E2D;
+  --color-gray-955: #0A0F18;
+
+  --color-indigo-105: #E0E4FF;
+  --color-indigo-650: #5A52FF;
+  --color-orange-455: #FF7B25;
+  --color-blue-455: #4791FF;
 }
 
 @layer base {

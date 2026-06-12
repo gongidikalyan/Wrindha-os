@@ -4005,7 +4005,7 @@ function DashboardView({
   const currentStreakVal = habits.length > 0 ? Math.max(...habits.map(h => h.streak || 0)) : 0;
 
   const studySessionsToday = studySessions.filter(s => s.sessionDate === todayStr);
-  const studyMinutesToday = studySessionsToday.reduce((acc, curr) => acc + curr.durationMinutes, 0);
+  const studyMinutesToday = studySessionsToday.reduce((acc, curr) => acc + (Number(curr.durationMinutes) || 0), 0);
 
   const getStartOfWeek = () => {
     const current = new Date();
@@ -4017,17 +4017,17 @@ function DashboardView({
   };
   const startOfWeek = getStartOfWeek();
   const weeklySessions = studySessions.filter(s => new Date(s.sessionDate) >= startOfWeek);
-  const weeklyStudyMinutes = weeklySessions.reduce((acc, curr) => acc + curr.durationMinutes, 0);
+  const weeklyStudyMinutes = weeklySessions.reduce((acc, curr) => acc + (Number(curr.durationMinutes) || 0), 0);
   const weeklyProgressPercentage = Math.round(Math.min(100, (weeklyStudyMinutes / 300) * 100)); // Target 300 min/week
 
   const shortTermGoals = goals.filter(g => g.type === GoalType.SHORT);
-  const shortTermProgress = shortTermGoals.length > 0 ? Math.round(shortTermGoals.reduce((acc, curr) => acc + curr.progress, 0) / shortTermGoals.length) : 0;
+  const shortTermProgress = shortTermGoals.length > 0 ? Math.round(shortTermGoals.reduce((acc, curr) => acc + (Number(curr.progress) || 0), 0) / shortTermGoals.length) : 0;
 
   const mediumTermGoals = goals.filter(g => g.type === GoalType.MEDIUM);
-  const mediumTermProgress = mediumTermGoals.length > 0 ? Math.round(mediumTermGoals.reduce((acc, curr) => acc + curr.progress, 0) / mediumTermGoals.length) : 0;
+  const mediumTermProgress = mediumTermGoals.length > 0 ? Math.round(mediumTermGoals.reduce((acc, curr) => acc + (Number(curr.progress) || 0), 0) / mediumTermGoals.length) : 0;
 
   const longTermGoals = goals.filter(g => g.type === GoalType.LONG);
-  const longTermProgress = longTermGoals.length > 0 ? Math.round(longTermGoals.reduce((acc, curr) => acc + curr.progress, 0) / longTermGoals.length) : 0;
+  const longTermProgress = longTermGoals.length > 0 ? Math.round(longTermGoals.reduce((acc, curr) => acc + (Number(curr.progress) || 0), 0) / longTermGoals.length) : 0;
 
   // Career
   const savedPath = localStorage.getItem("wrindha_active_career_path");
@@ -4041,22 +4041,68 @@ function DashboardView({
   // Expenses & Budget
   const currentMonthStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
   const monthlyExpenses = expenses.filter(e => e.date?.startsWith(currentMonthStr));
-  const monthlyTotalSpent = monthlyExpenses.reduce((acc, curr) => acc + curr.amount, 0);
+  const monthlyTotalSpent = monthlyExpenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   const budgetRemaining = budget - monthlyTotalSpent;
   const budgetProgressPercent = budget > 0 ? Math.max(0, Math.min(100, (budgetRemaining / budget) * 100)) : 0;
 
-  // Productivity Score Calculation
-  const taskRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
-  const habitRate = habits.length > 0 ? (habitsCompletedToday / habits.length) * 100 : 0;
-  const studyRate = Math.min(100, (studyMinutesToday / 45) * 100); // 45-min daily target
-  const goalsRate = goals.length > 0 ? (goals.reduce((acc, curr) => acc + curr.progress, 0) / goals.length) : 0;
+  // Productivity Score Calculation (Dynamically scaled so inactive modules don't penalize the user's score)
+  let totalScoreWeight = 0;
+  let accumulatedProductivity = 0;
 
-  const productivityScore = Math.round(
-    (taskRate * 0.3) +
-    (habitRate * 0.3) +
-    (studyRate * 0.2) +
-    (goalsRate * 0.2)
-  );
+  if (totalTasks > 0) {
+    // Encouraging curve: Starts at 50% baseline for listing tasks, scales up to 100% as tasks are completed.
+    const taskRate = 50 + (completedTasks / totalTasks) * 50;
+    accumulatedProductivity += taskRate * 0.3;
+    totalScoreWeight += 0.3;
+  }
+  if (habits.length > 0) {
+    // 7-day rolling retrospective consistency to prevent overnight score dropping to 0
+    const weekDates: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      weekDates.push(d.toISOString().split('T')[0]);
+    }
+
+    const habitConsistencyList = habits.map(h => {
+      if (!h.completedAt || h.completedAt.length === 0) return 0;
+      const completionsInWeek = weekDates.filter(dateStr => 
+        h.completedAt.some((dateTime: string) => dateTime.startsWith(dateStr))
+      ).length;
+      return (completionsInWeek / 7) * 100;
+    });
+
+    const avgConsistency = habitConsistencyList.length > 0 
+      ? habitConsistencyList.reduce((acc, curr) => acc + curr, 0) / habitConsistencyList.length 
+      : 100;
+
+    const todayHabitPercent = habits.length > 0 ? (habitsCompletedToday / habits.length) * 100 : 100;
+    
+    // 70% rolling weekly consistency + 30% today's execution
+    const habitRate = (avgConsistency * 0.7) + (todayHabitPercent * 0.3);
+    accumulatedProductivity += habitRate * 0.3;
+    totalScoreWeight += 0.3;
+  }
+  const hasStudyCourses = (studyCourses && studyCourses.length > 0) || (studySessions && studySessions.length > 0);
+  if (hasStudyCourses) {
+    const dailyStudyRate = Math.min(100, ((Number(studyMinutesToday) || 0) / 45) * 100); // 45-min daily target
+    const weeklyProgressPercentage = Math.round(Math.min(100, (weeklyStudyMinutes / 300) * 100)); // 300-min weekly target
+
+    // 40% daily progress + 60% weekly cumulative goal to keep morning score healthy
+    const studyRate = (dailyStudyRate * 0.4) + (weeklyProgressPercentage * 0.6);
+    accumulatedProductivity += studyRate * 0.2;
+    totalScoreWeight += 0.2;
+  }
+  if (goals && goals.length > 0) {
+    // Base floor of 50m to credit active ambitions; scales the rest relative to progress.
+    const goalsRate = goals.reduce((acc, curr) => acc + (50 + (Number(curr.progress) || 0) * 0.5), 0) / goals.length;
+    accumulatedProductivity += goalsRate * 0.2;
+    totalScoreWeight += 0.2;
+  }
+
+  const productivityScore = totalScoreWeight > 0 
+    ? Math.round(accumulatedProductivity / totalScoreWeight) 
+    : 100; // Starting fresh at 100% when no items are set up yet
 
   const isUnlimitedTasks = !!(
     subscriptionTier?.toLowerCase() === 'premium' || 
