@@ -723,12 +723,12 @@ export default function AnalyticsView({
               <div>
                 <h3 className="text-lg font-bold mb-6 dark:text-white flex items-center gap-2">
                   <Award className="w-5 h-5 text-teal-500 animate-pulse" />
-                  Career Trajectory Development Analytics
+                  Career Roadmap Development Analytics
                 </h3>
                 
                 {!path ? (
                   <div className="h-64 flex flex-col items-center justify-center text-gray-300 dark:text-gray-600">
-                    <p className="text-sm italic">Initiate a structured career trajectory roadmap to monitor learning pathway progress.</p>
+                    <p className="text-sm italic">Initiate a structured career roadmap to monitor learning pathway progress.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">

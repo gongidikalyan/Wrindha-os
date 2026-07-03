@@ -70,6 +70,18 @@ export interface Task {
   dueDate?: string;
   tags: string[];
   eisenhower_quadrant?: "do_first" | "schedule" | "delegate" | "eliminate";
+  priority?: "low" | "medium" | "high" | "urgent";
+  category?: string;
+  timeEstimate?: number; // in minutes
+  recurring?: "none" | "daily" | "weekly" | "monthly";
+  attachments?: { id: string; name: string; url: string; size?: string }[];
+  notes?: string;
+  dependencies?: string[]; // parent task IDs that must be completed first
+  subtasks?: { id: string; title: string; completed: boolean }[];
+  kanbanStatus?: "backlog" | "todo" | "inprogress" | "review" | "completed";
+  archived?: boolean;
+  subjectId?: string; // Integrated Study Course
+  projectId?: string; // Integrated Goal or Project
 }
 
 // 6. Goal Setting
@@ -109,6 +121,19 @@ export interface TimetableEntry {
   title: string;
   date: string;
   color: string;
+  startTime?: string;
+  endTime?: string;
+  description?: string;
+  category?: string;
+  location?: string;
+  notes?: string;
+  priority?: "low" | "medium" | "high" | "urgent";
+  recurring?: "none" | "daily" | "weekly" | "monthly" | "alternate" | "custom";
+  recurrenceRule?: string;
+  reminderMinutes?: number;
+  completed?: boolean;
+  subjectId?: string;
+  attachments?: { id: string; name: string; url: string }[];
 }
 
 // 9. Blogs & Guides

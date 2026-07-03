@@ -19,6 +19,7 @@ import {
   Brain,
   BookOpen,
   ChevronRight,
+  ChevronLeft,
   TrendingDown,
   TrendingUp,
   AlertCircle,
@@ -26,6 +27,7 @@ import {
   ShieldCheck,
   Shield,
   Users,
+  User,
   Activity,
   LogIn,
   LogOut,
@@ -47,13 +49,16 @@ import {
   Award,
   ShieldAlert,
   Timer,
+  CalendarRange,
   Play,
   Zap,
   QrCode,
   Smartphone,
   Tag,
   Ban,
-  RotateCcw
+  RotateCcw,
+  Copy,
+  ArrowRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn, formatCurrency, getStorage, setStorage } from "@/src/lib/utils";
@@ -66,19 +71,26 @@ import TaskNotesEditor from "./components/TaskNotesEditor";
 import CareerPlannerView from "./components/CareerPlannerView";
 import HabitRewards from "./components/HabitRewards";
 import LifeOSView from "./components/LifeOSView";
+import FocusCentre from "./components/FocusCentre";
+import { RevisionCalendarView } from "./components/RevisionCalendarView";
+import { ProfileView } from "./components/ProfileView";
+import { TodoView } from "./components/TodoView";
+import { TimetableView } from "./components/TimetableView";
 
 // Modules
 const modules = [
-  { id: 'dashboard', name: 'Overview', icon: LayoutDashboard, color: 'text-blue-500' },
-  { id: 'analytics', name: 'Analytics', icon: BarChart3, color: 'text-pink-500' },
-  { id: 'habits', name: 'Habit Tracker', icon: Flame, color: 'text-orange-500' },
-  { id: 'goals', name: 'Goal System', icon: Target, color: 'text-purple-500' },
-  { id: 'career', name: 'Career Trajectory', icon: Award, color: 'text-teal-500' },
-  { id: 'lifeos', name: 'Life OS', icon: Brain, color: 'text-indigo-500' },
-  { id: 'study', name: 'Study Planner', icon: GraduationCap, color: 'text-indigo-500' },
-  { id: 'finance', name: 'Expenses', icon: Wallet, color: 'text-emerald-500' },
+  { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, color: 'text-blue-500' },
+  { id: 'study', name: 'Study', icon: GraduationCap, color: 'text-indigo-500' },
   { id: 'timetable', name: 'Timetable', icon: Calendar, color: 'text-cyan-500' },
-  { id: 'blogs', name: 'Blogs & Guides', icon: FileText, color: 'text-rose-500' },
+  { id: 'focus', name: 'Focus Centre', icon: Timer, color: 'text-rose-500' },
+  { id: 'habits', name: 'Habits', icon: Flame, color: 'text-orange-500' },
+  { id: 'lifeos', name: 'Life OS', icon: Brain, color: 'text-purple-500' },
+  { id: 'goals', name: 'Goal System', icon: Target, color: 'text-rose-500' },
+  { id: 'career', name: 'Career Trajectory', icon: Award, color: 'text-teal-500' },
+  { id: 'todo', name: 'To-Do', icon: ListTodo, color: 'text-cyan-500' },
+  { id: 'finance', name: 'Finance', icon: Wallet, color: 'text-emerald-500' },
+  { id: 'analytics', name: 'Analytics', icon: BarChart3, color: 'text-pink-500' },
+  { id: 'profile', name: 'Profile', icon: User, color: 'text-teal-500' },
   { id: 'pricing', name: 'Plans & Pricing', icon: CreditCard, color: 'text-amber-500' },
 ];
 
@@ -115,6 +127,8 @@ const calculateTrialDates = (signupTimeStr: string | undefined | null, currentSe
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [preselectedFocusTaskId, setPreselectedFocusTaskId] = useState<string | null>(null);
+  const [preselectedFocusCourseId, setPreselectedFocusCourseId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
   const isFetchingRef = useRef(false);
   const [currency, _setCurrency] = useState<'USD' | 'INR'>(() => (localStorage.getItem('wrindha_currency') as 'USD' | 'INR') || 'INR');
@@ -614,6 +628,20 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [referrals, setReferrals] = useState<{ id: string; name: string; email: string; date: string; status: 'Completed' | 'Pending' }[]>(() => {
+    const saved = localStorage.getItem('wrindha_referrals');
+    if (saved) return JSON.parse(saved);
+    return [
+      { id: "ref1", name: "Anish Roy", email: "anish@gmail.com", date: "2026-06-15", status: "Completed" },
+      { id: "ref2", name: "Divya Sharma", email: "divya.sh@outlook.com", date: "2026-06-20", status: "Completed" },
+      { id: "ref3", name: "Kunal Verma", email: "kunal.v@gmail.com", date: "2026-06-28", status: "Completed" },
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('wrindha_referrals', JSON.stringify(referrals));
+  }, [referrals]);
+
   const [blogs, setBlogs] = useState<Blog[]>(() => {
     const saved = localStorage.getItem('wrindha_blogs');
     const defaultBlogs: Blog[] = [
@@ -660,8 +688,8 @@ You don't need to manually calculate progress. When you check off a Level 4 Dail
 - Project completions aggregate to drive your Level 1 Strategic Goal's progress bar.
 - The entire ecosystem feeds into your global "Productivity Index" score on your central cockpit!
 
-💡 PRO TIP: CONSULT THE AI ADVISOR
-Every morning, click "Analyze priority recommendations" on your Dashboard. Our AI guidance engine analyzes your strategic pyramid, projects, and active tasks, serving up personalized advice to help you spot bottlenecks, schedule high-leverage deep work blocks, and maintain massive momentum!`,
+💡 PRO TIP: CONSULT THE STRATEGIC ADVISOR
+Every morning, click "Analyze priority recommendations" on your Dashboard. Our strategic guidance engine analyzes your strategic pyramid, projects, and active tasks, serving up personalized advice to help you spot bottlenecks, schedule high-leverage deep work blocks, and maintain massive momentum!`,
         author: "Admin",
         category: "Productivity",
         createdAt: "2026-06-08T00:00:00Z",
@@ -1406,12 +1434,36 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
           mapped.user_id = session.user.id;
         }
         // Handle common camelCase to snake_case mapping
-        if (mapped.completedAt) { mapped.completed_at = mapped.completedAt; delete mapped.completedAt; }
-        if (mapped.dueDate) { mapped.due_date = mapped.dueDate; delete mapped.dueDate; }
-        if (mapped.targetDate) { mapped.target_date = mapped.targetDate; delete mapped.targetDate; }
-        if (mapped.courseId) { mapped.course_id = mapped.courseId; delete mapped.courseId; }
-        if (mapped.sessionDate) { mapped.session_date = mapped.sessionDate; delete mapped.sessionDate; }
-        if (mapped.durationMinutes) { mapped.duration_minutes = mapped.durationMinutes; delete mapped.durationMinutes; }
+        if ('completedAt' in mapped) { mapped.completed_at = mapped.completedAt || []; delete mapped.completedAt; }
+        if ('dueDate' in mapped) { mapped.due_date = mapped.dueDate || null; delete mapped.dueDate; }
+        if ('targetDate' in mapped) { mapped.target_date = mapped.targetDate || null; delete mapped.targetDate; }
+        if ('courseId' in mapped) { mapped.course_id = mapped.courseId; delete mapped.courseId; }
+        if ('sessionDate' in mapped) { mapped.session_date = mapped.sessionDate; delete mapped.sessionDate; }
+        if ('durationMinutes' in mapped) { mapped.duration_minutes = mapped.durationMinutes; delete mapped.durationMinutes; }
+
+        // Filter keys to only allow valid database columns to prevent database upsert errors
+        const tableColumns: { [key: string]: string[] } = {
+          profiles: ['id', 'email', 'full_name', 'budget', 'currency', 'subscription_tier', 'max_habits', 'custom_features', 'last_active', 'updated_at', 'trial_start_date', 'trial_end_date', 'is_trial_activated', 'has_paid'],
+          habits: ['id', 'user_id', 'name', 'frequency', 'streak', 'completed_at', 'color', 'created_at'],
+          tasks: ['id', 'user_id', 'title', 'description', 'completed', 'quadrant', 'due_date', 'tags', 'created_at'],
+          expenses: ['id', 'user_id', 'amount', 'category', 'date', 'note', 'created_at'],
+          goals: ['id', 'user_id', 'title', 'type', 'progress', 'target_date', 'created_at'],
+          timetable: ['id', 'user_id', 'type', 'title', 'date', 'color', 'created_at'],
+          study_courses: ['id', 'user_id', 'name', 'progress', 'color', 'exams', 'materials', 'created_at'],
+          study_sessions: ['id', 'course_id', 'session_date', 'duration_minutes', 'topic', 'notes', 'created_at']
+        };
+
+        const allowedColumns = tableColumns[table];
+        if (allowedColumns) {
+          const cleaned: any = {};
+          allowedColumns.forEach(col => {
+            if (col in mapped) {
+              cleaned[col] = mapped[col];
+            }
+          });
+          return cleaned;
+        }
+
         return mapped;
       };
 
@@ -1792,6 +1844,39 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
         <nav className="flex-1 px-4 space-y-1 mt-4">
           {modules.map((m) => {
             const isLocked = false;
+            const isActive = activeTab === m.id;
+            
+            // Dynamic badge computation for a super-premium active feel
+            let badgeText = "";
+            let badgeStyle = "";
+            if (m.id === 'todo') {
+              const pending = tasks.filter(t => !t.completed).length;
+              if (pending > 0) {
+                badgeText = String(pending);
+                badgeStyle = "bg-rose-550/10 text-rose-600 dark:text-rose-400 border border-rose-500/20";
+              }
+            } else if (m.id === 'habits') {
+              const active = habits.length;
+              if (active > 0) {
+                badgeText = String(active);
+                badgeStyle = "bg-orange-550/10 text-orange-600 dark:text-orange-400 border border-orange-500/20";
+              }
+            } else if (m.id === 'goals') {
+              const incomplete = goals.filter(g => g.progress < 100).length;
+              if (incomplete > 0) {
+                badgeText = String(incomplete);
+                badgeStyle = "bg-amber-550/10 text-amber-600 dark:text-amber-400 border border-amber-500/20";
+              }
+            } else if (m.id === 'pricing') {
+              const completedCount = referrals.filter(r => r.status === 'Completed').length;
+              const discountPct = Math.min(20, completedCount * 4);
+              badgeText = discountPct > 0 ? `-${discountPct}%` : "PRO";
+              badgeStyle = "bg-emerald-550/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20";
+            }
+
+            const colorClass = m.color || 'text-indigo-500';
+            const baseColor = colorClass.replace('text-', '').split('-')[0] || 'indigo';
+            
             return (
               <button
                 key={m.id}
@@ -1799,22 +1884,62 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
                   setActiveTab(m.id);
                 }}
                 className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group relative",
-                  activeTab === m.id 
-                    ? "bg-black dark:bg-indigo-600 text-white shadow-lg shadow-black/10" 
-                    : "text-[#6B7280] dark:text-gray-500 hover:bg-[#F3F4F6] dark:hover:bg-gray-800 hover:text-[#1A1A1A] dark:hover:text-white"
+                  "w-full flex items-center gap-3 py-2.5 transition-all duration-300 group relative rounded-xl font-medium text-sm overflow-hidden cursor-pointer",
+                  isActive
+                    ? "bg-slate-900/5 dark:bg-white/5 text-gray-900 dark:text-white pl-2.5 pr-3"
+                    : "text-[#6B7280] dark:text-gray-400 hover:bg-[#F3F4F6] dark:hover:bg-gray-800/40 hover:text-black dark:hover:text-white pl-3 pr-3 hover:translate-x-1"
                 )}
               >
-                <m.icon className={cn("w-5 h-5 shrink-0", activeTab !== m.id && m.color)} />
+                {/* Accent vertical bar on active */}
+                {isActive && (
+                  <span className={cn("absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-md", 
+                    baseColor === 'blue' && "bg-blue-500",
+                    baseColor === 'indigo' && "bg-indigo-500",
+                    baseColor === 'cyan' && "bg-cyan-500",
+                    baseColor === 'rose' && "bg-rose-500",
+                    baseColor === 'orange' && "bg-orange-500",
+                    baseColor === 'purple' && "bg-purple-500",
+                    baseColor === 'teal' && "bg-teal-500",
+                    baseColor === 'emerald' && "bg-emerald-500",
+                    baseColor === 'pink' && "bg-pink-500",
+                    baseColor === 'amber' && "bg-amber-500",
+                    !['blue','indigo','cyan','rose','orange','purple','teal','emerald','pink','amber'].includes(baseColor) && "bg-indigo-500"
+                  )} />
+                )}
+
+                <m.icon className={cn(
+                  "w-5 h-5 shrink-0 transition-transform duration-300 group-hover:scale-110",
+                  isActive ? "scale-105" : colorClass
+                )} />
+
                 {isSidebarOpen && (
-                  <span className="font-medium text-sm whitespace-nowrap flex items-center justify-between w-full">
-                    <span>{m.name}</span>
+                  <span className="flex-1 text-left whitespace-nowrap flex items-center justify-between gap-1.5">
+                    <span className={isActive ? "font-bold tracking-tight text-gray-900 dark:text-white" : ""}>
+                      {m.name}
+                    </span>
+                    {badgeText && (
+                      <span className={cn("text-[9px] px-1.5 py-0.5 rounded-md font-black tracking-wider leading-none", badgeStyle)}>
+                        {badgeText}
+                      </span>
+                    )}
                   </span>
                 )}
+
                 {!isSidebarOpen && (
-                  <div className="absolute left-16 bg-black text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-[60] flex items-center gap-1.5">
-                    {m.name}
-                  </div>
+                  <>
+                    {/* Tiny dot overlay in collapsed state for active notifications */}
+                    {badgeText && (
+                      <span className="absolute top-2 right-2.5 w-1.5 h-1.5 rounded-full bg-indigo-550 ring-2 ring-white dark:ring-gray-900 animate-pulse" />
+                    )}
+                    <div className="absolute left-16 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-[60] flex items-center gap-1.5 shadow-xl border border-gray-800">
+                      {m.name}
+                      {badgeText && (
+                        <span className="text-[9px] px-1 bg-white/20 text-white rounded font-mono">
+                          {badgeText}
+                        </span>
+                      )}
+                    </div>
+                  </>
                 )}
               </button>
             );
@@ -1824,16 +1949,26 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
             <button 
               onClick={() => setActiveTab('admin')}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group relative mt-4",
+                "w-full flex items-center gap-3 py-2.5 transition-all duration-300 group relative rounded-xl font-medium text-sm overflow-hidden mt-4 cursor-pointer",
                 activeTab === 'admin' 
-                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20" 
-                  : "text-indigo-400 dark:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                  ? "bg-indigo-600/10 dark:bg-indigo-600/15 text-indigo-600 dark:text-indigo-400 pl-2.5 pr-3" 
+                  : "text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 pl-3 pr-3 hover:translate-x-1"
               )}
             >
-              <ShieldCheck className="w-5 h-5 shrink-0" />
-              {isSidebarOpen && <span className="font-bold text-sm whitespace-nowrap">Admin Center</span>}
+              {activeTab === 'admin' && (
+                <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-md bg-indigo-600 dark:bg-indigo-400" />
+              )}
+              <ShieldCheck className={cn(
+                "w-5 h-5 shrink-0 transition-transform duration-300 group-hover:scale-110",
+                activeTab === 'admin' ? "scale-105" : "text-indigo-500"
+              )} />
+              {isSidebarOpen && (
+                <span className={activeTab === 'admin' ? "font-bold tracking-tight text-indigo-700 dark:text-indigo-300" : "font-bold"}>
+                  Admin Center
+                </span>
+              )}
               {!isSidebarOpen && (
-                <div className="absolute left-16 bg-indigo-600 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-[60]">
+                <div className="absolute left-16 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-[60] shadow-xl">
                   Admin Center
                 </div>
               )}
@@ -1844,17 +1979,17 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
         <div className="p-4 border-t border-[#E5E7EB] dark:border-gray-800 space-y-1">
           <button 
             onClick={() => setShowSettings(!showSettings)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#6B7280] dark:text-gray-500 hover:bg-[#F3F4F6] dark:hover:bg-gray-800 hover:text-black dark:hover:text-white transition-all"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#6B7280] dark:text-gray-400 hover:bg-[#F3F4F6] dark:hover:bg-gray-800/45 hover:text-black dark:hover:text-white transition-all group cursor-pointer"
           >
-            <Settings className="w-5 h-5 shrink-0" />
+            <Settings className="w-5 h-5 shrink-0 transition-transform duration-500 group-hover:rotate-45" />
             {isSidebarOpen && <span className="font-medium text-sm">Settings</span>}
           </button>
           {session && (
             <button 
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all group cursor-pointer"
             >
-              <LogOut className="w-5 h-5 shrink-0" />
+              <LogOut className="w-5 h-5 shrink-0 transition-transform duration-300 group-hover:translate-x-0.5" />
               {isSidebarOpen && <span className="font-medium text-sm">Logout</span>}
             </button>
           )}
@@ -2144,7 +2279,55 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
                 {activeTab === 'analytics' && <AnalyticsView expenses={expenses} habits={habits} tasks={tasks} goals={goals} courses={studyCourses} currency={currency} />}
                {activeTab === 'habits' && <HabitsView habits={habits} setHabits={setHabits} onDelete={(id) => deleteFromSupabase('habits', id)} theme={theme} subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} setActiveTab={setActiveTab} />}
                {activeTab === 'finance' && <FinanceView expenses={expenses} setExpenses={setExpenses} onDelete={(id) => deleteFromSupabase('expenses', id)} currency={currency} setCurrency={setCurrency} theme={theme} budget={userBudget} setBudget={setUserBudget} />}
-               {activeTab === 'study' && <StudyView courses={studyCourses} setCourses={setStudyCourses} onDeleteCourse={(id) => deleteFromSupabase('study_courses', id)} subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} setActiveTab={setActiveTab} />}
+               {activeTab === 'todo' && (
+                 <TodoView
+                   tasks={tasks}
+                   setTasks={setTasks}
+                   courses={studyCourses}
+                   timetableEntries={timetable}
+                   studySessions={studySessions}
+                   theme={theme}
+                   setActiveTab={setActiveTab}
+                   subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'}
+                 />
+               )}
+               {activeTab === 'focus' && (
+                 <FocusCentre 
+                   tasks={tasks}
+                   onToggleTask={(id) => setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t))}
+                   courses={studyCourses}
+                   studySessions={studySessions}
+                   setStudySessions={setStudySessions}
+                   theme={theme}
+                   setActiveTab={setActiveTab}
+                   preselectedTaskId={preselectedFocusTaskId}
+                   preselectedCourseId={preselectedFocusCourseId}
+                   onClearPreselected={() => {
+                     setPreselectedFocusTaskId(null);
+                     setPreselectedFocusCourseId(null);
+                   }}
+                 />
+               )}
+               {activeTab === 'study' && (
+                  <StudyView 
+                    courses={studyCourses} 
+                    setCourses={setStudyCourses} 
+                    onDeleteCourse={(id) => deleteFromSupabase('study_courses', id)} 
+                    subscriptionTier={hasActiveAccess ? (isPremiumPaid || isAdmin ? 'Premium' : 'Trial') : 'Expired'} 
+                    setActiveTab={setActiveTab}
+                    timetableEntries={timetable}
+                    setTimetableEntries={setTimetable}
+                    onDeleteTimetableEntry={(id) => deleteFromSupabase('timetable', id)}
+                    studySessions={studySessions}
+                    setStudySessions={setStudySessions}
+                    theme={theme}
+                    onLaunchFocusCentre={(taskId, courseId) => {
+                      if (taskId) setPreselectedFocusTaskId(taskId);
+                      if (courseId) setPreselectedFocusCourseId(courseId);
+                      setActiveTab('focus');
+                    }}
+                  />
+                )}
                {activeTab === 'goals' && (
                  <GoalsView 
                    goals={goals} 
@@ -2187,11 +2370,37 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
                    setTasks={setTasks}
                    studyCourses={studyCourses}
                    setStudyCourses={setStudyCourses}
+                   onLaunchFocusCentre={(taskId, courseId) => {
+                     if (taskId) setPreselectedFocusTaskId(taskId);
+                     if (courseId) setPreselectedFocusCourseId(courseId);
+                     setActiveTab('focus');
+                   }}
                  />
                )}
-               {activeTab === 'timetable' && <TimetableView entries={timetable} setEntries={setTimetable} onDelete={(id) => deleteFromSupabase('timetable', id)} theme={theme} />}
+                {activeTab === 'timetable' && (
+                  <OldTimetableView 
+                    entries={timetable} 
+                    setEntries={setTimetable} 
+                    onDelete={(id) => deleteFromSupabase('timetable', id)} 
+                    theme={theme} 
+                  />
+                )}
                {activeTab === 'blogs' && <BlogsView blogs={blogs} setBlogs={setBlogs} isAdmin={isAdmin} />}
-               {activeTab === 'pricing' && <PricingView plans={userPlans} subscriptionTier={subscriptionTier} onUpgrade={updateUserTier} onCancelSubscription={cancelUserSubscription} session={session} setActiveTab={setActiveTab} orders={orders} trialStartDateStr={trialStartDateStr} trialEndDateStr={trialEndDateStr} nowSecure={nowSecure} razorpayServerEnabled={razorpayServerEnabled} />}
+                {activeTab === 'profile' && (
+                  <ProfileView 
+                    referrals={referrals} 
+                    setReferrals={setReferrals} 
+                    userName={userName} 
+                    setUserName={setUserName} 
+                    theme={theme} 
+                    setTheme={setTheme} 
+                    subscriptionTier={subscriptionTier} 
+                    session={session} 
+                    setActiveTab={setActiveTab}
+                    handleLogout={handleLogout}
+                  />
+                )}
+               {activeTab === 'pricing' && <PricingView plans={userPlans} subscriptionTier={subscriptionTier} onUpgrade={updateUserTier} onCancelSubscription={cancelUserSubscription} session={session} setActiveTab={setActiveTab} orders={orders} trialStartDateStr={trialStartDateStr} trialEndDateStr={trialEndDateStr} nowSecure={nowSecure} razorpayServerEnabled={razorpayServerEnabled} referrals={referrals} />}
                {activeTab === 'admin' && isAdmin && (
                  <AdminView 
                    plans={userPlans} 
@@ -2218,11 +2427,11 @@ Wrindha OS maps these slots onto your calendar with beautiful category-driven co
       {/* Mobile Sticky Bottom Navigation Bar */}
       <div className="fixed bottom-0 left-0 right-0 z-45 md:hidden bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 px-3 py-2 flex justify-around items-center gap-1 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
         {[
-          { id: 'dashboard', name: 'Overview', icon: LayoutDashboard },
-          { id: 'analytics', name: 'Analytics', icon: BarChart3 },
+          { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
+          { id: 'study', name: 'Study', icon: GraduationCap },
           { id: 'habits', name: 'Habits', icon: Flame },
-          { id: 'blogs', name: 'Blogs', icon: FileText },
-          { id: 'pricing', name: 'Pricing', icon: Award },
+          { id: 'todo', name: 'To-Do', icon: ListTodo },
+          { id: 'profile', name: 'Profile', icon: User },
         ].map((m) => {
           const isLocked = false;
           return (
@@ -2831,7 +3040,7 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan, 
     "Goals milestones & percentage tracking",
     "Dynamic weekly & daily Timetable slots",
     "Admin privileges to publish custom Blogs",
-    "AI-powered context insights & suggestion prompts",
+    "Dynamic context insights & priority suggestion prompts",
     "Exclusive premium productivity badges",
     "Priority 24/7 dedicated chat support",
     "Advanced offline-first local database synchronization"
@@ -3540,7 +3749,7 @@ function AdminView({ plans, allUsers, onUpdateUser, onUpdatePlan, onDeletePlan, 
                   {[
                     { label: "New User Registration", desc: "Allow public account creation", checked: true },
                     { label: "Telemetry & Logs", desc: "Collect usage analytics anonymous data", checked: true },
-                    { label: "AI Optimization", desc: "Enable Gemini-powered smart features", checked: true },
+                    { label: "Database Backup Sync", desc: "Enable secure background cloud synchronization", checked: true },
                     { label: "Dark Mode Default", desc: "Set dark theme as system preference", checked: false },
                   ].map((flag, idx) => (
                     <div key={idx} className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-all">
@@ -4478,7 +4687,7 @@ function DashboardView({
           </p>
         </div>
 
-        {/* 5. Career Trajectory Card */}
+        {/* 5. Career Roadmap Card */}
         <div 
           onClick={() => setActiveTab('career')}
           className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] border border-gray-150 dark:border-gray-800 shadow-sm hover:shadow-md hover:scale-[1.01] transition-all group cursor-pointer flex flex-col justify-between"
@@ -4488,17 +4697,17 @@ function DashboardView({
               <div className="p-2 bg-teal-50 dark:bg-teal-950/40 rounded-xl group-hover:bg-teal-100 dark:group-hover:bg-teal-900/60 transition-colors">
                 <Award className="w-6 h-6 text-teal-600 dark:text-teal-400" />
               </div>
-              <span className="text-xs font-black uppercase tracking-wider text-teal-500">Career Trajectory</span>
+              <span className="text-xs font-black uppercase tracking-wider text-teal-500">Career Roadmap</span>
             </div>
 
-            <h3 className="text-lg font-extrabold mb-1 dark:text-white">Trajectory Summary</h3>
+            <h3 className="text-lg font-extrabold mb-1 dark:text-white">Roadmap Summary</h3>
             <p className="text-xs text-gray-400 dark:text-gray-500">Plan learning pathways & status.</p>
 
             <div className="space-y-4 mt-5">
               <div className="bg-teal-50/10 dark:bg-teal-950/10 p-3 rounded-2xl border border-teal-100/20 dark:border-teal-900/20">
                 <span className="text-[10px] uppercase font-black text-teal-500 block leading-tight">Active Roadmap</span>
                 <span className="text-xs font-bold text-gray-800 dark:text-gray-100 leading-normal block mt-1">
-                  {path ? `${path.current_position} ➔ ${path.target_position}` : "No active trajectory"}
+                  {path ? `${path.current_position} ➔ ${path.target_position}` : "No active roadmap"}
                 </span>
               </div>
 
@@ -4515,7 +4724,7 @@ function DashboardView({
           </div>
 
           <p className="text-[10px] text-gray-400 dark:text-gray-500 uppercase mt-5 tracking-widest truncate">
-            {path ? `Category: ${path.category} | target ${path.target_year}` : "Launch a brand-new target trajectory"}
+            {path ? `Category: ${path.category} | target ${path.target_year}` : "Launch a brand-new target roadmap"}
           </p>
         </div>
 
@@ -5659,7 +5868,36 @@ function FinanceView({ expenses, setExpenses, onDelete, currency, setCurrency, t
   );
 }
 
-function StudyView({ courses, setCourses, onDeleteCourse, subscriptionTier = 'Free', setActiveTab }: { courses: StudyCourse[], setCourses: (c: StudyCourse[]) => void, onDeleteCourse: (id: string) => void, subscriptionTier?: string, setActiveTab?: (t: string) => void }) {
+function StudyView({ 
+  courses, 
+  setCourses, 
+  onDeleteCourse, 
+  subscriptionTier = 'Free', 
+  setActiveTab,
+  timetableEntries,
+  setTimetableEntries,
+  onDeleteTimetableEntry,
+  studySessions,
+  setStudySessions,
+  theme,
+  onLaunchFocusCentre
+}: { 
+  courses: StudyCourse[]; 
+  setCourses: (c: StudyCourse[]) => void; 
+  onDeleteCourse: (id: string) => void; 
+  subscriptionTier?: string; 
+  setActiveTab?: (t: string) => void;
+  timetableEntries: TimetableEntry[];
+  setTimetableEntries: (e: TimetableEntry[]) => void;
+  onDeleteTimetableEntry: (id: string) => void;
+  studySessions: StudySession[];
+  setStudySessions: React.Dispatch<React.SetStateAction<StudySession[]>>;
+  theme: 'light' | 'dark';
+  onLaunchFocusCentre?: (taskId?: string, courseId?: string) => void;
+}) {
+  const [activeSubTab, setActiveSubTab] = useState<'planner' | 'revision' | 'focus' | 'timetable' | 'analytics'>('planner');
+
+  // Classic planner state
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(courses[0]?.id || null);
   const [showAddCourse, setShowAddCourse] = useState(false);
   const [newCourseName, setNewCourseName] = useState("");
@@ -5671,6 +5909,26 @@ function StudyView({ courses, setCourses, onDeleteCourse, subscriptionTier = 'Fr
   
   const [showAddMaterial, setShowAddMaterial] = useState(false);
   const [newMaterialTitle, setNewMaterialTitle] = useState("");
+
+  // Focus Center timer state (Integrated with the Global Focus Centre)
+  const [selectedFocusCourseId, setSelectedFocusCourseId] = useState<string>(courses[0]?.id || "");
+
+  // Revision Calendar stats
+  const allExams = React.useMemo(() => {
+    const list: { id: string; title: string; date: string; courseName: string; courseColor: string }[] = [];
+    courses.forEach(c => {
+      c.exams?.forEach(e => {
+        list.push({
+          id: e.id,
+          title: e.title,
+          date: e.date,
+          courseName: c.name,
+          courseColor: c.color
+        });
+      });
+    });
+    return list.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [courses]);
 
   const selectedCourse = courses.find(c => c.id === selectedCourseId);
 
@@ -5739,24 +5997,43 @@ function StudyView({ courses, setCourses, onDeleteCourse, subscriptionTier = 'Fr
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-end">
+    <div className="space-y-6 animate-fade-in text-gray-900 dark:text-white pb-12">
+      {/* Top Main Command Center Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-150 dark:border-gray-800 pb-5">
         <div>
-          <h2 className="text-3xl font-bold dark:text-white">Study Command Center</h2>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Manage your courses, exams, and study materials manually.</p>
+          <h2 className="text-3xl font-black tracking-tight flex items-center gap-2">
+            <GraduationCap className="w-8 h-8 text-indigo-550 dark:text-indigo-400" />
+            <span>Study Command Center</span>
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">
+            Access your Syllabus, Revision milestones, interactive Timetable, and live Focus session widgets.
+          </p>
         </div>
-        <button 
-          onClick={() => {
-            if (subscriptionTier === 'Expired') {
-              setShowLimitModal(true);
-            } else {
-              setShowAddCourse(true);
-            }
-          }}
-          className="bg-black dark:bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 hover:scale-105 transition-transform"
-        >
-          <Plus className="w-4 h-4" /> Add Course
-        </button>
+
+        {/* Sub-Tabs Selector */}
+        <div className="flex bg-gray-50 dark:bg-gray-850 p-1 rounded-2xl overflow-x-auto max-w-full border border-gray-100 dark:border-gray-800">
+          {[
+            { id: 'planner', label: 'Planner & Syllabus', icon: BookOpen },
+            { id: 'revision', label: 'Revision Calendar', icon: Calendar },
+            { id: 'focus', label: 'Focus Center', icon: Timer },
+            { id: 'timetable', label: 'Timetable', icon: CalendarRange },
+            { id: 'analytics', label: 'Study Analytics', icon: BarChart3 }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveSubTab(tab.id as any)}
+              className={cn(
+                "px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl whitespace-nowrap transition-all flex items-center gap-2 cursor-pointer",
+                activeSubTab === tab.id
+                  ? "bg-white dark:bg-gray-700 text-indigo-600 dark:text-white shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-indigo-550"
+              )}
+            >
+              <tab.icon className="w-4 h-4" />
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {subscriptionTier === 'Expired' && (
@@ -5789,67 +6066,25 @@ function StudyView({ courses, setCourses, onDeleteCourse, subscriptionTier = 'Fr
         </div>
       )}
 
-
-
-      {showLimitModal && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/45 backdrop-blur-md">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[2.5rem] p-8 border border-indigo-150 dark:border-gray-800 shadow-2xl space-y-6 text-center relative"
-          >
+      {/* RENDER ACTIVE SUBTAB CONTENT */}
+      {activeSubTab === 'planner' && (
+        <div className="space-y-8 animate-fade-in">
+          <div className="flex justify-between items-center">
+            <h3 className="font-bold text-sm tracking-tight text-gray-800 dark:text-gray-200">Manual Syllabus & Course Planners</h3>
             <button 
-              onClick={() => setShowLimitModal(false)}
-              className="absolute top-6 right-6 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400"
+              onClick={() => {
+                if (subscriptionTier === 'Expired') {
+                  setShowLimitModal(true);
+                } else {
+                  setShowAddCourse(true);
+                }
+              }}
+              className="bg-black dark:bg-indigo-600 text-white px-5 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-2 hover:scale-105 transition-transform"
             >
-              <X className="w-4 h-4" />
+              <Plus className="w-4 h-4" /> Add Course
             </button>
-            <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto shadow-inner">
-              <Zap className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-pulse" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-black dark:text-white">7-Day Free Trial Completed</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                Your 7-day free trial has completed. Please subscribe to Premium below to unlock unlimited courses, exams, and files. Your current data is safe and in read-only mode!
-              </p>
-            </div>
-            <div className="pt-2 flex flex-col gap-2">
-              <button 
-                onClick={() => {
-                  setShowLimitModal(false);
-                  if (setActiveTab) setActiveTab('pricing');
-                }}
-                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-indigo-600/10 active:scale-95"
-              >
-                Upgrade to Premium ⚡
-              </button>
-              <button 
-                onClick={() => setShowLimitModal(false)}
-                className="w-full py-3.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold rounded-2xl transition-all text-xs"
-              >
-                Stay on Free version
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
+          </div>
 
-      <AnimatePresence>
-        {showAddCourse && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white dark:bg-gray-900 p-6 rounded-3xl border-2 border-black dark:border-indigo-600 flex gap-4 shadow-xl">
-             <input 
-              autoFocus
-              className="flex-1 bg-gray-50 dark:bg-gray-800 dark:text-white rounded-xl px-4 text-sm font-medium outline-none" 
-              placeholder="Course name (e.g. Advanced Calculus)..." 
-              value={newCourseName}
-              onChange={e => setNewCourseName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addCourse()}
-             />
-             <button onClick={addCourse} className="bg-black dark:bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold text-sm">Create</button>
-             <button onClick={() => setShowAddCourse(false)} className="bg-gray-100 dark:bg-gray-800 text-black dark:text-white px-6 py-2 rounded-xl font-bold text-sm">Cancel</button>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Sidebar: Course List */}
@@ -5885,156 +6120,287 @@ function StudyView({ courses, setCourses, onDeleteCourse, subscriptionTier = 'Fr
                   </button>
                 </div>
               ))}
-              {courses.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-600 italic">No courses added yet.</p>}
+              {courses.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-650 italic">No courses added yet.</p>}
            </div>
         </div>
 
-        {/* Main: Course Content */}
-        {selectedCourse ? (
-          <div className="lg:col-span-3 space-y-6">
-             <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 p-8 shadow-sm">
-                <div className="flex justify-between items-start mb-6">
-                   <div>
-                      <h3 className="font-bold text-2xl dark:text-white">{selectedCourse.name}</h3>
-                      <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{selectedCourse.materials.length} Topics • {selectedCourse.exams.length} Milestones</p>
-                   </div>
-                   <div className="text-right">
-                      <span className="text-3xl font-bold font-mono dark:text-white">{selectedCourse.progress}%</span>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest">Mastery</p>
-                   </div>
+        {/* Selected course details */}
+        <div className="lg:col-span-3">
+          {selectedCourse ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {/* Milestones Exams Tracker */}
+              <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-6 shadow-sm space-y-6">
+                <div className="flex justify-between items-center border-b border-gray-50 dark:border-gray-800 pb-3">
+                  <h4 className="font-bold text-sm tracking-tight flex items-center gap-2">
+                    <Award className="w-4 h-4 text-rose-500" />
+                    <span>Milestones & Exams</span>
+                  </h4>
+                  <button 
+                    onClick={() => setShowAddExam(!showAddExam)}
+                    className="p-1 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-indigo-550 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
                 </div>
-                
-                <div className="w-full h-4 bg-gray-50 dark:bg-gray-800 rounded-full overflow-hidden">
-                   <motion.div 
-                     initial={{ width: 0 }}
-                     animate={{ width: `${selectedCourse.progress}%` }}
-                     className={cn("h-full rounded-full transition-all duration-500", selectedCourse.color)}
-                   />
-                </div>
-             </div>
 
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Key Milestones (Exams) */}
-                <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm">
-                   <div className="flex justify-between items-center mb-6">
-                      <h4 className="font-bold text-lg flex items-center gap-2 dark:text-white">
-                         <Calendar className="w-5 h-5 text-indigo-500" /> Key Milestones
-                      </h4>
+                <AnimatePresence>
+                  {showAddExam && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="space-y-3 overflow-hidden bg-gray-50 dark:bg-gray-800/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-800"
+                    >
+                      <input 
+                        placeholder="Milestone title (e.g. Midterm)" 
+                        className="w-full bg-white dark:bg-gray-900 rounded-xl px-3 py-2 text-xs font-bold border border-gray-200 dark:border-gray-800 outline-none text-gray-900 dark:text-white"
+                        value={newExam.title}
+                        onChange={e => setNewExam({ ...newExam, title: e.target.value })}
+                      />
+                      <input 
+                        type="date"
+                        className="w-full bg-white dark:bg-gray-900 rounded-xl px-3 py-2 text-xs font-bold border border-gray-200 dark:border-gray-800 outline-none text-gray-900 dark:text-white"
+                        value={newExam.date}
+                        onChange={e => setNewExam({ ...newExam, date: e.target.value })}
+                      />
+                      <button onClick={() => addExam(selectedCourse.id)} className="w-full py-2 bg-indigo-600 hover:bg-indigo-550 text-white rounded-xl font-bold text-xs uppercase tracking-wider">Add Exam</button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="space-y-3">
+                  {selectedCourse.exams?.map(exam => (
+                    <div key={exam.id} className="flex items-center justify-between p-3.5 bg-gray-50 dark:bg-gray-855 border border-gray-100 dark:border-gray-800/60 rounded-2xl text-xs">
+                      <div>
+                        <div className="font-bold">{exam.title}</div>
+                        <div className="text-gray-400 dark:text-gray-500 text-[10px] mt-0.5">{exam.date}</div>
+                      </div>
                       <button 
-                        onClick={() => setShowAddExam(!showAddExam)}
-                        className={cn("p-2 rounded-xl transition-all", showAddExam ? "bg-black dark:bg-indigo-600 text-white" : "bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-black dark:hover:text-white")}
+                        onClick={() => setCourses(courses.map(c => c.id === selectedCourse.id ? { ...c, exams: c.exams.filter(e => e.id !== exam.id) } : c))}
+                        className="text-gray-300 hover:text-red-500 p-1"
                       >
-                         {showAddExam ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                        <Trash2 className="w-4 h-4" />
                       </button>
-                   </div>
+                    </div>
+                  ))}
+                  {(!selectedCourse.exams || selectedCourse.exams.length === 0) && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 italic text-center py-4">No exam milestones listed yet.</p>
+                  )}
+                </div>
+              </div>
 
-                   <AnimatePresence>
-                     {showAddExam && (
-                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mb-6 space-y-3 overflow-hidden">
-                          <input 
-                            placeholder="Milestone title..." 
-                            className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white p-3 rounded-xl text-sm font-medium outline-none"
-                            value={newExam.title}
-                            onChange={e => setNewExam({...newExam, title: e.target.value})}
-                          />
-                          <input 
-                            type="date"
-                            className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white p-3 rounded-xl text-sm font-medium outline-none"
-                            value={newExam.date}
-                            onChange={e => setNewExam({...newExam, date: e.target.value})}
-                          />
-                          <button onClick={() => addExam(selectedCourse.id)} className="w-full py-3 bg-black dark:bg-indigo-600 text-white rounded-xl font-bold text-sm">Add Milestone</button>
-                       </motion.div>
-                     )}
-                   </AnimatePresence>
-
-                   <div className="space-y-4">
-                      {selectedCourse.exams.map(exam => (
-                        <div key={exam.id} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl group transition-all">
-                           <div>
-                              <p className="font-bold text-sm dark:text-gray-200">{exam.title}</p>
-                              <p className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase">{new Date(exam.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                           </div>
-                           <button 
-                             onClick={() => setCourses(courses.map(c => c.id === selectedCourse.id ? { ...c, exams: c.exams.filter(e => e.id !== exam.id) } : c))}
-                             className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white dark:hover:bg-gray-700 rounded-lg text-gray-300 dark:text-gray-600 hover:text-red-500 transition-all"
-                           >
-                              <X className="w-4 h-4" />
-                           </button>
-                        </div>
-                      ))}
-                      {selectedCourse.exams.length === 0 && <p className="text-sm text-gray-300 dark:text-gray-600 italic text-center py-4">No milestones scheduled.</p>}
-                   </div>
+              {/* Syllabus Checklist Material Manager */}
+              <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-6 shadow-sm md:col-span-2 space-y-6">
+                <div className="flex justify-between items-center border-b border-gray-50 dark:border-gray-800 pb-3">
+                  <h4 className="font-bold text-sm tracking-tight flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-cyan-500" />
+                    <span>Syllabus Checklist ({selectedCourse.materials?.length || 0} Topics)</span>
+                  </h4>
+                  <button 
+                    onClick={() => setShowAddMaterial(!showAddMaterial)}
+                    className="p-1 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-indigo-550 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
                 </div>
 
-                {/* Syllabus Checklist (Materials) */}
-                <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm">
-                   <div className="flex justify-between items-center mb-6">
-                      <h4 className="font-bold text-lg flex items-center gap-2 dark:text-white">
-                         <ListTodo className="w-5 h-5 text-emerald-500" /> Syllabus Checklist
-                      </h4>
+                <AnimatePresence>
+                  {showAddMaterial && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="flex gap-2 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-800"
+                    >
+                      <input 
+                        placeholder="Checklist topic/material..." 
+                        className="flex-1 bg-white dark:bg-gray-900 rounded-xl px-4 py-2.5 text-xs font-bold border border-gray-200 dark:border-gray-800 outline-none text-gray-900 dark:text-white"
+                        value={newMaterialTitle}
+                        onChange={e => setNewMaterialTitle(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && addMaterial(selectedCourse.id)}
+                      />
+                      <button onClick={() => addMaterial(selectedCourse.id)} className="bg-black dark:bg-indigo-600 hover:opacity-90 text-white rounded-xl font-bold text-xs uppercase tracking-wider px-5">Add</button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="space-y-2">
+                  {selectedCourse.materials?.map(material => (
+                    <div key={material.id} className="group flex items-center justify-between p-3.5 bg-gray-50/50 dark:bg-gray-850/40 border border-gray-100/50 dark:border-gray-800/40 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-855 transition-all text-xs">
+                      <div 
+                        className="flex items-center gap-3 cursor-pointer flex-1"
+                        onClick={() => toggleMaterial(selectedCourse.id, material.id)}
+                      >
+                        <div className={cn(
+                          "w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all",
+                          material.completed ? "bg-black dark:bg-indigo-600 border-black dark:border-indigo-600 text-white" : "border-gray-200 dark:border-gray-700"
+                        )}>
+                          {material.completed && <Check className="w-3.5 h-3.5" />}
+                        </div>
+                        <span className={cn("font-bold transition-colors", material.completed ? "text-gray-400 dark:text-gray-600 line-through" : "text-gray-700 dark:text-gray-300")}>{material.title}</span>
+                      </div>
                       <button 
-                        onClick={() => setShowAddMaterial(!showAddMaterial)}
-                        className={cn("p-2 rounded-xl transition-all", showAddMaterial ? "bg-black dark:bg-indigo-600 text-white" : "bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-black dark:hover:text-white")}
+                        onClick={() => setCourses(courses.map(c => c.id === selectedCourse.id ? { ...c, materials: c.materials.filter(m => m.id !== material.id) } : c))}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white dark:hover:bg-gray-750 rounded-lg text-gray-350 dark:text-gray-600 hover:text-red-500 transition-all"
                       >
-                         {showAddMaterial ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                        <X className="w-4 h-4" />
                       </button>
-                   </div>
-
-                   <AnimatePresence>
-                     {showAddMaterial && (
-                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mb-6 space-y-3 overflow-hidden">
-                          <input 
-                            placeholder="Topic title..." 
-                            className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white p-3 rounded-xl text-sm font-medium outline-none"
-                            value={newMaterialTitle}
-                            onChange={e => setNewMaterialTitle(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && addMaterial(selectedCourse.id)}
-                          />
-                          <button onClick={() => addMaterial(selectedCourse.id)} className="w-full py-3 bg-black dark:bg-indigo-600 text-white rounded-xl font-bold text-sm">Add Topic</button>
-                       </motion.div>
-                     )}
-                   </AnimatePresence>
-
-                   <div className="space-y-3">
-                      {selectedCourse.materials.map(material => (
-                        <div key={material.id} className="group flex items-center justify-between p-3 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-all">
-                           <div 
-                             className="flex items-center gap-3 cursor-pointer flex-1"
-                             onClick={() => toggleMaterial(selectedCourse.id, material.id)}
-                           >
-                              <div className={cn(
-                                "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all",
-                                material.completed ? "bg-black dark:bg-indigo-600 border-black dark:border-indigo-600 text-white" : "border-gray-200 dark:border-gray-700"
-                              )}>
-                                 {material.completed && <CheckCircle2 className="w-4 h-4" />}
-                              </div>
-                              <span className={cn("text-sm font-medium transition-colors", material.completed ? "text-gray-400 dark:text-gray-600 line-through" : "text-gray-700 dark:text-gray-300")}>{material.title}</span>
-                           </div>
-                           <button 
-                             onClick={() => setCourses(courses.map(c => c.id === selectedCourse.id ? { ...c, materials: c.materials.filter(m => m.id !== material.id) } : c))}
-                             className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white dark:hover:bg-gray-700 rounded-lg text-gray-300 dark:text-gray-600 hover:text-red-500 transition-all"
-                           >
-                              <X className="w-4 h-4" />
-                           </button>
-                        </div>
-                      ))}
-                      {selectedCourse.materials.length === 0 && <p className="text-sm text-gray-300 dark:text-gray-600 italic text-center py-4">Add your syllabus topics here.</p>}
-                   </div>
+                    </div>
+                  ))}
+                  {(!selectedCourse.materials || selectedCourse.materials.length === 0) && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 italic text-center py-6">No syllabus topics added. Click "+" to start scheduling your course topics!</p>
+                  )}
                 </div>
-             </div>
-          </div>
-        ) : (
-          <div className="lg:col-span-3 flex items-center justify-center h-[500px] border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-[3rem] bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm">
-             <div className="text-center">
-                <GraduationCap className="w-12 h-12 text-gray-200 dark:text-gray-800 mx-auto mb-4" />
-                <h3 className="font-bold text-gray-400 dark:text-gray-600">Select a course from the sidebar to begin managing your studies.</h3>
-             </div>
-          </div>
-        )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-[350px] border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-[2.5rem] bg-white/30 dark:bg-gray-900/30">
+              <div className="text-center">
+                <GraduationCap className="w-10 h-10 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
+                <h3 className="font-bold text-gray-400 dark:text-gray-500">Select a course to access planners</h3>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
-  );
+  )}
+
+  {/* REVISION CALENDAR */}
+  {activeSubTab === 'revision' && (
+    <RevisionCalendarView
+      courses={courses}
+      setCourses={setCourses}
+      studySessions={studySessions}
+      setStudySessions={setStudySessions}
+      timetableEntries={timetableEntries}
+      theme={theme}
+      onLaunchFocusCentre={onLaunchFocusCentre}
+      subscriptionTier={subscriptionTier}
+      setActiveTab={setActiveTab}
+    />
+  )}
+
+  {/* FOCUS CENTER (POMODORO) */}
+  {activeSubTab === 'focus' && (
+    <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 dark:from-indigo-950/20 dark:to-indigo-900/10 border border-indigo-100/80 dark:border-indigo-900/30 rounded-[2.5rem] p-10 shadow-sm animate-fade-in text-gray-900 dark:text-white flex flex-col items-center justify-center text-center max-w-4xl mx-auto space-y-8 min-h-[420px]">
+      <div className="p-4 bg-indigo-500/10 rounded-full text-indigo-600 dark:text-indigo-400">
+        <Timer className="w-12 h-12" />
+      </div>
+
+      <div className="space-y-3 max-w-xl">
+        <h3 className="font-black text-2xl tracking-tight text-indigo-950 dark:text-white">Upgraded Focus Centre</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+          We have consolidated all study timers and life focus modules into a brand new, highly capable 
+          <span className="font-bold text-indigo-600 dark:text-indigo-400"> Global Focus Centre</span>.
+        </p>
+      </div>
+
+      <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-6 shadow-sm w-full max-w-md space-y-5">
+        <div className="space-y-1.5 text-left">
+          <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">Select Study Course</label>
+          <select 
+            className="w-full bg-gray-50 dark:bg-gray-805 rounded-2xl px-4 py-3 text-xs font-bold border border-gray-100 dark:border-gray-800 outline-none focus:border-indigo-550 text-gray-900 dark:text-white"
+            value={selectedFocusCourseId}
+            onChange={(e) => setSelectedFocusCourseId(e.target.value)}
+          >
+            <option value="">General Productivity</option>
+            {courses.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <button 
+          onClick={() => onLaunchFocusCentre?.('', selectedFocusCourseId)}
+          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-wider py-4 px-6 rounded-2xl shadow-lg shadow-indigo-600/15 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <span>Launch Focus Centre</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-3 pt-4 border-t border-indigo-200/30 dark:border-indigo-900/20 w-full max-w-2xl text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+        <div className="flex items-center justify-center gap-2">⏱️ Pomodoro</div>
+        <div className="flex items-center justify-center gap-2">🧠 Deep Work Mode</div>
+        <div className="flex items-center justify-center gap-2">⏱️ Stopwatch</div>
+        <div className="flex items-center justify-center gap-2">🎵 Ambient Sounds</div>
+        <div className="flex items-center justify-center gap-2">📊 Focus Analytics</div>
+        <div className="flex items-center justify-center gap-2">📋 Productivity Reports</div>
+      </div>
+    </div>
+  )}
+
+  {/* NESTED TIMETABLE IN STUDY MODULE */}
+  {activeSubTab === 'timetable' && (
+    <div className="animate-fade-in text-gray-900 dark:text-white">
+      <TimetableView 
+        entries={timetableEntries} 
+        setEntries={setTimetableEntries} 
+        onDelete={onDeleteTimetableEntry} 
+        theme={theme} 
+        courses={courses}
+        studySessions={studySessions}
+        setStudySessions={setStudySessions}
+        onLaunchFocusCentre={onLaunchFocusCentre}
+      />
+    </div>
+  )}
+
+  {/* STUDY ANALYTICS */}
+  {activeSubTab === 'analytics' && (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-in text-gray-900 dark:text-white">
+      <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2.5rem] p-6 shadow-sm space-y-4">
+        <h4 className="font-bold text-sm tracking-tight">Syllabus Completion Checklist (%)</h4>
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={courses.map(c => ({ name: c.name, progress: c.progress }))}>
+              <XAxis dataKey="name" stroke="#888888" fontSize={10} tickLine={false} axisLine={false} />
+              <YAxis stroke="#888888" fontSize={10} tickLine={false} axisLine={false} />
+              <Tooltip />
+              <Bar dataKey="progress" fill="#6366F1" radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2.5rem] p-6 shadow-sm space-y-4">
+        <h4 className="font-bold text-sm tracking-tight">Study Hours logged per Course (mins)</h4>
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={courses.map(c => {
+              const totalMins = studySessions.filter(s => s.courseId === c.id).reduce((acc, curr) => acc + curr.durationMinutes, 0);
+              return { name: c.name, minutes: totalMins };
+            })}>
+              <XAxis dataKey="name" stroke="#888888" fontSize={10} tickLine={false} axisLine={false} />
+              <YAxis stroke="#888888" fontSize={10} tickLine={false} axisLine={false} />
+              <Tooltip />
+              <Bar dataKey="minutes" fill="#10B981" radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  )}
+
+  {/* Limiting upgrade modal placeholder */}
+  {showLimitModal && (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-900 border-2 border-indigo-600 max-w-sm rounded-[2.5rem] p-8 shadow-2xl text-center space-y-4 text-gray-900 dark:text-white">
+        <Lock className="w-10 h-10 text-indigo-600 mx-auto" />
+        <h3 className="text-lg font-black tracking-tight">SaaS Study Matrix Limit</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400">Your active workspace is in Free mode. Please upgrade to Premium or Trial to insert unlimited academic planners & milestones.</p>
+        <button 
+          onClick={() => { setShowLimitModal(false); if (setActiveTab) setActiveTab('pricing'); }}
+          className="bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase tracking-wider py-3 px-6 rounded-xl w-full"
+        >
+          Unlock Premium Space
+        </button>
+      </div>
+    </div>
+  )}
+</div>
+);
 }
 
 function GoalsView({ 
@@ -6272,112 +6638,733 @@ function GoalsView({
   );
 }
 
-function TimetableView({ entries, setEntries, onDelete, theme }: { entries: TimetableEntry[], setEntries: (e: TimetableEntry[]) => void, onDelete: (id: string) => void, theme: 'light' | 'dark' }) {
+function OldTimetableView({ entries, setEntries, onDelete, theme }: { entries: TimetableEntry[], setEntries: (e: TimetableEntry[]) => void, onDelete: (id: string) => void, theme: 'light' | 'dark' }) {
+  const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth()); // 0-11
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    return new Date().toISOString().split('T')[0];
+  });
+  const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('monthly');
+  const [filterType, setFilterType] = useState<string>('All'); // 'All' or TimetableType
   const [showAdd, setShowAdd] = useState(false);
-  const [newEntry, setNewEntry] = useState({ title: '', type: TimetableType.WEEKLY, date: '' });
+  
+  // New entry form state
+  const [newEntry, setNewEntry] = useState({
+    title: '',
+    type: TimetableType.WEEKLY,
+    date: selectedDate,
+    startTime: '09:00',
+    endTime: '10:00',
+    specifyTime: true,
+    color: 'bg-cyan-500'
+  });
+
+  // Keep newEntry.date in sync with selectedDate
+  useEffect(() => {
+    setNewEntry(prev => ({ ...prev, date: selectedDate }));
+  }, [selectedDate]);
 
   const addEntry = () => {
     if (!newEntry.title || !newEntry.date) return;
+    
     const e: TimetableEntry = {
       id: Math.random().toString(36).substr(2, 9),
       title: newEntry.title,
       type: newEntry.type,
       date: newEntry.date,
-      color: ['bg-cyan-500', 'bg-indigo-500', 'bg-rose-500', 'bg-emerald-500'][Math.floor(Math.random() * 4)]
+      color: newEntry.color,
+      startTime: newEntry.specifyTime ? newEntry.startTime : undefined,
+      endTime: newEntry.specifyTime ? newEntry.endTime : undefined
     };
+
     setEntries([...entries, e]);
-    setNewEntry({ title: '', type: TimetableType.WEEKLY, date: '' });
+    setNewEntry({
+      title: '',
+      type: TimetableType.WEEKLY,
+      date: selectedDate,
+      startTime: '09:00',
+      endTime: '10:00',
+      specifyTime: true,
+      color: 'bg-cyan-500'
+    });
     setShowAdd(false);
   };
 
+  const MONTH_NAMES = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  const formatTimeAMPM = (timeStr?: string) => {
+    if (!timeStr) return "All Day";
+    const parts = timeStr.split(':');
+    const hours = Number(parts[0]);
+    const minutes = Number(parts[1]);
+    if (isNaN(hours) || isNaN(minutes)) return timeStr;
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${String(minutes).padStart(2, '0')} ${ampm}`;
+  };
+
+  const calculateDuration = (start?: string, end?: string) => {
+    if (!start || !end) return "";
+    const [startH, startM] = start.split(':').map(Number);
+    const [endH, endM] = end.split(':').map(Number);
+    if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) return "";
+    
+    let diffMins = (endH * 60 + endM) - (startH * 60 + startM);
+    if (diffMins < 0) diffMins += 24 * 60; // crossover
+    
+    const h = Math.floor(diffMins / 60);
+    const m = diffMins % 60;
+    
+    if (h === 0) return `${m} mins`;
+    if (m === 0) return `${h} hr${h > 1 ? 's' : ''}`;
+    return `${h} hr${h > 1 ? 's' : ''} ${m} min${m > 1 ? 's' : ''}`;
+  };
+
+  const isEventActive = (entry: TimetableEntry) => {
+    if (!entry.startTime || !entry.endTime) return false;
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (entry.date !== todayStr) return false;
+    
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    
+    const [startH, startM] = entry.startTime.split(':').map(Number);
+    const [endH, endM] = entry.endTime.split(':').map(Number);
+    
+    if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) return false;
+    
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+    
+    if (startMinutes <= endMinutes) {
+      return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+    } else {
+      return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+    }
+  };
+
+  const selectedDateObject = new Date(selectedDate);
+  const selectedDateFormatted = isNaN(selectedDateObject.getTime()) 
+    ? selectedDate 
+    : selectedDateObject.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  // Filter entries
+  const filteredEntries = entries.filter(e => {
+    if (filterType === 'All') return true;
+    return e.type === filterType;
+  });
+
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-center">
+    <div className="space-y-8" id="yearly-timetable-view">
+      {/* View Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold dark:text-white">Life Timeline</h2>
-          <p className="text-gray-500 dark:text-gray-400">Visualize your path across weeks, months, and years.</p>
+          <h2 className="text-3xl font-black dark:text-white tracking-tight flex items-center gap-2">
+            <Calendar className="w-8 h-8 text-cyan-500" />
+            <span>Life Timeline & Calendar</span>
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">
+            Schedule specific time-to-time activities, classes, and study slots inside your yearly roadmap.
+          </p>
         </div>
-        <button onClick={() => setShowAdd(true)} className="bg-black dark:bg-indigo-600 text-white p-3 rounded-2xl hover:scale-105 transition-transform">
-          <Plus className="w-5 h-5" />
+        <button 
+          onClick={() => setShowAdd(true)} 
+          className="bg-cyan-500 hover:bg-cyan-600 text-white font-black text-xs uppercase tracking-wider px-5 py-3 rounded-2xl flex items-center gap-2 shadow-lg shadow-cyan-500/20 transition-all active:scale-95 cursor-pointer"
+        >
+          <Plus className="w-4 h-4" /> Schedule Block
         </button>
       </div>
 
+      {/* Control Filters and Layout Toggles */}
+      <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-4 rounded-3xl flex flex-col sm:flex-row justify-between items-center gap-4">
+        {/* Navigation & View Mode Toggles */}
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
+          <div className="flex items-center bg-gray-50 dark:bg-gray-800 p-1 rounded-2xl">
+            <button 
+              onClick={() => {
+                if (viewMode === 'monthly') {
+                  const prevM = currentMonth === 0 ? 11 : currentMonth - 1;
+                  const prevY = currentMonth === 0 ? currentYear - 1 : currentYear;
+                  setCurrentMonth(prevM);
+                  setCurrentYear(prevY);
+                } else {
+                  setCurrentYear(prev => prev - 1);
+                }
+              }}
+              className="p-2 text-gray-500 hover:text-indigo-500 hover:bg-white dark:hover:bg-gray-700 rounded-xl transition-all"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="px-3 font-black text-xs uppercase tracking-widest text-gray-800 dark:text-gray-200 min-w-[120px] text-center">
+              {viewMode === 'monthly' ? `${MONTH_NAMES[currentMonth]} ${currentYear}` : currentYear}
+            </span>
+            <button 
+              onClick={() => {
+                if (viewMode === 'monthly') {
+                  const nextM = currentMonth === 11 ? 0 : currentMonth + 1;
+                  const nextY = currentMonth === 11 ? currentYear + 1 : currentYear;
+                  setCurrentMonth(nextM);
+                  setCurrentYear(nextY);
+                } else {
+                  setCurrentYear(prev => prev + 1);
+                }
+              }}
+              className="p-2 text-gray-500 hover:text-indigo-500 hover:bg-white dark:hover:bg-gray-700 rounded-xl transition-all"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="flex bg-gray-50 dark:bg-gray-800 p-1 rounded-2xl">
+            <button 
+              onClick={() => setViewMode('monthly')}
+              className={cn(
+                "px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all",
+                viewMode === 'monthly' 
+                  ? "bg-indigo-600 text-white shadow-sm" 
+                  : "text-gray-500 dark:text-gray-400 hover:text-indigo-550"
+              )}
+            >
+              Monthly
+            </button>
+            <button 
+              onClick={() => setViewMode('yearly')}
+              className={cn(
+                "px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all",
+                viewMode === 'yearly' 
+                  ? "bg-indigo-600 text-white shadow-sm" 
+                  : "text-gray-500 dark:text-gray-400 hover:text-indigo-550"
+              )}
+            >
+              Yearly 12-Month
+            </button>
+          </div>
+        </div>
+
+        {/* Classification Filters */}
+        <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-2xl overflow-x-auto max-w-full">
+          {['All', TimetableType.WEEKLY, TimetableType.MONTHLY, TimetableType.YEARLY].map(type => (
+            <button
+              key={type}
+              onClick={() => setFilterType(type)}
+              className={cn(
+                "px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl whitespace-nowrap transition-all",
+                filterType === type 
+                  ? "bg-white dark:bg-gray-700 text-indigo-600 dark:text-white shadow-sm" 
+                  : "text-gray-500 dark:text-gray-400 hover:text-indigo-500"
+              )}
+            >
+              {type === 'All' ? 'All Slots' : type}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Creator Form Modal/Panel */}
       <AnimatePresence>
         {showAdd && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border-2 border-black dark:border-indigo-600 flex flex-col md:flex-row gap-4 items-end">
-            <div className="flex-1 space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Event/Milestone</label>
-              <input 
-                className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white rounded-xl px-4 py-2 text-sm font-medium outline-none" 
-                placeholder="e.g. Vacation, Product Launch" 
-                value={newEntry.title}
-                onChange={e => setNewEntry({...newEntry, title: e.target.value})}
-              />
-            </div>
-            <div className="w-full md:w-48 space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">View</label>
-              <select 
-                className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white rounded-xl px-4 py-2 text-sm font-medium outline-none appearance-none"
-                value={newEntry.type}
-                onChange={e => setNewEntry({...newEntry, type: e.target.value as TimetableType})}
+          <motion.div 
+            initial={{ opacity: 0, y: -15 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            exit={{ opacity: 0, y: -15 }} 
+            className="bg-white dark:bg-gray-900 p-6 md:p-8 rounded-[2.5rem] border-2 border-cyan-500 shadow-xl space-y-6"
+          >
+            <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-4">
+              <h3 className="font-black text-sm uppercase tracking-wider text-gray-900 dark:text-white flex items-center gap-2">
+                <Clock className="w-5 h-5 text-cyan-500" /> Specify Calendar Time-to-Time Block
+              </h3>
+              <button 
+                onClick={() => setShowAdd(false)}
+                className="text-gray-400 hover:text-red-500 transition-colors"
               >
-                <option value={TimetableType.WEEKLY} className="bg-white dark:bg-gray-900">Weekly</option>
-                <option value={TimetableType.MONTHLY} className="bg-white dark:bg-gray-900">Monthly</option>
-                <option value={TimetableType.YEARLY} className="bg-white dark:bg-gray-900">Yearly</option>
-              </select>
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <div className="w-full md:w-48 space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Date</label>
-              <input 
-                type="date"
-                className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white rounded-xl px-4 py-2 text-sm font-medium outline-none"
-                value={newEntry.date}
-                onChange={e => setNewEntry({...newEntry, date: e.target.value})}
-              />
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Event Title */}
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">Event / Schedule Title</label>
+                <input 
+                  className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white rounded-2xl px-5 py-3 text-sm font-bold border border-gray-100 dark:border-gray-800 outline-none focus:border-cyan-400 transition-colors" 
+                  placeholder="e.g., Deep Work: Software Engineering, Workout, UPSC Test" 
+                  value={newEntry.title}
+                  onChange={e => setNewEntry({...newEntry, title: e.target.value})}
+                />
+              </div>
+
+              {/* Scope Class */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">Roadmap Type</label>
+                <select 
+                  className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white rounded-2xl px-5 py-3 text-sm font-bold border border-gray-100 dark:border-gray-800 outline-none focus:border-cyan-400 transition-colors appearance-none"
+                  value={newEntry.type}
+                  onChange={e => setNewEntry({...newEntry, type: e.target.value as TimetableType})}
+                >
+                  <option value={TimetableType.WEEKLY}>Weekly Routine</option>
+                  <option value={TimetableType.MONTHLY}>Monthly Focus</option>
+                  <option value={TimetableType.YEARLY}>Yearly Milestone</option>
+                </select>
+              </div>
+
+              {/* Date Input */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">Calendar Date</label>
+                <input 
+                  type="date"
+                  className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white rounded-2xl px-5 py-3 text-sm font-bold border border-gray-100 dark:border-gray-800 outline-none focus:border-cyan-400 transition-colors"
+                  value={newEntry.date}
+                  onChange={e => setNewEntry({...newEntry, date: e.target.value})}
+                />
+              </div>
+
+              {/* Time specification Toggle */}
+              <div className="space-y-2 flex flex-col justify-end">
+                <label className="flex items-center gap-2.5 cursor-pointer pb-3 select-none">
+                  <input 
+                    type="checkbox"
+                    className="w-4 h-4 text-cyan-600 bg-gray-100 border-gray-350 rounded focus:ring-cyan-500 focus:ring-2 dark:bg-gray-700"
+                    checked={newEntry.specifyTime}
+                    onChange={e => setNewEntry({...newEntry, specifyTime: e.target.checked})}
+                  />
+                  <span className="text-[11px] font-black uppercase tracking-wider text-gray-650 dark:text-gray-300">Allow Specific Time-to-Time Slot</span>
+                </label>
+              </div>
+
+              {/* Hour inputs */}
+              {newEntry.specifyTime && (
+                <div className="grid grid-cols-2 gap-4 md:col-span-1">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">Start Time</label>
+                    <input 
+                      type="time"
+                      className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white rounded-2xl px-4 py-3 text-sm font-bold border border-gray-100 dark:border-gray-800 outline-none focus:border-cyan-400"
+                      value={newEntry.startTime}
+                      onChange={e => setNewEntry({...newEntry, startTime: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">End Time</label>
+                    <input 
+                      type="time"
+                      className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white rounded-2xl px-4 py-3 text-sm font-bold border border-gray-100 dark:border-gray-800 outline-none focus:border-cyan-400"
+                      value={newEntry.endTime}
+                      onChange={e => setNewEntry({...newEntry, endTime: e.target.value})}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Preset Color Selection */}
+              <div className="md:col-span-3 space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 block">Highlight Theme Color</label>
+                <div className="flex gap-2">
+                  {[
+                    { value: 'bg-cyan-500', name: 'Cyan' },
+                    { value: 'bg-indigo-500', name: 'Indigo' },
+                    { value: 'bg-rose-500', name: 'Rose' },
+                    { value: 'bg-emerald-500', name: 'Emerald' },
+                    { value: 'bg-amber-500', name: 'Amber' }
+                  ].map(c => (
+                    <button 
+                      key={c.value}
+                      type="button"
+                      onClick={() => setNewEntry({...newEntry, color: c.value})}
+                      className={cn(
+                        "w-8 h-8 rounded-full border-2 transition-transform hover:scale-110",
+                        c.value,
+                        newEntry.color === c.value ? "border-gray-900 dark:border-white scale-105" : "border-transparent"
+                      )}
+                      title={c.name}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <button onClick={addEntry} className="bg-black dark:bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold text-sm">Schedule</button>
-              <button onClick={() => setShowAdd(false)} className="bg-gray-100 dark:bg-gray-800 text-black dark:text-white px-6 py-2 rounded-xl font-bold text-sm">Cancel</button>
+
+            <div className="flex gap-3 justify-end pt-2">
+              <button 
+                onClick={() => setShowAdd(false)} 
+                className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold text-xs uppercase tracking-wider px-6 py-3 rounded-2xl hover:bg-gray-200 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={addEntry} 
+                className="bg-cyan-500 hover:bg-cyan-600 text-white font-black text-xs uppercase tracking-wider px-8 py-3 rounded-2xl transition-all shadow-md cursor-pointer"
+              >
+                Schedule Block
+              </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {[TimetableType.WEEKLY, TimetableType.MONTHLY, TimetableType.YEARLY].map(type => (
-          <div key={type} className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 min-h-[400px]">
-            <h3 className="font-bold text-xl mb-6 dark:text-white">{type} Roadmap</h3>
-            <div className="space-y-4">
-              {entries.filter(e => e.type === type).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(entry => (
-                <div key={entry.id} className="group relative flex gap-4">
-                   <div className="flex flex-col items-center">
-                     <div className={cn("w-3 h-3 rounded-full mt-1.5 shrink-0", entry.color)}></div>
-                     <div className="w-0.5 flex-1 bg-gray-100 dark:bg-gray-800 group-last:hidden"></div>
-                   </div>
-                   <div className="pb-6">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase">{new Date(entry.date).toLocaleDateString()}</span>
-                        <X 
-                          className="w-3 h-3 text-gray-300 dark:text-gray-600 cursor-pointer hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all" 
-                          onClick={() => {
-                            onDelete(entry.id);
-                            setEntries(entries.filter(e => e.id !== entry.id));
-                          }}
-                        />
+      {/* Main Grid Renderers */}
+      {viewMode === 'monthly' ? (
+        <OldLargeMonthGrid 
+          month={currentMonth}
+          year={currentYear}
+          entries={filteredEntries}
+          onDayClick={setSelectedDate}
+          selectedDate={selectedDate}
+          onAddClick={(date) => {
+            setSelectedDate(date);
+            setShowAdd(true);
+          }}
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {MONTH_NAMES.map((name, idx) => (
+            <OldMiniMonthGrid 
+              key={name}
+              month={idx}
+              year={currentYear}
+              entries={filteredEntries}
+              onDayClick={(dateStr) => {
+                setSelectedDate(dateStr);
+                setCurrentMonth(idx);
+                setViewMode('monthly');
+              }}
+              selectedDate={selectedDate}
+              onMonthClick={() => {
+                setCurrentMonth(idx);
+                setViewMode('monthly');
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Daily Agenda Detail Grid */}
+      <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-6 md:p-8 rounded-[2.5rem] shadow-sm grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-6">
+          <div>
+            <span className="text-[10px] uppercase font-black text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/40 px-3 py-1.5 rounded-lg">Selected Schedule Date</span>
+            <h3 className="text-xl font-black text-gray-950 dark:text-white tracking-tight mt-3">
+              {selectedDateFormatted}
+            </h3>
+          </div>
+
+          <div className="space-y-4">
+            {entries.filter(e => e.date === selectedDate).sort((a,b) => {
+              if (!a.startTime) return -1;
+              if (!b.startTime) return 1;
+              return a.startTime.localeCompare(b.startTime);
+            }).map(entry => {
+              const active = isEventActive(entry);
+              const duration = calculateDuration(entry.startTime, entry.endTime);
+
+              return (
+                <div 
+                  key={entry.id} 
+                  className={cn(
+                    "flex flex-col sm:flex-row sm:items-center justify-between p-5 rounded-2xl transition-all border relative overflow-hidden group",
+                    active 
+                      ? "bg-indigo-50/40 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-900/50 shadow-inner" 
+                      : "bg-gray-50/40 dark:bg-gray-950/40 border-gray-100 dark:border-gray-800/60"
+                  )}
+                >
+                  {/* Active highlight side indicator */}
+                  {active && (
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-550 animate-pulse" />
+                  )}
+
+                  <div className="flex items-start gap-4">
+                    {/* Event color code sphere */}
+                    <div className={cn("w-3.5 h-3.5 rounded-full mt-1.5 shrink-0 shadow-sm", entry.color)} />
+                    
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-sm text-gray-950 dark:text-white">{entry.title}</span>
+                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-md">
+                          {entry.type}
+                        </span>
+                        {active && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest bg-indigo-100/50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-550 shrink-0" /> Now Active
+                          </span>
+                        )}
                       </div>
-                      <p className="font-bold text-sm text-gray-900 dark:text-gray-200">{entry.title}</p>
-                   </div>
+                      
+                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 font-bold">
+                        <Clock className="w-3.5 h-3.5 text-gray-400" />
+                        <span>{formatTimeAMPM(entry.startTime)}</span>
+                        {entry.endTime && (
+                          <>
+                            <span>&rarr;</span>
+                            <span>{formatTimeAMPM(entry.endTime)}</span>
+                          </>
+                        )}
+                        {duration && (
+                          <span className="text-gray-400 dark:text-gray-500 font-medium">({duration})</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => {
+                      onDelete(entry.id);
+                      setEntries(entries.filter(e => e.id !== entry.id));
+                    }}
+                    className="mt-3 sm:mt-0 px-3 py-2 text-gray-400 hover:text-red-500 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/20 transition-all opacity-100 sm:opacity-0 group-hover:opacity-100 cursor-pointer text-left self-start sm:self-center"
+                    title="Delete scheduled block"
+                  >
+                    <Trash2 className="w-4 h-4 inline-block sm:block" />
+                  </button>
                 </div>
-              ))}
-              {entries.filter(e => e.type === type).length === 0 && (
-                <div className="text-center py-12">
-                   <Calendar className="w-8 h-8 text-gray-100 dark:text-gray-800 mx-auto mb-3" />
-                   <p className="text-xs text-gray-400 dark:text-gray-600 font-bold uppercase tracking-widest">Nothing scheduled</p>
+              );
+            })}
+
+            {entries.filter(e => e.date === selectedDate).length === 0 && (
+              <div className="text-center py-16 bg-gray-50/20 dark:bg-gray-950/20 border border-dashed border-gray-150 dark:border-gray-800 rounded-3xl">
+                <Calendar className="w-10 h-10 text-gray-200 dark:text-gray-800 mx-auto mb-4" />
+                <h4 className="text-xs font-black uppercase text-gray-400 dark:text-gray-500 tracking-wider">No Scheduled Time Blocks</h4>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5 max-w-xs mx-auto font-medium">
+                  Add a specific daily timetable block or class schedule for this date to unlock raw action.
+                </p>
+                <button 
+                  onClick={() => setShowAdd(true)}
+                  className="mt-5 text-[10px] font-black uppercase tracking-wider text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer"
+                >
+                  + Create First Block
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Calendar Side Summary statistics */}
+        <div className="bg-gray-50/50 dark:bg-gray-950/40 p-6 rounded-3xl border border-gray-100 dark:border-gray-800/80 space-y-6 self-start">
+          <h4 className="font-black text-xs uppercase tracking-widest text-gray-900 dark:text-white">Timeline Metrics</h4>
+          
+          <div className="space-y-4">
+            <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800/60 shadow-sm">
+              <span className="text-[9px] uppercase font-black text-gray-400">Total Year Slots</span>
+              <div className="text-2xl font-black text-gray-950 dark:text-white mt-1">
+                {entries.filter(e => e.date?.startsWith(String(currentYear))).length} <span className="text-xs font-bold text-gray-500">Scheduled</span>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800/60 shadow-sm">
+              <span className="text-[9px] uppercase font-black text-gray-400">This Month's Slots</span>
+              <div className="text-2xl font-black text-gray-950 dark:text-white mt-1">
+                {entries.filter(e => {
+                  const entryDate = new Date(e.date);
+                  return entryDate.getMonth() === currentMonth && entryDate.getFullYear() === currentYear;
+                }).length} <span className="text-xs font-bold text-gray-500">Active</span>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800/60 shadow-sm">
+              <span className="text-[9px] uppercase font-black text-gray-400">Classification</span>
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                <div className="text-center">
+                  <div className="text-xs font-black text-cyan-500">
+                    {entries.filter(e => e.type === TimetableType.WEEKLY).length}
+                  </div>
+                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-tight mt-0.5">Weekly</div>
                 </div>
-              )}
+                <div className="text-center border-x border-gray-100 dark:border-gray-800">
+                  <div className="text-xs font-black text-indigo-500">
+                    {entries.filter(e => e.type === TimetableType.MONTHLY).length}
+                  </div>
+                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-tight mt-0.5">Monthly</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xs font-black text-rose-500">
+                    {entries.filter(e => e.type === TimetableType.YEARLY).length}
+                  </div>
+                  <div className="text-[8px] font-bold text-gray-400 uppercase tracking-tight mt-0.5">Yearly</div>
+                </div>
+              </div>
             </div>
           </div>
-        ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OldMiniMonthGrid({ month, year, entries, onDayClick, selectedDate, onMonthClick }: { 
+  month: number, 
+  year: number, 
+  entries: TimetableEntry[], 
+  onDayClick: (dateStr: string) => void,
+  selectedDate: string,
+  onMonthClick: () => void,
+  key?: any
+}) {
+  const MONTH_NAMES = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+  const WEEKDAY_NAMES = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayIndex = new Date(year, month, 1).getDay();
+
+  const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const blanks = Array.from({ length: firstDayIndex }, (_, i) => i);
+
+  return (
+    <div className="bg-white dark:bg-gray-900 p-5 rounded-3xl border border-gray-150 dark:border-gray-800/80 hover:shadow-md transition-all flex flex-col h-[280px]">
+      <div className="flex justify-between items-center mb-3">
+        <button 
+          onClick={onMonthClick}
+          className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 text-left cursor-pointer"
+        >
+          {MONTH_NAMES[month]}
+        </button>
+        <span className="text-[9px] font-black text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800/60 px-1.5 py-0.5 rounded">
+          {entries.filter(e => {
+            const entryDate = new Date(e.date);
+            return entryDate.getMonth() === month && entryDate.getFullYear() === year;
+          }).length}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-[8px] font-black text-gray-400 dark:text-gray-500 text-center mb-1">
+        {WEEKDAY_NAMES.map(d => <span key={d}>{d}</span>)}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-center flex-1">
+        {blanks.map(b => <div key={`b-${b}`} className="aspect-square" />)}
+        {daysArray.map(day => {
+          const dayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const isSelected = selectedDate === dayStr;
+          const dayEntries = entries.filter(e => e.date === dayStr);
+          const hasEntries = dayEntries.length > 0;
+
+          return (
+            <button
+              key={day}
+              onClick={() => onDayClick(dayStr)}
+              className={cn(
+                "aspect-square flex flex-col items-center justify-center text-[10px] font-extrabold rounded-lg relative hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-all cursor-pointer",
+                isSelected ? "bg-indigo-600 text-white hover:bg-indigo-700 font-black shadow-sm" : "text-gray-800 dark:text-gray-200",
+                hasEntries && !isSelected && "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-black border border-cyan-500/25"
+              )}
+            >
+              <span>{day}</span>
+              {hasEntries && !isSelected && (
+                <span className="absolute bottom-1 w-1 h-1 bg-cyan-500 rounded-full" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function OldLargeMonthGrid({ month, year, entries, onDayClick, selectedDate, onAddClick }: {
+  month: number,
+  year: number,
+  entries: TimetableEntry[],
+  onDayClick: (dateStr: string) => void,
+  selectedDate: string,
+  onAddClick: (dateStr: string) => void
+}) {
+  const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const MONTH_NAMES = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayIndex = new Date(year, month, 1).getDay();
+
+  const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const blanks = Array.from({ length: firstDayIndex }, (_, i) => i);
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] border border-gray-150 dark:border-gray-800 shadow-sm p-6 overflow-x-auto">
+      <div className="min-w-[700px]">
+        <div className="grid grid-cols-7 gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 text-center mb-4">
+          {WEEKDAY_NAMES.map(d => <span key={d}>{d}</span>)}
+        </div>
+
+        <div className="grid grid-cols-7 gap-2 md:gap-3">
+          {blanks.map(b => (
+            <div key={`b-${b}`} className="aspect-square bg-gray-50/20 dark:bg-gray-950/10 rounded-2xl border border-transparent" />
+          ))}
+          
+          {daysArray.map(day => {
+            const dayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const isSelected = selectedDate === dayStr;
+            const dayEntries = entries.filter(e => e.date === dayStr).sort((a,b) => {
+              if (!a.startTime) return -1;
+              if (!b.startTime) return 1;
+              return a.startTime.localeCompare(b.startTime);
+            });
+            const hasEntries = dayEntries.length > 0;
+
+            return (
+              <div
+                key={day}
+                onClick={() => onDayClick(dayStr)}
+                className={cn(
+                  "aspect-square p-2.5 rounded-[1.5rem] border flex flex-col justify-between cursor-pointer transition-all hover:scale-[1.01]",
+                  isSelected 
+                    ? "bg-indigo-600 text-white border-indigo-700 shadow-lg shadow-indigo-500/20" 
+                    : "bg-gray-50/40 dark:bg-gray-950/40 text-gray-900 dark:text-gray-100 border-gray-100 dark:border-gray-800/80 hover:bg-gray-50 dark:hover:bg-gray-950"
+                )}
+              >
+                <div className="flex justify-between items-start">
+                  <span className={cn(
+                    "text-xs font-black w-6 h-6 rounded-full flex items-center justify-center",
+                    isSelected ? "bg-white/25 text-white" : ""
+                  )}>
+                    {day}
+                  </span>
+                  
+                  {hasEntries && (
+                    <span className="flex gap-1">
+                      {dayEntries.slice(0, 3).map((e, idx) => (
+                        <span key={idx} className={cn("w-1.5 h-1.5 rounded-full shrink-0 shadow-sm", e.color)} />
+                      ))}
+                    </span>
+                  )}
+                </div>
+
+                {/* Day entries list mini tags */}
+                <div className="flex flex-col gap-1 overflow-hidden mt-1.5 max-h-[65%]">
+                  {dayEntries.slice(0, 2).map((entry, idx) => (
+                    <div 
+                      key={idx} 
+                      className={cn(
+                        "text-[9px] px-1.5 py-0.5 rounded font-black truncate leading-tight flex items-center gap-1",
+                        isSelected 
+                          ? "bg-white/20 text-white" 
+                          : "bg-cyan-550/10 text-cyan-600 dark:text-cyan-400"
+                      )}
+                    >
+                      <span className={cn("w-1 h-1 rounded-full shrink-0", isSelected ? "bg-white" : entry.color)} />
+                      <span>{entry.startTime ? `${entry.startTime} ` : ""}{entry.title}</span>
+                    </div>
+                  ))}
+                  
+                  {dayEntries.length > 2 && (
+                    <div className={cn(
+                      "text-[8px] font-black text-right pr-1 uppercase tracking-tight",
+                      isSelected ? "text-white/80" : "text-gray-400 dark:text-gray-500"
+                    )}>
+                      +{dayEntries.length - 2} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -6412,6 +7399,418 @@ function PlaceholderView({ name }: { name: string }) {
         <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
         <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
         <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+      </div>
+    </div>
+  );
+}
+
+function OldProfileView({
+  referrals,
+  setReferrals,
+  userName,
+  setUserName,
+  theme,
+  setTheme,
+  subscriptionTier,
+  session,
+  setActiveTab
+}: {
+  referrals: any[];
+  setReferrals: (r: any[]) => void;
+  userName: string;
+  setUserName: (n: string) => void;
+  theme: 'light' | 'dark';
+  setTheme: (t: 'light' | 'dark') => void;
+  subscriptionTier: string;
+  session: any;
+  setActiveTab: (t: string) => void;
+}) {
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [timezone, setTimezone] = useState(() => localStorage.getItem('wrindha_timezone') || 'Asia/Kolkata');
+  const [language, setLanguage] = useState(() => localStorage.getItem('wrindha_language') || 'English');
+  const [notifEnabled, setNotifEnabled] = useState(() => localStorage.getItem('wrindha_notif_enabled') !== 'false');
+  const [profileMessage, setProfileMessage] = useState<string | null>(null);
+
+  const completedCount = referrals.filter(r => r.status === 'Completed').length;
+  const discountPct = Math.min(20, completedCount * 4);
+  const originalPrice = 59;
+  const currentPrice = originalPrice * (1 - discountPct / 100);
+
+  const referralCode = `WRINDHA-${session?.user?.id?.substr(0, 5).toUpperCase() || 'KALYAN'}`;
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(`Hey, join me on WrindhaOS—the ultimate productivity operating system! Use my referral code "${referralCode}" to get started: https://wrindha.com`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSendInvite = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteName.trim() || !inviteEmail.trim()) return;
+    const newRef = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: inviteName,
+      email: inviteEmail,
+      date: new Date().toISOString().split('T')[0],
+      status: 'Completed' as const
+    };
+    setReferrals([...referrals, newRef]);
+    setInviteName("");
+    setInviteEmail("");
+    setProfileMessage("Referral invitation simulated successfully! Your active discount has been updated.");
+    setTimeout(() => setProfileMessage(null), 4000);
+  };
+
+  const handleRemoveReferral = (id: string) => {
+    setReferrals(referrals.filter(r => r.id !== id));
+  };
+
+  const handleSaveProfile = () => {
+    localStorage.setItem('wrindha_timezone', timezone);
+    localStorage.setItem('wrindha_language', language);
+    localStorage.setItem('wrindha_notif_enabled', notifEnabled.toString());
+    setProfileMessage("Your account preferences have been saved successfully.");
+    setTimeout(() => setProfileMessage(null), 4000);
+  };
+
+  return (
+    <div className="space-y-8 animate-fade-in text-gray-900 dark:text-white pb-12">
+      {/* Profile Banner */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-150 dark:border-gray-800 pb-5">
+        <div>
+          <h2 className="text-3xl font-black tracking-tight flex items-center gap-2">
+            <User className="w-8 h-8 text-teal-500" />
+            <span>Profile Dashboard</span>
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">
+            Manage your credentials, referral rewards, premium theme setups, and active memberships.
+          </p>
+        </div>
+
+        {profileMessage && (
+          <div className="px-4 py-2.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-2xl border border-emerald-200 dark:border-emerald-900/50 flex items-center gap-2">
+            <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+            <span>{profileMessage}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column: Account Settings & Themes */}
+        <div className="lg:col-span-1 space-y-8">
+          {/* Account Card */}
+          <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-6 shadow-sm space-y-6">
+            <h3 className="font-bold text-base tracking-tight flex items-center gap-2 border-b border-gray-50 dark:border-gray-800 pb-3">
+              <Settings className="w-5 h-5 text-indigo-500" />
+              <span>Account Settings</span>
+            </h3>
+
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">Your Full Name</label>
+                <input 
+                  type="text"
+                  className="w-full bg-gray-50 dark:bg-gray-800 rounded-2xl px-4 py-2.5 text-sm font-bold border border-gray-100 dark:border-gray-800 outline-none focus:border-indigo-500 transition-colors"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  placeholder="Your Name"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">Registered Email</label>
+                <input 
+                  type="email"
+                  disabled
+                  className="w-full bg-gray-100 dark:bg-gray-800/40 opacity-70 cursor-not-allowed rounded-2xl px-4 py-2.5 text-sm font-bold border border-gray-150 dark:border-gray-800"
+                  value={session?.user?.email || "guest@wrindha.com"}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">Timezone Preference</label>
+                <select 
+                  className="w-full bg-gray-50 dark:bg-gray-800 rounded-2xl px-4 py-2.5 text-sm font-bold border border-gray-100 dark:border-gray-800 outline-none focus:border-indigo-500 appearance-none"
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
+                >
+                  <option value="Asia/Kolkata">Asia/Kolkata (UTC +5:30)</option>
+                  <option value="UTC">UTC (Coordinated Universal Time)</option>
+                  <option value="US/Eastern">US/Eastern (UTC -5:00)</option>
+                  <option value="US/Pacific">US/Pacific (UTC -8:00)</option>
+                  <option value="Europe/London">Europe/London (UTC +0:00)</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">Locale Language</label>
+                <select 
+                  className="w-full bg-gray-50 dark:bg-gray-800 rounded-2xl px-4 py-2.5 text-sm font-bold border border-gray-100 dark:border-gray-800 outline-none focus:border-indigo-500 appearance-none"
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                >
+                  <option value="English">English (US/UK)</option>
+                  <option value="Hindi">हिन्दी (Hindi)</option>
+                  <option value="Spanish">Español (Spanish)</option>
+                  <option value="German">Deutsch (German)</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between py-2 border-t border-gray-50 dark:border-gray-800 mt-4">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold">Email Alerts & Notifications</span>
+                  <span className="text-[10px] text-gray-400 dark:text-gray-500">Receive weekly analytical digests</span>
+                </div>
+                <button
+                  onClick={() => setNotifEnabled(!notifEnabled)}
+                  className={cn(
+                    "w-12 h-6 rounded-full p-1 transition-colors duration-200 outline-none focus:ring-2 focus:ring-indigo-500",
+                    notifEnabled ? "bg-indigo-600" : "bg-gray-200 dark:bg-gray-700"
+                  )}
+                >
+                  <div className={cn(
+                    "w-4 h-4 bg-white rounded-full transition-transform duration-200",
+                    notifEnabled ? "translate-x-6" : "translate-x-0"
+                  )} />
+                </button>
+              </div>
+
+              <button 
+                onClick={handleSaveProfile}
+                className="w-full bg-black dark:bg-indigo-600 hover:opacity-90 text-white font-bold text-xs uppercase tracking-wider py-3 rounded-2xl transition-all mt-2 cursor-pointer"
+              >
+                Save Preferences
+              </button>
+            </div>
+          </div>
+
+          {/* Premium Themes Card */}
+          <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-6 shadow-sm space-y-4">
+            <h3 className="font-bold text-base tracking-tight flex items-center gap-2 border-b border-gray-50 dark:border-gray-800 pb-3">
+              <Sparkles className="w-5 h-5 text-purple-500" />
+              <span>Premium Aesthetics</span>
+            </h3>
+
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              Toggle the overall visual tone of the system. Light & Dark themes are masterfully optimized for eye-comfort.
+            </p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <button 
+                onClick={() => setTheme('light')}
+                className={cn(
+                  "p-4 border rounded-2xl flex flex-col items-center justify-center gap-2 transition-all active:scale-95",
+                  theme === 'light' 
+                    ? "border-teal-500 bg-teal-50/20 text-teal-600 dark:text-teal-400" 
+                    : "border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
+                )}
+              >
+                <div className="w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center">
+                  <span className="text-amber-500 text-lg">☀️</span>
+                </div>
+                <span className="text-xs font-bold">Light Mode</span>
+              </button>
+
+              <button 
+                onClick={() => setTheme('dark')}
+                className={cn(
+                  "p-4 border rounded-2xl flex flex-col items-center justify-center gap-2 transition-all active:scale-95",
+                  theme === 'dark' 
+                    ? "border-purple-500 bg-purple-950/20 text-purple-400" 
+                    : "border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
+                )}
+              >
+                <div className="w-8 h-8 rounded-full bg-slate-950 border border-gray-800 flex items-center justify-center shadow-lg shadow-purple-500/10">
+                  <span className="text-purple-400 text-lg">🌙</span>
+                </div>
+                <span className="text-xs font-bold">Dark Mode</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Referrals & Pricing Plans */}
+        <div className="lg:col-span-2 space-y-8">
+          {/* Referrals & Discount Rewards */}
+          <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-50 dark:border-gray-800 pb-4">
+              <div>
+                <h3 className="font-bold text-lg tracking-tight flex items-center gap-2">
+                  <Users className="w-5 h-5 text-teal-500" />
+                  <span>Refer & Save System</span>
+                </h3>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                  Share your passion for WrindhaOS. Get a recurring discount for every friend who signs up!
+                </p>
+              </div>
+
+              <div className="bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/30 rounded-2xl px-4 py-2 flex flex-col items-center justify-center">
+                <span className="text-[9px] uppercase tracking-wider text-teal-600 dark:text-teal-400 font-black">Active Discount</span>
+                <span className="text-xl font-black text-teal-600 dark:text-teal-400">{discountPct}% OFF</span>
+              </div>
+            </div>
+
+            {/* Referral Dashboard KPI Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100/50 dark:border-gray-800">
+                <span className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider">Friends Joined</span>
+                <div className="text-xl font-black mt-1 font-mono">{completedCount} / 5</div>
+                <div className="w-full bg-gray-200 dark:bg-gray-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                  <div className="bg-teal-500 h-full rounded-full transition-all" style={{ width: `${(completedCount / 5) * 100}%` }}></div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100/50 dark:border-gray-800">
+                <span className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider">Base Premium Price</span>
+                <div className="text-xl font-black mt-1 font-mono">₹{originalPrice}.00<span className="text-xs font-normal text-gray-400">/mo</span></div>
+                <span className="text-[9px] text-gray-400 mt-2 block">Standard rate</span>
+              </div>
+
+              <div className="p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100/50 dark:border-gray-800">
+                <span className="text-[10px] text-teal-500 font-bold uppercase tracking-wider">Effective Premium Price</span>
+                <div className="text-xl font-black text-teal-500 mt-1 font-mono">₹{currentPrice.toFixed(2)}<span className="text-xs font-normal text-gray-400">/mo</span></div>
+                <span className="text-[9px] text-teal-600 dark:text-teal-400 font-bold mt-2 block">Your personalized pricing!</span>
+              </div>
+            </div>
+
+            {/* Share Code Widget */}
+            <div className="bg-gray-50 dark:bg-gray-850 p-5 rounded-2xl border border-gray-100 dark:border-gray-800/80 space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">Your Unique Referral Invite link</label>
+              <div className="flex gap-2">
+                <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl px-4 py-3 font-mono text-sm font-bold flex-1 select-all break-all text-indigo-600 dark:text-indigo-400">
+                  {referralCode}
+                </div>
+                <button 
+                  onClick={handleCopyCode}
+                  className={cn(
+                    "px-4 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer",
+                    copied ? "bg-emerald-500 text-white" : "bg-black dark:bg-indigo-600 hover:opacity-90 text-white"
+                  )}
+                >
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  <span>{copied ? "Copied" : "Copy"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Send simulated invite for preview testing */}
+            <form onSubmit={handleSendInvite} className="bg-gray-50 dark:bg-gray-850 p-5 rounded-2xl border border-gray-100 dark:border-gray-800/80 space-y-4">
+              <h4 className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">Invite a Friend (Test Simulation)</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <input 
+                  type="text" 
+                  placeholder="Friend's Full Name"
+                  className="bg-white dark:bg-gray-900 rounded-xl px-4 py-2.5 text-xs font-bold border border-gray-200 dark:border-gray-800 outline-none focus:border-teal-400"
+                  value={inviteName}
+                  onChange={(e) => setInviteName(e.target.value)}
+                />
+                <input 
+                  type="email" 
+                  placeholder="Friend's Email Address"
+                  className="bg-white dark:bg-gray-900 rounded-xl px-4 py-2.5 text-xs font-bold border border-gray-200 dark:border-gray-800 outline-none focus:border-teal-400"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                />
+              </div>
+              <button 
+                type="submit"
+                className="bg-teal-500 hover:bg-teal-600 text-white text-[11px] font-black uppercase tracking-wider py-2.5 px-6 rounded-xl transition-all cursor-pointer w-full sm:w-auto"
+              >
+                Send simulated invite
+              </button>
+            </form>
+
+            {/* Invited History List */}
+            <div className="space-y-3">
+              <h4 className="font-bold text-sm tracking-tight text-gray-800 dark:text-gray-200">Friends Invited ({referrals.length})</h4>
+              {referrals.length === 0 ? (
+                <div className="p-6 border border-dashed border-gray-150 dark:border-gray-800 rounded-2xl text-center text-xs text-gray-400">
+                  No friends invited yet. Use your invite link to get started!
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-50 dark:divide-gray-800 border border-gray-100 dark:border-gray-800 rounded-2xl overflow-hidden bg-white dark:bg-gray-900">
+                  {referrals.map((ref) => (
+                    <div key={ref.id} className="flex items-center justify-between p-4 text-xs">
+                      <div>
+                        <div className="font-bold">{ref.name}</div>
+                        <div className="text-[10px] text-gray-400 dark:text-gray-500">{ref.email} • Invited on {ref.date}</div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-[10px] font-black rounded-full border border-emerald-100 dark:border-emerald-900/30 uppercase tracking-wide flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Joined
+                        </span>
+                        <button 
+                          onClick={() => handleRemoveReferral(ref.id)}
+                          className="text-gray-300 hover:text-red-500 p-1 transition-colors"
+                          title="Remove referral"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Premium Membership Benefits & Action */}
+          <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-bold text-lg tracking-tight flex items-center gap-2">
+                  <Award className="w-5 h-5 text-indigo-500" />
+                  <span>WrindhaOS Premium Benefits</span>
+                </h3>
+                <p className="text-xs text-gray-400 dark:text-gray-500">
+                  Enjoy the complete power of WrindhaOS without limitations.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-gray-400">Current Plan:</span>
+                <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 text-xs font-black rounded-full border border-indigo-100 dark:border-indigo-900/30 uppercase tracking-wider">
+                  {subscriptionTier}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {[
+                "Unlimited Habit Trackers & Custom Streaks",
+                "Unlimited Priority Eisenhower Matrix Tasks",
+                "Advanced Interactive Multi-tier Daily Timetables",
+                "In-depth Visual Analytics & Global Performance Reports",
+                "Full Financial Accounts & Budget tracking",
+                "Dedicated Study Planner, Focus Center, & Syllabus Suite",
+                "Career Roadmaps with Goal Pyramids Integration",
+                "Direct Priority VIP Support & Zero Ad Limits"
+              ].map((b, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                  <span className="font-bold text-gray-700 dark:text-gray-300">{b}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t border-gray-50 dark:border-gray-800 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div className="text-center sm:text-left">
+                <span className="text-xs text-gray-400 block">Pricing with 1 referral successful: ₹56.64/mo • 5 referrals successful: ₹47.20/mo</span>
+                <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">Your Current Personal Rate: ₹{currentPrice.toFixed(2)}/month</span>
+              </div>
+
+              <button 
+                onClick={() => setActiveTab('pricing')}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase tracking-wider px-8 py-3.5 rounded-2xl shadow-lg shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer"
+              >
+                Go to Plans & Billing
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -7321,9 +8720,13 @@ interface PricingViewProps {
   trialEndDateStr: string;
   nowSecure: number;
   razorpayServerEnabled?: boolean;
+  referrals?: any[];
 }
 
-function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription, session, setActiveTab, orders = [], trialStartDateStr, trialEndDateStr, nowSecure, razorpayServerEnabled = false }: PricingViewProps) {
+function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription, session, setActiveTab, orders = [], trialStartDateStr, trialEndDateStr, nowSecure, razorpayServerEnabled = false, referrals = [] }: PricingViewProps) {
+  const completedCount = referrals.filter(r => r.status === 'Completed').length;
+  const discountPct = Math.min(20, completedCount * 4);
+
   const [upgradingTo, setUpgradingTo] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
@@ -7390,7 +8793,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
     setCouponError(null);
 
     const rawPrice = parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''));
-    const originalPrice = rawPrice;
+    const originalPrice = rawPrice * (1 - discountPct / 100);
 
     try {
       const res = await authFetch(`${API_URL}/api/coupons/validate`, {
@@ -7558,7 +8961,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
     try {
       // Calculate precise plan pricing
       const rawPrice = parseFloat(plan.price.replace(/[^\d.]/g, ''));
-      const calculatedPrice = rawPrice;
+      const calculatedPrice = rawPrice * (1 - discountPct / 100);
 
       const finalPriceToOrder = appliedCoupon ? appliedCoupon.payableAmount : calculatedPrice;
 
@@ -7879,12 +9282,23 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                   )}
                 </div>
 
-                <div className="flex items-baseline gap-1 pt-2">
-                  <span className={cn("text-5xl font-black font-mono", isCurrent ? "text-white" : "text-gray-900 dark:text-white")}>
-                    {p.price.startsWith('₹') ? '₹' : p.price.startsWith('$') ? '$' : '₹'}
-                    {p.price.replace(/[^\d.]/g, '')}
-                  </span>
-                  <span className="text-gray-400 text-sm font-semibold">/ {p.period || 'month'}</span>
+                <div className="space-y-1">
+                  {discountPct > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs text-gray-400 line-through font-mono">
+                      {p.price.startsWith('₹') ? '₹' : p.price.startsWith('$') ? '$' : '₹'}
+                      {parseFloat(p.price.replace(/[^\d.]/g, '')).toFixed(2)}
+                    </div>
+                  )}
+                  <div className="flex items-baseline gap-1 pt-0.5">
+                    <span className={cn("text-5xl font-black font-mono", isCurrent ? "text-white" : "text-gray-900 dark:text-white")}>
+                      {p.price.startsWith('₹') ? '₹' : p.price.startsWith('$') ? '$' : '₹'}
+                      {(parseFloat(p.price.replace(/[^\d.]/g, '')) * (1 - discountPct / 100)).toFixed(2)}
+                    </span>
+                    <span className="text-gray-400 text-sm font-semibold">/ {p.period || 'month'}</span>
+                  </div>
+                  {discountPct > 0 && (
+                    <span className="text-[10px] text-teal-500 font-extrabold block">Your Personalized Referral Price ({discountPct}% Off!)</span>
+                  )}
                 </div>
 
                 <div className="h-[2px] bg-gray-100 dark:bg-gray-800/60 w-full"></div>
@@ -8044,7 +9458,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
               <div className="py-6 flex items-baseline justify-between">
                 <span className="text-sm font-black dark:text-white font-mono">Amount</span>
                 <span className="text-3xl font-black font-mono text-gray-900 dark:text-white">
-                  ₹59
+                  {selectedReceipt.currency === 'INR' ? '₹' : '$'}{parseFloat(selectedReceipt.amount).toFixed(2)}
                 </span>
               </div>
 
@@ -8065,7 +9479,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                         <hr style="border: 1px dashed #000; margin-top: 20px;" />
                         <h3 style="display: flex; justify-content: space-between; font-weight: 900; margin-top: 20px;">
                           <span>AMOUNT:</span>
-                          <span>₹59</span>
+                          <span>${selectedReceipt.currency === 'INR' ? '₹' : '$'}${parseFloat(selectedReceipt.amount).toFixed(2)}</span>
                         </h3>
                         <p style="text-align: center; color: #888; font-size: 10px; margin-top: 40px;">Thank you for upgrading! Your system credentials have been recompiled successfully.</p>
                       </div>
@@ -8201,7 +9615,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                         {appliedCoupon ? (
                           <>
                             <span className="text-xs line-through text-gray-400 dark:text-gray-500 mr-2 font-mono">
-                              ₹{parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''))}
+                              ₹{(parseFloat(checkoutPlan.price.replace(/[^\d.]/g, '')) * (1 - discountPct / 100)).toFixed(2)}
                             </span>
                             <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
                               ₹{appliedCoupon.payableAmount}
@@ -8209,10 +9623,21 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                             <p className="text-[10px] text-emerald-500 font-extrabold mt-0.5 font-sans">₹{appliedCoupon.discountAmount} Coupon Saved!</p>
                           </>
                         ) : (
-                          <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400 font-mono">
-                            {checkoutPlan.price.startsWith('₹') ? '₹' : checkoutPlan.price.startsWith('$') ? '$' : '₹'}
-                            {parseFloat(checkoutPlan.price.replace(/[^\d.]/g, ''))}
-                          </span>
+                          <>
+                            {discountPct > 0 && (
+                              <span className="text-xs line-through text-gray-400 dark:text-gray-500 mr-2 font-mono">
+                                {checkoutPlan.price.startsWith('₹') ? '₹' : checkoutPlan.price.startsWith('$') ? '$' : '₹'}
+                                {parseFloat(checkoutPlan.price.replace(/[^\d.]/g, '')).toFixed(2)}
+                              </span>
+                            )}
+                            <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400 font-mono">
+                              {checkoutPlan.price.startsWith('₹') ? '₹' : checkoutPlan.price.startsWith('$') ? '$' : '₹'}
+                              {(parseFloat(checkoutPlan.price.replace(/[^\d.]/g, '')) * (1 - discountPct / 100)).toFixed(2)}
+                            </span>
+                            {discountPct > 0 && (
+                              <p className="text-[10px] text-teal-500 font-extrabold mt-0.5 font-sans">{discountPct}% Referral Discount Applied!</p>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -8428,7 +9853,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
               <div className="py-6 flex items-baseline justify-between">
                 <span className="text-sm font-black dark:text-white font-mono">Amount</span>
                 <span className="text-3xl font-black font-mono text-gray-900 dark:text-white">
-                  ₹59
+                  {selectedReceipt.currency === 'INR' ? '₹' : '$'}{parseFloat(selectedReceipt.amount).toFixed(2)}
                 </span>
               </div>
 
@@ -8449,7 +9874,7 @@ function PricingView({ plans, subscriptionTier, onUpgrade, onCancelSubscription,
                         <hr style="border: 1px dashed #000; margin-top: 20px;" />
                         <h3 style="display: flex; justify-content: space-between; font-weight: 900; margin-top: 20px;">
                           <span>AMOUNT:</span>
-                          <span>₹59</span>
+                          <span>${selectedReceipt.currency === 'INR' ? '₹' : '$'}${parseFloat(selectedReceipt.amount).toFixed(2)}</span>
                         </h3>
                         <p style="text-align: center; color: #888; font-size: 10px; margin-top: 40px;">Thank you for upgrading! Your system credentials have been recompiled successfully.</p>
                       </div>

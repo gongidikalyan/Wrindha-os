@@ -40,21 +40,7 @@ export const gemini = {
 
   async getAiSuggestions(module: string, context: any) {
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (apiKey && apiKey !== "YOUR_GEMINI_API_KEY" && apiKey.trim() !== "") {
-        try {
-          const prompt = `Provide 3 actionable tips for my ${module} module. 
-            Context: ${JSON.stringify(context)}. 
-            Format: JSON array of strings.`;
-          
-          const result = await this.generateContent(prompt, "You are an elite productivity coach.");
-          // Clean summary output to avoid markdown block wrapping
-          const cleanText = result.replace(/```json/g, "").replace(/```/g, "").trim();
-          return JSON.parse(cleanText || "[]");
-        } catch (apiError) {
-          console.warn("Gemini API call failed, falling back to local offline suggestions:", apiError);
-        }
-      }
+      // Directly utilize the High-quality Offline Productivity Engine to keep the workspace completely private and secure without AI dependencies.
 
       // High-quality Offline Productivity Engine
       const habitsCount = context.habits || 0;

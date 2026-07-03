@@ -674,7 +674,7 @@ export default function CareerPlannerView({
         suggested_actions: []
       }
     });
-    setSyncToast("Career trajectory plan reset completed successfully.");
+    setSyncToast("Career roadmap plan reset completed successfully.");
   };
 
   // Integrations mapping sync to other modules
@@ -751,7 +751,7 @@ export default function CareerPlannerView({
                 </div>
                 {renderDbSyncStatus()}
               </div>
-              <h2 className="text-3xl font-black text-gray-950 dark:text-white tracking-tight">Manual Trajectory Planner</h2>
+              <h2 className="text-3xl font-black text-gray-950 dark:text-white tracking-tight">Manual Roadmap Planner</h2>
               <p className="text-gray-500 dark:text-gray-400 text-sm">
                 Map out your future roles, skill arrays, milestones, and courses manually. Complete tasks to level up your Power Score indexing.
               </p>
@@ -780,7 +780,7 @@ export default function CareerPlannerView({
                 type="text" 
                 required
                 className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white rounded-2xl px-5 py-4 text-sm font-bold border border-gray-100 dark:border-gray-800 outline-none focus:border-indigo-400 transition-colors"
-                placeholder="e.g. Lead AI Specialist, Government Administrator, Founder"
+                placeholder="e.g. Lead Software Architect, Government Administrator, Founder"
                 value={targetPosition}
                 onChange={e => setTargetPosition(e.target.value)}
               />
@@ -794,7 +794,7 @@ export default function CareerPlannerView({
                 onChange={e => setTargetYear(parseInt(e.target.value))}
               >
                 <option value={1}>1 Year (Short Interval)</option>
-                <option value={3}>3 Years (Medium Trajectory)</option>
+                <option value={3}>3 Years (Medium Roadmap)</option>
                 <option value={5}>5 Years (Strategic Transform)</option>
                 <option value={10}>10 Years (Ultimate Milestone)</option>
               </select>
@@ -862,7 +862,7 @@ export default function CareerPlannerView({
                 <span className="text-indigo-600 dark:text-indigo-400">{activePath.target_position}</span>
               </h2>
               <div className="border-l-4 border-indigo-400 pl-4 space-y-1.5 bg-indigo-50/20 dark:bg-indigo-950/20 py-2 pr-4 rounded-r-xl">
-                <h6 className="text-[10px] font-extrabold uppercase text-indigo-600 dark:text-indigo-300 tracking-wider">My Trajectory Goal Vision</h6>
+                <h6 className="text-[10px] font-extrabold uppercase text-indigo-600 dark:text-indigo-300 tracking-wider">My Roadmap Goal Vision</h6>
                 <p className="text-xs font-bold text-gray-900 dark:text-gray-100 max-w-2xl leading-relaxed">
                   "{activePath.vision_statement}"
                 </p>
@@ -893,7 +893,7 @@ export default function CareerPlannerView({
                   onClick={() => setShowResetConfirm(true)}
                   className="flex items-center gap-1.5 px-4 py-3 border border-red-200 dark:border-red-950/50 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 text-xs font-black rounded-xl transition-colors cursor-pointer"
                 >
-                  <Trash2 className="w-4 h-4" /> Reset Trajectory
+                  <Trash2 className="w-4 h-4" /> Reset Roadmap
                 </button>
               )}
             </div>

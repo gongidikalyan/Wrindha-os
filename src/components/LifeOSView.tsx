@@ -25,7 +25,8 @@ import {
   Brain,
   HelpCircle,
   BookOpen,
-  Grid
+  Grid,
+  ArrowRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "../lib/supabase";
@@ -60,6 +61,7 @@ interface LifeOSViewProps {
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
   studyCourses: any[];
   setStudyCourses: React.Dispatch<React.SetStateAction<any[]>>;
+  onLaunchFocusCentre?: (taskId?: string, courseId?: string) => void;
 }
 
 // ================= PARSING & SERIALIZING DATA =================
@@ -123,19 +125,17 @@ export default function LifeOSView({
   onDelete,
   subscriptionTier,
   setActiveTab,
-  habits
+  habits,
+  setHabits,
+  studyCourses,
+  setStudyCourses,
+  onLaunchFocusCentre
 }: LifeOSViewProps) {
   // Navigation Tabs for Unified Productivity OS: Plan (Pyramid), Organize (Kanban), Execute (Timeblock), Dashboard, Focus Timer
   const [activeSubTab, setActiveSubTab] = useState<"dashboard" | "pyramid" | "kanban" | "timeblock" | "focus" | "eisenhower">("dashboard");
 
-  // Enhanced Pomodoro focus states
-  const [focusTabMode, setFocusTabMode] = useState<"pomodoro" | "shortbreak" | "longbreak">("pomodoro");
-  const [focusDurations, setFocusDurations] = useState({
-    pomodoro: 25,
-    shortbreak: 5,
-    longbreak: 15,
-  });
-  const [completedPomodorosCount, setCompletedPomodorosCount] = useState<number>(0);
+  // Preselected task state for global Focus Centre shortcut
+  const [selectedFocusTaskId, setSelectedFocusTaskId] = useState<string>("");
 
   // Eisenhower Matrix input states
   const [eisenTitle, setEisenTitle] = useState("");
@@ -574,93 +574,10 @@ export default function LifeOSView({
     }
   };
 
-  // Focus Timer controls (Deep Work session)
+  // Focus Timer controls (Deep Work session - Delegated to the Global Focus Centre)
   const startFocusTimer = (node: PyramidNode) => {
-    setActiveTimerTask(node);
-    setTimerSecondsLeft(node.durationMinutes * 60 || 1500);
-    setTimerRunning(true);
+    onLaunchFocusCentre?.(node.id, '');
   };
-
-  const toggleFocusTimer = () => {
-    setTimerRunning(!timerRunning);
-  };
-
-  const resetFocusTimer = () => {
-    if (activeTimerTask) {
-      setTimerSecondsLeft(activeTimerTask.durationMinutes * 60 || 1500);
-    } else {
-      setTimerSecondsLeft(focusDurations[focusTabMode] * 60);
-    }
-    setTimerRunning(false);
-  };
-
-  // Helper to play synthesized chimes upon completion
-  const playFocusCompleteChime = () => {
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      
-      // Play a quick pleasant major chord chime (C5 -> E5 -> G5)
-      const playTone = (freq: number, start: number, duration: number) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(freq, start);
-        gain.gain.setValueAtTime(0, start);
-        gain.gain.linearRampToValueAtTime(0.2, start + 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
-        osc.start(start);
-        osc.stop(start + duration);
-      };
-
-      const now = ctx.currentTime;
-      playTone(523.25, now, 0.4);         // C5
-      playTone(659.25, now + 0.15, 0.4);  // E5
-      playTone(783.99, now + 0.3, 0.6);   // G5
-    } catch (e) {
-      console.warn("Chime playback paused/not allowed:", e);
-    }
-  };
-
-  // Handle focus countdown timer ticks
-  useEffect(() => {
-    if (timerRunning && timerSecondsLeft > 0) {
-      timerRef.current = setTimeout(() => {
-        setTimerSecondsLeft(v => v - 1);
-      }, 1000);
-    } else if (timerRunning && timerSecondsLeft === 0) {
-      setTimerRunning(false);
-      playFocusCompleteChime();
-
-      if (activeTimerTask) {
-        // Complete current block!
-        updateSupabaseNodeStatus(activeTimerTask.id, true, "completed");
-        setAiOutput(`🎉 Deep Work Accomplished! You completed a ${activeTimerTask.durationMinutes} minute focus block on: "${activeTimerTask.title}". Keep it up!`);
-        setCompletedPomodorosCount(prev => prev + 1);
-        setActiveTimerTask(null);
-      } else {
-        setCompletedPomodorosCount(prev => prev + 1);
-        if (focusTabMode === "pomodoro") {
-          setAiOutput(`🎉 Pomodoro Sprint Completed! You spent a pristine 25-minute block focused. Time to take a short break!`);
-          
-          // Auto switch to short break preset
-          setFocusTabMode("shortbreak");
-          setTimerSecondsLeft(focusDurations.shortbreak * 60);
-        } else {
-          setAiOutput(`🍀 Break completed! Let's conquer your next Pomodoro sprint now!`);
-          setFocusTabMode("pomodoro");
-          setTimerSecondsLeft(focusDurations.pomodoro * 60);
-        }
-      }
-    }
-
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [timerRunning, timerSecondsLeft, activeTimerTask, focusTabMode, focusDurations]);
 
   const formatTimerString = (sec: number) => {
     const mins = Math.floor(sec / 60);
@@ -817,7 +734,7 @@ export default function LifeOSView({
         >
           <Sparkles className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
           <div className="flex-1">
-            <span className="text-[10px] uppercase tracking-wider font-extrabold text-indigo-500 block mb-1">AI Assistant Guidance</span>
+            <span className="text-[10px] uppercase tracking-wider font-extrabold text-indigo-500 block mb-1">Strategic Priority Advice</span>
             <p className="text-gray-700 dark:text-gray-300 leading-relaxed font-medium">{aiOutput}</p>
           </div>
           <button 
@@ -997,56 +914,34 @@ export default function LifeOSView({
                     </div>
 
                     {/* FOCUS CONTROLS / POMODORO WIDGET */}
-                    {activeTimerTask ? (
-                      <div className="p-5 bg-indigo-500 text-white rounded-3xl text-center space-y-4">
-                        <span className="text-[9px] font-black uppercase tracking-wider block bg-indigo-600/30 px-3 py-1 rounded-full w-max mx-auto">Active Deep Work Block</span>
-                        <h4 className="font-bold text-xs truncate">{activeTimerTask.title}</h4>
-                        <div className="text-3xl font-black font-mono tracking-widest">{formatTimerString(timerSecondsLeft)}</div>
-                        <div className="flex justify-center gap-2">
-                          <button 
-                            onClick={toggleFocusTimer} 
-                            className="bg-white text-indigo-600 p-2.5 rounded-full hover:scale-105 active:scale-95 transition-all text-xs font-black uppercase cursor-pointer"
-                          >
-                            {timerRunning ? <Pause className="w-4 h-4 text-rose-500" /> : <Play className="w-4 h-4 text-emerald-500" />}
-                          </button>
-                          <button 
-                            onClick={resetFocusTimer} 
-                            className="bg-white/20 text-white p-2.5 rounded-full hover:bg-white/30 active:scale-95 transition-all cursor-pointer"
-                          >
-                            <RotateCcw className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {pyramidNodes
-                          .filter(n => (n.level === 3 || n.level === 4) && n.scheduledDate === todayStr)
-                          .slice(0, 3)
-                          .map(task => (
-                            <div key={task.id} className="p-3.5 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl flex items-center justify-between gap-3">
-                              <div className="min-w-0">
-                                <span className="text-[8px] font-mono font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded block w-max">
-                                  {task.scheduledTime || "09:00"} &bull; {task.durationMinutes}m
-                                </span>
-                                <h5 className="font-bold text-xs truncate dark:text-white mt-1">{task.title}</h5>
-                              </div>
-                              <button 
-                                onClick={() => startFocusTimer(task)}
-                                className="p-2 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-500 hover:text-white text-indigo-500 rounded-xl transition-colors cursor-pointer"
-                                title="Start Focus Session"
-                              >
-                                <Play className="w-3.5 h-3.5" />
-                              </button>
+                    <div className="space-y-3">
+                      {pyramidNodes
+                        .filter(n => (n.level === 3 || n.level === 4) && n.scheduledDate === todayStr)
+                        .slice(0, 3)
+                        .map(task => (
+                          <div key={task.id} className="p-3.5 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <span className="text-[8px] font-mono font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded block w-max">
+                                {task.scheduledTime || "09:00"} &bull; {task.durationMinutes}m
+                              </span>
+                              <h5 className="font-bold text-xs truncate dark:text-white mt-1">{task.title}</h5>
                             </div>
-                          ))}
-                        
-                        {pyramidNodes.filter(n => (n.level === 3 || n.level === 4) && n.scheduledDate === todayStr).length === 0 && (
-                          <div className="py-6 text-center text-xs italic text-gray-400">
-                            No time blocks scheduled for today. Drag or set actions under the Calendar tab!
+                            <button 
+                              onClick={() => startFocusTimer(task)}
+                              className="p-2 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-500 hover:text-white text-indigo-500 rounded-xl transition-colors cursor-pointer"
+                              title="Start Focus Session"
+                            >
+                              <Play className="w-3.5 h-3.5" />
+                            </button>
                           </div>
-                        )}
-                      </div>
-                    )}
+                        ))}
+                      
+                      {pyramidNodes.filter(n => (n.level === 3 || n.level === 4) && n.scheduledDate === todayStr).length === 0 && (
+                        <div className="py-6 text-center text-xs italic text-gray-400">
+                          No time blocks scheduled for today. Drag or set actions under the Calendar tab!
+                        </div>
+                      )}
+                    </div>
                   </div>
                   
                   <button 
@@ -1055,7 +950,7 @@ export default function LifeOSView({
                     className="w-full bg-black dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white font-bold text-xs py-3.5 rounded-2xl flex items-center justify-center gap-2 hover:opacity-95 transition-all mt-6 cursor-pointer"
                   >
                     <Sparkles className="w-4 h-4 text-amber-300" />
-                    {aiLoading ? "Consulting AI Engine..." : "Analyze priority recommendations"}
+                    {aiLoading ? "Analyzing Priorities..." : "Analyze priority recommendations"}
                   </button>
                 </div>
               </div>
@@ -1726,318 +1621,51 @@ export default function LifeOSView({
               className="space-y-6"
               id="focus-timer-section"
             >
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                
-                {/* COLUMN A: MAIN CHRONO CLOCK WIDGET (8 Cols) */}
-                <div className="lg:col-span-8 bg-white dark:bg-gray-950 p-6 md:p-12 rounded-[2.5rem] border border-gray-100 dark:border-gray-900 shadow-sm flex flex-col items-center justify-between text-center min-h-[500px]" id="focus-timer-card">
-                  
-                  {/* Presets Row */}
-                  <div className="flex bg-gray-100 dark:bg-gray-900/60 p-1.5 rounded-2xl gap-1 w-full max-w-md shadow-inner" id="focus-presets-bench">
-                    {[
-                      { id: "pomodoro", label: "Focus Sprint", duration: focusDurations.pomodoro },
-                      { id: "shortbreak", label: "Short Break", duration: focusDurations.shortbreak },
-                      { id: "longbreak", label: "Long Break", duration: focusDurations.longbreak }
-                    ].map(preset => (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => {
-                          if (timerRunning) {
-                            if (confirm("This resets the current active focus sprint. Continue?")) {
-                              setTimerRunning(false);
-                            } else {
-                              return;
-                            }
-                          }
-                          setFocusTabMode(preset.id as any);
-                          setTimerSecondsLeft(preset.duration * 60);
-                        }}
-                        className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          focusTabMode === preset.id 
-                            ? "bg-indigo-500 text-white shadow-md font-extrabold"
-                            : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
-                        }`}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Circular Clock Stage */}
-                  <div className="relative w-72 h-72 my-8 flex items-center justify-center select-none animate-pulse-slow">
-                    {/* SVG Progress Circle Background and Ring */}
-                    <svg className="w-full h-full transform -rotate-90">
-                      <circle 
-                        cx="144" 
-                        cy="144" 
-                        r="120" 
-                        className="stroke-gray-100 dark:stroke-gray-900 fill-none" 
-                        strokeWidth="8"
-                      />
-                      <motion.circle 
-                        cx="144" 
-                        cy="144" 
-                        r="120" 
-                        className={`${
-                          focusTabMode === "pomodoro" 
-                            ? "stroke-indigo-500 dark:stroke-indigo-400" 
-                            : "stroke-emerald-500 dark:stroke-emerald-400"
-                        } fill-none`} 
-                        strokeWidth="10"
-                        strokeLinecap="round"
-                        style={{
-                          strokeDasharray: 2 * Math.PI * 120,
-                          strokeDashoffset: (2 * Math.PI * 120) * (
-                            1 - (timerSecondsLeft / (
-                              (activeTimerTask ? activeTimerTask.durationMinutes : focusDurations[focusTabMode]) * 60 || 1500
-                            ))
-                          )
-                        }}
-                      />
-                    </svg>
-
-                    {/* Numeric Countdown Info inside Circle */}
-                    <div className="absolute flex flex-col items-center justify-center">
-                      <h2 className="text-5xl font-black font-mono tracking-widest text-gray-900 dark:text-white tabular-nums drop-shadow-sm">
-                        {formatTimerString(timerSecondsLeft)}
-                      </h2>
-                      <span className="text-[10px] tracking-widest font-black uppercase text-gray-400 dark:text-gray-500 mt-2 block">
-                        {focusTabMode === "pomodoro" ? "🔥 FOCUS PHASE" : "🌱 RENEW PHASE"}
-                      </span>
-                      
-                      {/* Sub-label showing link state */}
-                      <p className="text-xs text-indigo-500 dark:text-indigo-400 font-extrabold max-w-[180px] mt-2 block truncate">
-                        {activeTimerTask ? `🎯 ${activeTimerTask.title}` : "⚡ Free-form block"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Chrono Adjustments / Play Commands */}
-                  <div className="space-y-6 w-full">
-                    
-                    {/* Core Toggle Buttons */}
-                    <div className="flex items-center justify-center gap-4">
-                      
-                      {/* Decrement Time Option */}
-                      <button
-                        onClick={() => {
-                          setTimerSecondsLeft(v => Math.max(60, v - 60)); // - 1 min
-                        }}
-                        className="px-3.5 py-2 hover:bg-gray-100 dark:hover:bg-gray-900 text-gray-500 hover:text-black dark:hover:text-white rounded-xl border border-gray-100 dark:border-gray-800 text-xs font-bold transition-all cursor-pointer"
-                        title="-1 Minute"
-                      >
-                        - 1m
-                      </button>
-
-                      {/* Main Play Action */}
-                      <button 
-                        onClick={toggleFocusTimer} 
-                        id="btn-play-pause-timer"
-                        className={`w-16 h-16 rounded-full flex items-center justify-center text-white font-black hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-lg ${
-                          timerRunning 
-                            ? "bg-rose-500 hover:bg-rose-600 shadow-rose-500/20" 
-                            : "bg-indigo-500 hover:bg-indigo-600 shadow-indigo-500/20"
-                        }`}
-                      >
-                        {timerRunning ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-1" />}
-                      </button>
-
-                      {/* Reset Action */}
-                      <button 
-                        onClick={resetFocusTimer} 
-                        id="btn-reset-timer"
-                        className="p-4 bg-gray-100 dark:bg-gray-900 hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-full transition-colors cursor-pointer"
-                        title="Reset Timer"
-                      >
-                        <RotateCcw className="w-5 h-5" />
-                      </button>
-
-                      {/* Increment Time Option */}
-                      <button
-                        onClick={() => {
-                          setTimerSecondsLeft(v => v + 60); // + 1 min
-                        }}
-                        className="px-3.5 py-2 hover:bg-gray-100 dark:hover:bg-gray-900 text-gray-500 hover:text-black dark:hover:text-white rounded-xl border border-gray-100 dark:border-gray-800 text-xs font-bold transition-all cursor-pointer"
-                        title="+1 Minute"
-                      >
-                        + 1m
-                      </button>
-
-                    </div>
-
-                    <p className="text-[11px] text-gray-400 font-medium">
-                      Configure custom default presets on the right side if standard cycles don't fit.
-                    </p>
-                  </div>
-
+              <div className="bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/20 dark:to-purple-900/10 border border-purple-100/80 dark:border-purple-900/30 rounded-[2.5rem] p-10 shadow-sm text-gray-900 dark:text-white flex flex-col items-center justify-center text-center max-w-4xl mx-auto space-y-8 min-h-[420px]">
+                <div className="p-4 bg-purple-500/10 rounded-full text-purple-600 dark:text-purple-400">
+                  <Timer className="w-12 h-12" />
                 </div>
 
-                {/* COLUMN B: LINKING TARGETS & BENCH CONFIG (4 Cols) */}
-                <div className="lg:col-span-4 space-y-6">
-                  
-                  {/* 1. LINK PYRAMID MISSION PANEL */}
-                  <div className="bg-white dark:bg-gray-950 p-6 rounded-[2.5rem] border border-gray-100 dark:border-gray-900 shadow-sm space-y-4" id="link-pyramid-panel">
-                    <div>
-                      <h3 className="text-sm font-black dark:text-white flex items-center gap-2">
-                        <Target className="w-4 h-4 text-indigo-500" />
-                        Focus Target
-                      </h3>
-                      <p className="text-[11px] text-gray-400">Lock the timer to a specific Level 3 Task or Level 4 Daily Action</p>
-                    </div>
-
-                    <div className="space-y-3">
-                      <select
-                        id="focus-task-select"
-                        value={activeTimerTask?.id || ""}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (!val) {
-                            setActiveTimerTask(null);
-                            setTimerSecondsLeft(focusDurations[focusTabMode] * 60);
-                            return;
-                          }
-                          const node = pyramidNodes.find(item => item.id === val);
-                          if (node) {
-                            setActiveTimerTask(node);
-                            setTimerSecondsLeft(node.durationMinutes * 60 || 1500);
-                          }
-                        }}
-                        className="w-full py-2.5 px-3 bg-gray-50 dark:bg-gray-900 border border-gray-250 dark:border-gray-800 text-xs font-semibold rounded-2xl text-gray-800 dark:text-white outline-none cursor-pointer"
-                      >
-                        <option value="">-- Free-form Session --</option>
-                        
-                        {/* Group Level 3 Important Tasks */}
-                        <optgroup label="Level 3 - Important Tasks">
-                          {pyramidNodes
-                            .filter(n => n.level === 3 && !n.completed)
-                            .map(n => (
-                              <option key={n.id} value={n.id}>{n.title} ({n.durationMinutes}m)</option>
-                            ))
-                          }
-                        </optgroup>
-
-                        {/* Group Level 4 Daily Actions */}
-                        <optgroup label="Level 4 - Daily Actions">
-                          {pyramidNodes
-                            .filter(n => n.level === 4 && !n.completed)
-                            .map(n => (
-                              <option key={n.id} value={n.id}>{n.title} ({n.durationMinutes}m)</option>
-                            ))
-                          }
-                        </optgroup>
-                      </select>
-
-                      {activeTimerTask && (
-                        <div className="p-4 bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100/50 dark:border-indigo-900/30 rounded-2xl text-xs space-y-1">
-                          <span className="text-[9px] font-black uppercase text-indigo-500 font-mono block">Linked Objective Node</span>
-                          <h4 className="font-extrabold text-gray-800 dark:text-white">{activeTimerTask.title}</h4>
-                          <p className="text-[11px] text-gray-400">Completing this block automatically flags this task as 100% completed inside your database hierarchy.</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* 2. DURATION CONFIG PANEL */}
-                  <div className="bg-white dark:bg-gray-950 p-6 rounded-[2.5rem] border border-gray-100 dark:border-gray-900 shadow-sm space-y-4" id="focus-configuration-panel">
-                    <div>
-                      <h3 className="text-sm font-black dark:text-white flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-emerald-500" />
-                        Preset Intervals (min)
-                      </h3>
-                      <p className="text-[11px] text-gray-400">Design your work-break cycle durations</p>
-                    </div>
-
-                    <div className="space-y-4 text-xs">
-                      
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <label className="block text-[10px] text-gray-400 font-black uppercase mb-1">Sprint</label>
-                          <input 
-                            type="number" 
-                            min="1" 
-                            max="180" 
-                            id="focus-duration-input"
-                            value={focusDurations.pomodoro}
-                            onChange={(e) => {
-                              const val = Math.max(1, parseInt(e.target.value) || 25);
-                              setFocusDurations(prev => ({ ...prev, pomodoro: val }));
-                              if (focusTabMode === "pomodoro" && !timerRunning && !activeTimerTask) {
-                                setTimerSecondsLeft(val * 60);
-                              }
-                            }}
-                            className="w-full p-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl text-center text-xs font-bold"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] text-gray-400 font-black uppercase mb-1">Short</label>
-                          <input 
-                            type="number" 
-                            min="1" 
-                            max="60" 
-                            value={focusDurations.shortbreak}
-                            onChange={(e) => {
-                              const val = Math.max(1, parseInt(e.target.value) || 5);
-                              setFocusDurations(prev => ({ ...prev, shortbreak: val }));
-                              if (focusTabMode === "shortbreak" && !timerRunning && !activeTimerTask) {
-                                setTimerSecondsLeft(val * 60);
-                              }
-                            }}
-                            className="w-full p-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl text-center text-xs font-bold"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] text-gray-400 font-black uppercase mb-1">Long</label>
-                          <input 
-                            type="number" 
-                            min="1" 
-                            max="120" 
-                            value={focusDurations.longbreak}
-                            onChange={(e) => {
-                              const val = Math.max(1, parseInt(e.target.value) || 15);
-                              setFocusDurations(prev => ({ ...prev, longbreak: val }));
-                              if (focusTabMode === "longbreak" && !timerRunning && !activeTimerTask) {
-                                setTimerSecondsLeft(val * 60);
-                              }
-                            }}
-                            className="w-full p-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl text-center text-xs font-bold"
-                          />
-                        </div>
-                      </div>
-
-                    </div>
-                  </div>
-
-                  {/* 3. FOCUS STATS & METRICS SUMMARY */}
-                  <div className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white p-6 rounded-[2.5rem] shadow-md space-y-4" id="focus-performance-panel">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="text-[9px] font-black uppercase tracking-widest bg-white/20 px-2.5 py-1 rounded-full text-white block w-max">Sprint Ledger</span>
-                        <h3 className="text-md font-extrabold mt-2">Personal Momentum</h3>
-                      </div>
-                      <Award className="w-8 h-8 text-amber-300 mt-1 shrink-0" />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 pt-2">
-                      <div className="p-3 bg-white/10 rounded-2xl">
-                        <span className="text-[10px] font-bold text-indigo-150 block uppercase leading-none font-mono">COMPLETE TODAY</span>
-                        <span className="text-xl font-black block mt-1 leading-none">{completedPomodorosCount} Sprint{completedPomodorosCount !== 1 ? 's' : ''}</span>
-                      </div>
-
-                      <div className="p-3 bg-white/10 rounded-2xl">
-                        <span className="text-[10px] font-bold text-indigo-150 block uppercase leading-none font-mono">ACCUMULATED SESSIONS</span>
-                        <span className="text-xl font-black block mt-1 leading-none">{completedPomodorosCount * 25} Mins</span>
-                      </div>
-                    </div>
-
-                    <div className="p-3.5 bg-black/10 rounded-2xl text-[11px] leading-relaxed font-medium">
-                      🚀 "Focus on being productive instead of busy." Every Pomodoro block you complete fuels the dynamic priority progress bars in your overview cabinet! Leave notifications aside and focus.
-                    </div>
-                  </div>
-
+                <div className="space-y-3 max-w-xl">
+                  <h3 className="font-black text-2xl tracking-tight text-purple-950 dark:text-white">Upgraded Focus Centre</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                    All focus timers and deep-work settings have been consolidated into our newly optimized, globally accessible 
+                    <span className="font-bold text-purple-600 dark:text-purple-400"> Global Focus Centre</span>.
+                  </p>
                 </div>
 
+                <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-6 shadow-sm w-full max-w-md space-y-5">
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">Associate with Task</label>
+                    <select 
+                      className="w-full bg-gray-50 dark:bg-gray-805 rounded-2xl px-4 py-3 text-xs font-bold border border-gray-100 dark:border-gray-800 outline-none focus:border-purple-550 text-gray-900 dark:text-white"
+                      value={selectedFocusTaskId}
+                      onChange={(e) => setSelectedFocusTaskId(e.target.value)}
+                    >
+                      <option value="">General Deep Work</option>
+                      {tasks.filter(t => !t.completed).map(t => (
+                        <option key={t.id} value={t.id}>{t.title}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button 
+                    onClick={() => onLaunchFocusCentre?.(selectedFocusTaskId, '')}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-wider py-4 px-6 rounded-2xl shadow-lg shadow-purple-600/15 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span>Launch Focus Centre</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-3 pt-4 border-t border-purple-200/30 dark:border-purple-900/20 w-full max-w-2xl text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+                  <div className="flex items-center justify-center gap-2">⏱️ Pomodoro</div>
+                  <div className="flex items-center justify-center gap-2">🧠 Deep Work Mode</div>
+                  <div className="flex items-center justify-center gap-2">⏱️ Stopwatch</div>
+                  <div className="flex items-center justify-center gap-2">🎵 Ambient Sounds</div>
+                  <div className="flex items-center justify-center gap-2">📊 Focus Analytics</div>
+                  <div className="flex items-center justify-center gap-2">📋 Productivity Reports</div>
+                </div>
               </div>
             </motion.div>
           )}
